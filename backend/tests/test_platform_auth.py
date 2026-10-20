@@ -174,3 +174,16 @@ async def test_admin_page_is_admins_only(darlene: httpx.AsyncClient) -> None:
     r = await darlene.post("/api/admin/projects", json={"slug": "x-tool", "name": "X", "project_group": "other"})
     assert r.status_code == 403
     assert (await darlene.get("/api/admin/projects")).status_code == 200  # Digital Staff can read
+
+
+async def test_dev_picker_lists_staff_from_each_company_in_the_group(anon: httpx.AsyncClient) -> None:
+    people = (await anon.get("/api/auth/dev/users")).json()
+    staff = [p for p in people if p["role"] == "staff"]
+    assert {p["company"] for p in staff} == {"REDMEN", "ADAIR", "Offshore ops"}
+    assert all(p["company"] is None for p in people if p["role"] != "staff")
+
+    client = await signed_in(staff[0]["email"])
+    me = (await client.get("/api/me")).json()
+    assert (me["role"], me["name"]) == ("staff", staff[0]["name"])
+    assert (await client.get("/api/console/usage")).status_code == 403
+    await client.aclose()

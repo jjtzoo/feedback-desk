@@ -12,6 +12,7 @@ from app.config import get_settings
 from app.errors import ServiceError
 from app.models import DigitalStaff
 from app.schemas import MeOut
+from app.seed import demo_staff
 from app.services import auth as auth_service
 
 router = APIRouter(tags=["auth"])
@@ -91,20 +92,24 @@ class DevUserOut(BaseModel):
     email: str
     name: str
     role: str
+    company: str | None = None
+    title: str | None = None
 
 
 @router.get("/auth/dev/users", response_model=list[DevUserOut])
 async def dev_users(db: Db) -> list[DevUserOut]:
-    """Seeded people to sign in as, for the local stand-in only."""
+    """Seeded people to sign in as, for the local stand-in only: the Digital team, then made-up
+    staff from each company in the group."""
     s = get_settings()
     if not (s.dev_login and s.is_dev):
         return []
     staff = await db.scalars(
         select(DigitalStaff).where(DigitalStaff.active.is_(True)).order_by(DigitalStaff.role, DigitalStaff.name)
     )
-    return [
+    team = [
         DevUserOut(email=p.google_email, name=p.name, role="admin" if p.role == "admin" else "digital") for p in staff
     ]
+    return team + [DevUserOut(role="staff", **row) for row in demo_staff()]
 
 
 @router.post("/auth/dev/sign-in", status_code=204)

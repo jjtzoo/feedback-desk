@@ -14,6 +14,8 @@ interface DevUser {
   email: string;
   name: string;
   role: "staff" | "digital" | "admin";
+  company: string | null;
+  title: string | null;
 }
 
 const ERRORS: Record<string, string> = {
@@ -21,6 +23,16 @@ const ERRORS: Record<string, string> = {
   state: "That sign-in link expired. Please try again.",
   google: "Google sign-in didn't work. Please try again.",
 };
+/** The Digital team first, then made-up staff from each company in the group. */
+function groups(people: DevUser[]): [string, DevUser[]][] {
+  const out = new Map<string, DevUser[]>();
+  for (const p of people) {
+    const key = p.company ?? "Digital team";
+    out.set(key, [...(out.get(key) ?? []), p]);
+  }
+  return [...out];
+}
+
 const ROLE: Record<DevUser["role"], string> = { staff: "Staff", digital: "Digital Staff", admin: "Admin" };
 
 function SignIn() {
@@ -88,25 +100,30 @@ function SignIn() {
             <div className="mt-8 rounded-2xl border border-dashed bg-card p-4">
               <p className="text-sm font-semibold">Local development sign-in</p>
               <p className="mb-3 text-xs text-muted-foreground">Seed people. Local only (spec D23).</p>
-              <ul className="grid gap-1">
-                {people.map((p) => (
-                  <li key={p.email}>
-                    <button
-                      type="button"
-                      onClick={() => devSignIn(p.email)}
-                      disabled={busy !== null}
-                      className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-muted disabled:opacity-60"
-                    >
-                      <span className="grid size-8 place-items-center rounded-full bg-muted text-xs font-bold">{initials(p.name)}</span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{p.name}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{p.email}</span>
-                      </span>
-                      <span className="text-xs text-muted-foreground">{busy === p.email ? "Signing in…" : ROLE[p.role]}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              {groups(people).map(([group, list]) => (
+                <section key={group} aria-label={group} className="mt-3 first-of-type:mt-0">
+                  <h3 className="px-2 text-xs font-semibold text-muted-foreground">{group}</h3>
+                  <ul className="mt-1 grid gap-1">
+                    {list.map((p) => (
+                      <li key={p.email}>
+                        <button
+                          type="button"
+                          onClick={() => devSignIn(p.email)}
+                          disabled={busy !== null}
+                          className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-muted disabled:opacity-60"
+                        >
+                          <span className="grid size-8 place-items-center rounded-full bg-muted text-xs font-bold">{initials(p.name)}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold">{p.name}</span>
+                            <span className="block truncate text-xs text-muted-foreground">{p.title ?? p.email}</span>
+                          </span>
+                          <span className="text-xs text-muted-foreground">{busy === p.email ? "Signing in…" : ROLE[p.role]}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
             </div>
           )}
         </div>

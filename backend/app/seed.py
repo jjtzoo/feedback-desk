@@ -23,6 +23,11 @@ def load(name: str) -> list[dict[str, Any]]:
     return list(data[name])
 
 
+def demo_staff() -> list[dict[str, str]]:
+    """Made-up staff across the group (REDMEN, ADAIR, offshore ops) for local sign-in only."""
+    return [{k: str(v) for k, v in row.items()} for row in load("demo_staff")]
+
+
 async def seed_staff(db: AsyncSession, rows: list[dict[str, Any]]) -> int:
     added = 0
     for row in rows:

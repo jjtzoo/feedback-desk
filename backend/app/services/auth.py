@@ -21,6 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.errors import Forbidden, ServiceError
 from app.models import DigitalStaff, UserSession
+from app.seed import demo_staff
 from app.services.actors import User
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -139,7 +140,8 @@ async def dev_sign_in(db: AsyncSession, email: str, name: str | None) -> UserSes
     if not domain_allowed(email, domain):
         raise Forbidden("Feedback is only for REDADAIR Google accounts.")
     staff = await db.scalar(select(DigitalStaff).where(DigitalStaff.google_email == email))
-    display = name or (staff.name if staff else email.split("@")[0].replace(".", " ").title())
+    demo = next((d["name"] for d in demo_staff() if d["email"] == email), None)
+    display = name or (staff.name if staff else demo or email.split("@")[0].replace(".", " ").title())
     return await start_session(db, email, display, domain)
 
 

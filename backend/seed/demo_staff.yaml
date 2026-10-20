@@ -1,0 +1,10 @@
+# Made-up staff across the REDADAIR group, for trying the staff side locally (D23).
+# They are not stored anywhere: the local sign-in picker lists them, and signing in as one
+# works like any staff Google account. redadair.example is only accepted in local development.
+demo_staff:
+  - {email: liam.carter@redadair.example, name: Liam Carter, company: REDMEN, title: Service technician}
+  - {email: aisha.rahman@redadair.example, name: Aisha Rahman, company: REDMEN, title: Scheduling coordinator}
+  - {email: tom.nguyen@redadair.example, name: Tom Nguyen, company: ADAIR, title: Emergency planning consultant}
+  - {email: grace.obrien@redadair.example, name: Grace O'Brien, company: ADAIR, title: Training officer}
+  - {email: rafael.santos@redadair.example, name: Rafael Santos, company: Offshore ops, title: Operations supervisor}
+  - {email: mei.lin@redadair.example, name: Mei Lin, company: Offshore ops, title: Site safety officer}
