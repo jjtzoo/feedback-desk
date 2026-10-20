@@ -184,17 +184,6 @@
   animation-delay: calc(var(--i, 0) * 60ms);
 }
 
-@keyframes breathe {
-  50% {
-    transform: scale(1.05);
-  }
-}
-
-/* The assistant's idle state: a slow, small swell. Never red, never fast. */
-@utility animate-breathe {
-  animation: breathe 5s ease-in-out infinite;
-}
-
 /* Cards and rows rise slightly under the pointer and settle when released. */
 @utility lift {
   transition:
@@ -227,7 +216,6 @@
   }
 
   /* Loops stop; the static icon or skeleton fill stays. */
-  .animate-breathe,
   .animate-spin,
   .animate-pulse {
     animation: none !important;

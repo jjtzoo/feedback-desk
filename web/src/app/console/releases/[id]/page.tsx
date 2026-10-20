@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2, Plus, Save, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -144,13 +144,13 @@ export default function ReleaseReviewPage() {
               ])
             }
           >
-            <Plus /> Add item
+            Add item
           </Button>
           <Button variant="outline" className="h-11 rounded-xl" onClick={() => void save()} disabled={busy !== null}>
-            {busy === "save" ? <Loader2 className="animate-spin" /> : <Save />} Save draft
+            {busy === "save" && <Loader2 className="animate-spin" />} Save draft
           </Button>
           <Button className="h-11 rounded-xl px-5" onClick={() => void publish()} disabled={busy !== null || !items.some((i) => i.visible_to_staff)}>
-            {busy === "publish" ? <Loader2 className="animate-spin" /> : <Upload />} Approve and publish
+            {busy === "publish" && <Loader2 className="animate-spin" />} Approve and publish
           </Button>
         </div>
       )}

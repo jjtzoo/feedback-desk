@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Gavel, Hash, KanbanSquare, Menu, Megaphone, Settings2 } from "lucide-react";
+import { Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -15,12 +15,12 @@ import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/console", label: "Work", icon: KanbanSquare, exact: true },
-  { href: "/console/approvals", label: "Approvals", icon: Gavel, admin: true },
-  { href: "/console/channels", label: "Channels", icon: Hash },
-  { href: "/console/releases", label: "Releases", icon: Megaphone },
-  { href: "/console/dashboard", label: "Dashboard", icon: BarChart3 },
-  { href: "/console/admin", label: "Admin", icon: Settings2 },
+  { href: "/console", label: "Work", exact: true },
+  { href: "/console/approvals", label: "Approvals", admin: true },
+  { href: "/console/channels", label: "Channels" },
+  { href: "/console/releases", label: "Releases" },
+  { href: "/console/dashboard", label: "Dashboard" },
+  { href: "/console/admin", label: "Admin" },
 ];
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -28,7 +28,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const path = usePathname();
   return (
     <nav aria-label="Console" className="grid gap-1">
-      {NAV.filter((n) => !n.admin || me.role === "admin").map(({ href, label, icon: Icon, exact }) => {
+      {NAV.filter((n) => !n.admin || me.role === "admin").map(({ href, label, exact }) => {
         const active = exact ? path === href : path.startsWith(href);
         return (
           <Link
@@ -38,10 +38,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-              active && "bg-brand-tint text-brand-text hover:bg-brand-tint hover:text-brand-text",
+              active && "bg-muted text-foreground",
             )}
           >
-            <Icon className="size-[18px]" aria-hidden="true" /> {label}
+            {label}
           </Link>
         );
       })}
@@ -82,7 +82,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
             </SheetContent>
           </Sheet>
           <Brand href="/console" tone="dark" />
-          <span className="hidden rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold sm:inline">Console</span>
+          <span className="hidden text-sm text-band-muted sm:inline">Console</span>
           <div className="ml-auto flex items-center gap-1">
             <GuideButton area="console" tone="dark" />
             <NotificationBell tone="dark" />

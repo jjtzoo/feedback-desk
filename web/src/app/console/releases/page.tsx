@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Loader2, Wand2 } from "lucide-react";
+import { ChevronRight, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -49,12 +49,12 @@ export default function ReleasesPage() {
         <div>
           <h1 className="text-2xl font-extrabold">Releases</h1>
           <p className="text-sm text-muted-foreground">
-            Every Friday at 9:00 the agent drafts a release for each project with activity. Owners tick what staff see, edit, and publish.
+            Every Friday at 9:00 the agent drafts a release for each project with activity.
           </p>
         </div>
         {me.role === "admin" && (
           <Button variant="outline" className="h-11 rounded-xl" onClick={() => void draftNow()} disabled={drafting}>
-            {drafting ? <Loader2 className="animate-spin" /> : <Wand2 />} Draft this week now
+            {drafting && <Loader2 className="animate-spin" />} Draft this week now
           </Button>
         )}
       </div>
@@ -64,7 +64,7 @@ export default function ReleasesPage() {
       <ul className="grid gap-2">
         {releases?.map((r) => (
           <li key={r.id}>
-            <Link href={`/console/releases/${r.id}`} className="flex items-center gap-4 rounded-2xl border bg-card p-4 shadow-card hover:border-primary/40">
+            <Link href={`/console/releases/${r.id}`} className="flex items-center gap-4 rounded-2xl border bg-card p-4 shadow-card hover:bg-muted/50">
               <span className="min-w-0 flex-1">
                 <span className="block font-semibold">{r.project.name}</span>
                 <span className="text-sm text-muted-foreground">Week ending {day(r.week_ending)}</span>

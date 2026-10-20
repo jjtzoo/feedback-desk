@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -63,7 +63,7 @@ export default function AdminPage() {
       <div>
         <h1 className="text-2xl font-extrabold">Admin</h1>
         <p className="text-sm text-muted-foreground">
-          {admin ? "The project list, the people who can be assigned, and routing rules. The agent picks up changes straight away." : "Read only. Only Admins can change these."}
+          {admin ? "Changes take effect straight away." : "Read only. Only Admins can change these."}
         </p>
       </div>
       <Tabs defaultValue="projects">
@@ -76,7 +76,7 @@ export default function AdminPage() {
         <TabsContent value="projects" className="grid gap-3 pt-3">
           {admin && (
             <Button className="w-fit rounded-xl" onClick={() => setEditProject("new")}>
-              <Plus /> Add project
+              Add project
             </Button>
           )}
           <div className="overflow-x-auto rounded-2xl border bg-card shadow-card">
@@ -119,7 +119,7 @@ export default function AdminPage() {
         <TabsContent value="staff" className="grid gap-3 pt-3">
           {admin && (
             <Button className="w-fit rounded-xl" onClick={() => setAddStaff(true)}>
-              <Plus /> Add person
+              Add person
             </Button>
           )}
           <div className="overflow-x-auto rounded-2xl border bg-card shadow-card">
@@ -169,7 +169,7 @@ export default function AdminPage() {
         <TabsContent value="rules" className="grid gap-3 pt-3">
           {admin && (
             <Button className="w-fit rounded-xl" onClick={() => setAddRule(true)}>
-              <Plus /> Add rule
+              Add rule
             </Button>
           )}
           <p className="text-sm text-muted-foreground">Checked before the project owner, lowest order first. Several rules at the same order form a group; the person with fewest open items gets it.</p>

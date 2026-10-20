@@ -39,7 +39,7 @@ export function StaffHeader() {
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "rounded-full px-3.5 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                    active && "bg-brand-tint text-brand-text hover:bg-brand-tint hover:text-brand-text",
+                    active && "bg-muted text-foreground",
                   )}
                 >
                   {n.label}
@@ -63,7 +63,7 @@ export function StaffHeader() {
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "grid min-h-11 place-items-center rounded-full px-2 text-center text-[13px] font-semibold whitespace-nowrap text-muted-foreground",
-                  active && "bg-brand-tint text-brand-text",
+                  active && "bg-muted text-foreground",
                 )}
               >
                 {n.label}

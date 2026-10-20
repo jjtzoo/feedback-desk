@@ -1,10 +1,10 @@
 "use client";
 
-import { Bot, Check, CircleSlash, FileText, Gavel, GitMerge, Hammer, Lock, MessageCircleQuestion, Play, Send, StickyNote, X } from "lucide-react";
+import { FileText } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
-import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
+import { PriorityBadge, StatusBadge } from "@/components/badges";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
 import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
@@ -120,48 +120,47 @@ export function ItemPanel({
           <>
             <header className="sticky top-0 z-10 border-b bg-card px-5 pt-5 pb-4">
               <div className="flex flex-wrap items-center gap-1.5 pr-8">
-                <span className="font-mono text-sm font-semibold text-brand-text">{item.reference}</span>
-                <WorkTypeBadge workType={item.work_type} />
+                <span className="font-mono text-sm font-semibold">{item.reference}</span>
                 <PriorityBadge showCode priority={item.priority} />
                 <StatusBadge status={item.status} />
               </div>
               <SheetTitle className="mt-2 text-xl leading-snug font-bold">{item.title}</SheetTitle>
               <SheetDescription>
-                {item.project?.name ?? "Tool to confirm"} · {item.submitter_name} · {age(item.created_at)} ago
+                {[item.work_type && WORK_TYPE_LABEL[item.work_type], item.project?.name ?? "Tool to confirm", item.submitter_name].filter(Boolean).join(" · ")} · {age(item.created_at)} ago
                 {item.channel === "fallback" && " · backup form"}
               </SheetDescription>
               <div className="mt-3 flex flex-wrap gap-2">
                 {awaiting && me.role === "admin" && (
                   <>
                     <Button className="h-10 rounded-xl" disabled={busy} onClick={() => void act("approve").then((ok) => ok && toast.success("Approved"))}>
-                      <Gavel /> Approve
+                      Approve
                     </Button>
                     <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("decline")}>
-                      <CircleSlash /> Decline
+                      Decline
                     </Button>
                     <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("ask")}>
-                      <MessageCircleQuestion /> Ask for info
+                      Ask for info
                     </Button>
                   </>
                 )}
                 {item.status === "approved" && (
                   <Button className="h-10 rounded-xl" disabled={busy} onClick={() => void act("start")}>
-                    <Play /> Start work
+                    Start work
                   </Button>
                 )}
                 {item.status === "in_progress" && (
                   <Button className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("resolve")}>
-                    <Check /> Resolve
+                    Resolve
                   </Button>
                 )}
                 {open && !awaiting && (
                   <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("update")}>
-                    <Hammer /> Post update
+                    Post update
                   </Button>
                 )}
                 {open && (
                   <Button variant="ghost" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("close")}>
-                    <X /> Close
+                    Close
                   </Button>
                 )}
               </div>
@@ -178,9 +177,8 @@ export function ItemPanel({
 
               <TabsContent value="brief" className="grid gap-5 pt-3">
                 {item.ai_recommendation?.decision && (
-                  <p className="flex gap-2 rounded-2xl bg-muted p-3 text-sm">
-                    <Bot className="mt-0.5 size-4 shrink-0 text-brand-text" aria-hidden="true" />
-                    <span>
+                  <p className="rounded-2xl bg-muted p-3 text-sm">
+                                        <span>
                       <strong>Recommendation: {item.ai_recommendation.decision.replace("_", " ")}.</strong> {item.ai_recommendation.reason}
                       {item.effort && ` Effort ${item.effort}.`} {item.impact && `Impact: ${item.impact.replace("_", " ")}.`}
                     </span>
@@ -231,7 +229,7 @@ export function ItemPanel({
                 </dl>
 
                 <section className="grid gap-3 rounded-2xl border p-4" aria-label="Classification">
-                  <p className="text-sm font-semibold">Classification · corrections are logged to improve routing</p>
+                  <p className="text-sm font-semibold">Classification (corrections are logged)</p>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <FieldSelect
                       label={`Project (${percent(item.ai_confidence.project)})`}
@@ -278,7 +276,7 @@ export function ItemPanel({
                         </span>
                         {open && (
                           <Button variant="outline" size="sm" disabled={busy} onClick={() => void act("merge", { into: d.reference })}>
-                            <GitMerge /> Merge into it
+                            Merge into it
                           </Button>
                         )}
                       </div>
@@ -300,12 +298,11 @@ export function ItemPanel({
                       key={m.id}
                       className={cn(
                         "rounded-2xl border p-3 text-sm",
-                        m.is_internal && "border-dashed border-warning/60 bg-warning-tint/40",
+                        m.is_internal && "border-dashed",
                         m.author_type === "staff" && "bg-muted/50",
                       )}
                     >
                       <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {m.is_internal && <Lock className="size-3" aria-hidden="true" />}
                         <span className="font-semibold text-foreground">{m.author_name ?? "Feedback"}</span>
                         {MESSAGE_LABEL[m.message_type]} · {when(m.created_at)}
                       </p>
@@ -318,7 +315,7 @@ export function ItemPanel({
                     <div className="flex gap-1" role="group" aria-label="Message type">
                       {(["reply", "note"] as const).map((k) => (
                         <Button key={k} type="button" size="sm" variant={composer === k ? "secondary" : "ghost"} aria-pressed={composer === k} onClick={() => setComposer(k)}>
-                          {k === "reply" ? <Send /> : <StickyNote />} {k === "reply" ? "Reply to submitter" : "Internal note"}
+                          {k === "reply" ? "Reply to submitter" : "Internal note"}
                         </Button>
                       ))}
                     </div>
@@ -356,7 +353,7 @@ export function ItemPanel({
               <TabsContent value="files" className="grid gap-3 pt-3">
                 {item.attachments.length === 0 && <p className="text-sm text-muted-foreground">No files attached.</p>}
                 {item.attachments.map((a) => (
-                  <a key={a.id} href={`/api/files/${a.id}`} target="_blank" rel="noreferrer" className="grid gap-2 rounded-2xl border p-3 hover:border-primary/40">
+                  <a key={a.id} href={`/api/files/${a.id}`} target="_blank" rel="noreferrer" className="grid gap-2 rounded-2xl border p-3 hover:bg-muted/50">
                     {a.mime_type.startsWith("image/") && (
                       // eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived link; next/image can't optimise it
                       <img src={`/api/files/${a.id}`} alt={`Attachment ${a.file_name}`} className="max-h-64 rounded-xl object-contain" />

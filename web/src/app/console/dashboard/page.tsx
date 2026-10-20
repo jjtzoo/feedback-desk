@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock3, Gavel, Inbox, Repeat2, Sparkles, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,12 +10,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { api, errorText, type Category, type Dashboard, type UsageSummary, type WorkType } from "@/lib/api";
 import { CATEGORY_LABEL, WORK_TYPE_LABEL, day } from "@/lib/format";
 
-function Stat({ icon: Icon, label, value, note, warn }: { icon: typeof Inbox; label: string; value: string; note?: string; warn?: boolean }) {
+function Stat({ label, value, note, warn }: { label: string; value: string; note?: string; warn?: boolean }) {
   return (
     <div className="rounded-3xl border bg-card p-5 shadow-card">
-      <p className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-        <Icon className="size-4" aria-hidden="true" /> {label}
-      </p>
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
       <p className="mt-2 font-mono text-3xl font-bold tabular">{value}</p>
       {note && (
         <p className={`mt-1 flex items-center gap-1 text-sm ${warn ? "font-semibold text-warning" : "text-muted-foreground"}`}>
@@ -154,10 +152,12 @@ function Budget({ label, spent, budget }: { label: string; spent: number; budget
           <div role="meter" aria-label={`${label} spend`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-2 overflow-hidden rounded-full bg-muted">
             <div className={`h-full rounded-full ${high ? "bg-warning" : "bg-series-1"}`} style={{ width: `${percent}%` }} />
           </div>
-          <p className={`flex items-center gap-1 text-xs ${high ? "font-semibold text-warning" : "text-muted-foreground"}`}>
-            {high && <TriangleAlert className="size-3.5" aria-hidden="true" />}
-            {percent}% used{percent >= 100 ? ". New chats are going to the backup form." : ""}
-          </p>
+          {high && (
+            <p className="flex items-center gap-1 text-xs font-semibold text-warning">
+              <TriangleAlert className="size-3.5" aria-hidden="true" />
+              {percent}% used{percent >= 100 ? ". New chats are going to the backup form." : ""}
+            </p>
+          )}
         </>
       )}
     </div>
@@ -170,8 +170,8 @@ function AiUsage({ u }: { u: UsageSummary }) {
   return (
     <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="ai-usage">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="ai-usage" className="flex items-center gap-2 font-bold">
-          <Sparkles className="size-4 text-primary" aria-hidden="true" /> AI usage
+        <h2 id="ai-usage" className="font-bold">
+          AI usage
         </h2>
         <p className="text-xs text-muted-foreground">Estimated from Gemini token counts. Per-person limit: {tokens(u.daily_tokens_per_user)} tokens a day.</p>
       </div>
@@ -226,7 +226,7 @@ function AiUsage({ u }: { u: UsageSummary }) {
                   <TableCell>
                     <span className="font-medium">{p.name}</span>
                     {p.limit_reached && (
-                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning">
+                      <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-warning">
                         <TriangleAlert className="size-3" aria-hidden="true" /> Limit reached
                       </span>
                     )}
@@ -258,22 +258,17 @@ export default function DashboardPage() {
   const open = d.open_by_project.reduce((n, r) => n + r.count, 0);
   return (
     <div className="grid gap-4 p-4 sm:p-6">
-      <div>
-        <h1 className="text-2xl font-extrabold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Computed live from the feedback and its history.</p>
-      </div>
+      <h1 className="text-2xl font-extrabold">Dashboard</h1>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={Inbox} label="Open items" value={String(open)} />
+        <Stat label="Open items" value={String(open)} />
         <Stat
-          icon={Gavel}
           label="Waiting for approval"
           value={String(d.approvals_waiting)}
-          note={d.approvals_over_2_days ? `${d.approvals_over_2_days} over 2 business days` : "None overdue"}
+          note={d.approvals_over_2_days ? `${d.approvals_over_2_days} over 2 business days` : undefined}
           warn={d.approvals_over_2_days > 0}
         />
-        <Stat icon={Clock3} label="Avg time to first response" value={d.avg_first_response_hours === null ? "–" : `${d.avg_first_response_hours} h`} note="Target: under 2 business days" />
+        <Stat label="Avg time to first response" value={d.avg_first_response_hours === null ? "–" : `${d.avg_first_response_hours} h`} note="Target: under 2 business days" />
         <Stat
-          icon={Repeat2}
           label="Project reassignment rate"
           value={d.project_reassignment_rate === null ? "–" : `${Math.round(d.project_reassignment_rate * 100)}%`}
           note="Target: 10% or less (90% correct)"

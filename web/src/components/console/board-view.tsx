@@ -30,7 +30,7 @@ function ColumnView({ column, onOpen }: { column: Column; onOpen: (ref: string) 
     <section
       ref={setNodeRef}
       aria-label={`${column.title}, ${column.count} items`}
-      className={cn("flex w-[290px] shrink-0 flex-col rounded-3xl bg-muted/60 p-2.5 transition-colors", isOver && "bg-brand-tint ring-2 ring-primary/40")}
+      className={cn("flex w-[290px] shrink-0 flex-col rounded-3xl bg-muted/60 p-2.5 transition-colors", isOver && "bg-muted ring-2 ring-foreground/20")}
     >
       <header className="flex items-center justify-between px-2 pt-1 pb-2.5">
         <h2 className="text-sm font-bold">

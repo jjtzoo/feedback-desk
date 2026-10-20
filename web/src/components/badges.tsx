@@ -1,20 +1,7 @@
-import {
-  CheckCircle2,
-  CircleDot,
-  Clock3,
-  Hammer,
-  Lightbulb,
-  Minus,
-  OctagonAlert,
-  Sparkles,
-  ThumbsUp,
-  TriangleAlert,
-  Wrench,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle2, CircleDot, Clock3, Hammer, Minus, OctagonAlert, ThumbsUp, TriangleAlert, XCircle } from "lucide-react";
 
-import type { Priority, Stage, Status, WorkType } from "@/lib/api";
-import { PRIORITY_LABEL, PRIORITY_WORD, STAGE_LABEL, STATUS_LABEL, WORK_TYPE_LABEL } from "@/lib/format";
+import type { Priority, Stage, Status } from "@/lib/api";
+import { PRIORITY_LABEL, PRIORITY_WORD, STAGE_LABEL, STATUS_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // Every badge pairs a word with an icon, so status never relies on colour (fire-services-ui).
@@ -39,31 +26,13 @@ export function PriorityBadge({ priority, showCode = false, className }: { prior
   );
 }
 
-export function WorkTypeBadge({ workType, className }: { workType: WorkType | null; className?: string }) {
-  if (!workType) return null;
-  const styles: Record<WorkType, string> = {
-    fix: "bg-info-tint text-info",
-    improvement: "bg-success-tint text-success",
-    new_feature: "bg-brand-tint text-brand-text",
-    no_change: "bg-secondary text-muted-foreground",
-  };
-  const icons: Record<WorkType, typeof Wrench> = { fix: Wrench, improvement: Sparkles, new_feature: Lightbulb, no_change: ThumbsUp };
-  const Icon = icons[workType];
-  return (
-    <span className={cn(base, styles[workType], className)}>
-      <Icon className="size-3.5" aria-hidden="true" />
-      {WORK_TYPE_LABEL[workType]}
-    </span>
-  );
-}
-
 export function StatusBadge({ status, className }: { status: Status; className?: string }) {
   const tone: Record<Status, string> = {
     new: "border border-border text-foreground",
     needs_review: "bg-warning-tint text-warning",
     awaiting_approval: "bg-warning-tint text-warning",
     approved: "bg-info-tint text-info",
-    in_progress: "bg-brand-tint text-brand-text",
+    in_progress: "bg-warning-tint text-warning",
     resolved: "bg-success-tint text-success",
     acknowledged: "bg-success-tint text-success",
     declined: "bg-secondary text-muted-foreground",
@@ -93,7 +62,7 @@ export function StageBadge({ stage, className }: { stage: Stage; className?: str
   const tone: Record<Stage, string> = {
     received: "border border-border text-foreground",
     approved: "bg-info-tint text-info",
-    in_progress: "bg-brand-tint text-brand-text",
+    in_progress: "bg-warning-tint text-warning",
     resolved: "bg-success-tint text-success",
     closed: "bg-secondary text-muted-foreground",
   };

@@ -18,7 +18,7 @@ The palette is drawn from redmen.com.au (a Sydney fire protection company): brig
 | Dial | Value | Meaning here |
 | --- | --- | --- |
 | DESIGN_VARIANCE | 3 | Predictable grids. People scan these screens under time pressure; layouts stay where they expect them. Marketing or landing pages may go to 5. |
-| MOTION_INTENSITY | 4 | Apple-style: springy entrances, press and lift feedback, staggered lists. One calm idle loop (the assistant avatar). Raised from 2 at the user's request, 2026-10-20. |
+| MOTION_INTENSITY | 4 | Apple-style: springy entrances, press and lift feedback, staggered lists. No idle loops; the assistant avatar is static. Raised from 2 at the user's request, 2026-10-20. |
 | VISUAL_DENSITY | 4 public screens, 7 staff screens | Forms and status pages breathe; queues and lists are compact, separated by lines instead of cards. |
 
 Follow these unless the user asks for something else in chat. Do not ask the user to edit this file.
@@ -131,12 +131,16 @@ Build every state, not only the happy path (taste-skill rule 5):
 ## 7. Motion
 
 - Animate `opacity` and `transform` only. Entrances use the spring curve `--ease-spring` (about 400 ms, one soft overshoot); hover, press and state changes stay 150 to 320 ms.
-- Allowed: spring entrances for messages, cards and steps; a 60 ms stagger on short lists (`--i`); press scale (0.98) on buttons and cards; a 2 px lift on hover for tappable rows (`lift`); sheet and menu open; a badge changing state; the assistant avatar's slow idle swell (`animate-breathe`, 5 s, 5 % scale).
+- Allowed: spring entrances for messages, cards and steps; a 60 ms stagger on short lists (`--i`); press scale (0.98) on buttons and cards; a 2 px lift on hover for tappable rows (`lift`); sheet and menu open; a badge changing state; nothing loops.
 - Not allowed: other looping animations, parallax, scroll hijack, magnetic buttons, particle effects, pulsing red dots. A pulsing red element in a fire services app reads as an alarm.
 - `prefers-reduced-motion: reduce`: no transform motion, no idle loop, opacity fades at 120 ms.
 - No motion library. CSS easing curves and keyframes cover this intensity.
 
-## 8. Copy
+## 8. Quiet by default
+
+The owner's rule (2026-10-21): no component is noisy. Remove what doesn't earn its place before adding anything. No text repeated on a screen or between sign-in and landing; red for the one key action and the hero band, not decorative icons; muted secondary text; pills only for status; show information when it helps (a warning near a limit, not a constant meter); motion only when it explains something.
+
+## 9. Copy
 
 - Plain words, short sentences, active voice. Say what happened and what to do next.
 - Name things the way the team does: "ticket", "queue", "pick up", "hand back", "reference".
@@ -144,7 +148,7 @@ Build every state, not only the happy path (taste-skill rule 5):
 - Realistic sample data: real-sounding app names and people, irregular numbers (FD-0137, 3 h 12 m), never "John Doe", "Acme" or 99.9 %.
 - Dates and times in the user's locale; relative ages ("2 h ago") in lists, exact time on hover and on detail pages.
 
-## 9. Accessibility (non-negotiable)
+## 10. Accessibility (non-negotiable)
 
 - WCAG 2.2 AA in both themes. Visible focus ring on every interactive element.
 - Everything works with keyboard only, in a logical order. Dialogs trap focus and return it on close.
@@ -152,11 +156,11 @@ Build every state, not only the happy path (taste-skill rule 5):
 - Status changes announced with `aria-live="polite"` (new message from the agent, ticket picked up).
 - Images and icons that carry meaning have labels; decorative ones are hidden from screen readers.
 
-## 10. Stack defaults
+## 11. Stack defaults
 
 Unless the project says otherwise: React + Vite + TypeScript + Tailwind, tokens as CSS variables mapped into the Tailwind theme. Check `package.json` before importing any library and give the install command if it is missing. Check the Tailwind version before using v4 syntax.
 
-## 11. Pre-flight check
+## 12. Pre-flight check
 
 Before handing over a screen, check:
 - [ ] Red covers 10 % of the screen or less, and there is one solid red button at most.

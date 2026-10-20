@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, CircleCheck, MessageSquarePlus } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
@@ -14,12 +14,9 @@ export function DoneView({ saved, plusOne, onAgain }: { saved: Saved; plusOne: b
   const waiting = saved.status === "awaiting_approval" || saved.status === "needs_review";
   return (
     <section className="animate-fade-up p-6 sm:p-8" aria-live="polite">
-      <span className="grid size-12 place-items-center rounded-2xl bg-success-tint text-success" aria-hidden="true">
-        <CircleCheck className="size-6" />
-      </span>
-      <h2 ref={heading} tabIndex={-1} className="mt-4 text-2xl font-extrabold outline-none">
+      <h2 ref={heading} tabIndex={-1} className="text-2xl font-extrabold outline-none">
         {plusOne ? "Added to " : "Sent. Your reference is "}
-        <span className="rounded-lg bg-brand-tint px-2 font-mono text-brand-text">{saved.reference}</span>
+        <span className="font-mono">{saved.reference}</span>
       </h2>
       <p className="mt-3 max-w-prose text-muted-foreground">
         {plusOne
@@ -33,7 +30,7 @@ export function DoneView({ saved, plusOne, onAgain }: { saved: Saved; plusOne: b
           </Link>
         </Button>
         <Button variant="outline" className="h-11 rounded-xl px-5 text-base" onClick={onAgain}>
-          <MessageSquarePlus /> Give more feedback
+          Give more feedback
         </Button>
       </div>
     </section>

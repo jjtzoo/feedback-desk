@@ -1,23 +1,22 @@
 "use client";
 
-import { Columns3, LayoutGrid, List, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
+import { PriorityBadge } from "@/components/badges";
 import { ActionDialog, type ActionResult } from "@/components/console/action-dialogs";
 import { BoardView } from "@/components/console/board-view";
 import { ItemPanel } from "@/components/console/item-panel";
 import { WorkCard } from "@/components/console/work-card";
-import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, errorText, type Board, type ConsoleView, type ItemList, type Project, type Staff } from "@/lib/api";
-import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, WORK_TYPES, WORK_TYPE_LABEL, age, day } from "@/lib/format";
+import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, STATUS_LABEL, WORK_TYPES, WORK_TYPE_LABEL, age, day } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const INBOXES = [
@@ -28,14 +27,13 @@ const INBOXES = [
   { key: "closed", label: "Closed" },
 ];
 const FILTERS = ["project", "category", "priority", "work_type", "assignee", "q"] as const;
-const VIEWS: { key: ConsoleView; label: string; icon: typeof List }[] = [
-  { key: "board", label: "Board", icon: Columns3 },
-  { key: "list", label: "List", icon: List },
-  { key: "cards", label: "Cards", icon: LayoutGrid },
+const VIEWS: { key: ConsoleView; label: string }[] = [
+  { key: "board", label: "Board" },
+  { key: "list", label: "List" },
+  { key: "cards", label: "Cards" },
 ];
 
 function Work() {
-  const me = useMe();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -132,14 +130,9 @@ function Work() {
   return (
     <div className="grid gap-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold">Work</h1>
-          <p className="text-sm text-muted-foreground">
-            {me.role === "admin" ? "Approve, assign and follow everything." : "Your items, and everything else the team is working on."}
-          </p>
-        </div>
+        <h1 className="text-2xl font-extrabold">Work</h1>
         <div className="flex rounded-xl bg-muted p-1" role="group" aria-label="View">
-          {VIEWS.map(({ key, label, icon: Icon }) => (
+          {VIEWS.map(({ key, label }) => (
             <Button
               key={key}
               variant="ghost"
@@ -147,7 +140,7 @@ function Work() {
               onClick={() => void changeView(key)}
               className={cn("h-9 rounded-lg px-3", effectiveView === key && "bg-card shadow-card hover:bg-card")}
             >
-              <Icon /> {label}
+              {label}
             </Button>
           ))}
         </div>
@@ -231,22 +224,18 @@ function Work() {
               <TableBody>
                 {items?.map((c) => (
                   <TableRow key={c.reference} className="cursor-pointer" onClick={() => setParam("item", c.reference)}>
-                    <TableCell className="font-mono text-xs font-semibold text-brand-text">
+                    <TableCell className="font-mono text-xs font-semibold">
                       <button type="button" className="rounded" onClick={() => setParam("item", c.reference)}>
                         {c.reference}
                       </button>
                     </TableCell>
                     <TableCell className="max-w-72 truncate font-medium">{c.title}</TableCell>
                     <TableCell>{c.project?.name ?? "–"}</TableCell>
-                    <TableCell>
-                      <WorkTypeBadge workType={c.work_type} />
-                    </TableCell>
+                    <TableCell>{c.work_type ? WORK_TYPE_LABEL[c.work_type] : "–"}</TableCell>
                     <TableCell>
                       <PriorityBadge showCode priority={c.priority} />
                     </TableCell>
-                    <TableCell>
-                      <StatusBadge status={c.status} />
-                    </TableCell>
+                    <TableCell>{STATUS_LABEL[c.status]}</TableCell>
                     <TableCell>{c.assignee?.name ?? "Unassigned"}</TableCell>
                     <TableCell className="font-mono text-xs tabular">{age(c.created_at)}</TableCell>
                     <TableCell className={cn(c.overdue && "font-semibold text-destructive")}>{c.expected_by ? day(c.expected_by) : "–"}</TableCell>
@@ -266,7 +255,7 @@ function Work() {
 }
 
 function Empty() {
-  return <p className="p-10 text-center text-sm text-muted-foreground">No items in this view. New feedback appears here as soon as it is routed.</p>;
+  return <p className="p-10 text-center text-sm text-muted-foreground">No items in this view. New feedback appears when it is routed.</p>;
 }
 
 function FilterSelect({ label, all, value, options, onChange }: { label: string; all: string; value: string | null; options: [string, string][]; onChange: (v: string | null) => void }) {

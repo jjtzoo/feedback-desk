@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export function AssistantAvatar({ className }: { className?: string }) {
   return (
     <Avatar className={cn("size-8", className)} aria-hidden="true">
-      <AvatarFallback className="bg-brand-tint text-brand-text">
+      <AvatarFallback className="bg-muted text-muted-foreground">
         <Sparkles className="size-[55%]" />
       </AvatarFallback>
     </Avatar>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -71,7 +71,7 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
         >
           <Bell className="size-5" />
           {unread > 0 && (
-            <span className="absolute top-1.5 right-1.5 grid min-w-5 place-items-center rounded-full bg-primary px-1 font-mono text-[11px] font-semibold text-primary-foreground tabular">
+            <span className="absolute top-1.5 right-1.5 grid min-w-5 place-items-center rounded-full bg-foreground px-1 font-mono text-[11px] font-semibold text-background tabular">
               {unread > 99 ? "99+" : unread}
             </span>
           )}
@@ -82,7 +82,7 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
           <p className="font-semibold">Notifications</p>
           {unread > 0 && (
             <Button variant="ghost" size="sm" onClick={readAll}>
-              <CheckCheck /> Mark all read
+              Mark all read
             </Button>
           )}
         </div>
@@ -91,7 +91,7 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
           {items.map((n) => (
             <li key={n.id}>
               <Link href={n.link} onClick={() => readOne(n)} className="flex gap-3 px-4 py-3 hover:bg-muted">
-                <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", n.read_at ? "bg-transparent" : "bg-primary")} aria-hidden="true" />
+                <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", n.read_at ? "bg-transparent" : "bg-foreground")} aria-hidden="true" />
                 <span className="min-w-0 flex-1">
                   <span className={cn("block text-sm", !n.read_at && "font-semibold")}>{n.title}</span>
                   {n.body && <span className="line-clamp-2 block text-sm text-muted-foreground">{n.body}</span>}

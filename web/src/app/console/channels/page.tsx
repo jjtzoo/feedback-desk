@@ -1,6 +1,5 @@
 "use client";
 
-import { Hash } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -21,7 +20,7 @@ export default function ChannelsPage() {
     <div className="mx-auto grid max-w-4xl gap-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-extrabold">Channels</h1>
-        <p className="text-sm text-muted-foreground">Private to the Digital team: what you&apos;re doing, decisions, handy notes. Staff never see these.</p>
+        <p className="text-sm text-muted-foreground">Private to the Digital team. Staff never see these.</p>
       </div>
       {error && <p className="text-destructive" role="alert">{error}</p>}
       {!projects && !error && <Skeleton className="h-60 rounded-3xl" />}
@@ -36,8 +35,7 @@ export default function ChannelsPage() {
             <ul className="grid gap-2 sm:grid-cols-2">
               {list.map((p) => (
                 <li key={p.slug}>
-                  <Link href={`/console/channels/${p.slug}`} className="flex min-h-12 items-center gap-3 rounded-2xl border bg-card px-4 shadow-card hover:border-primary/40">
-                    <Hash className="size-4 text-primary" aria-hidden="true" />
+                  <Link href={`/console/channels/${p.slug}`} className="flex min-h-12 items-center gap-3 rounded-2xl border bg-card px-4 shadow-card hover:bg-muted/50">
                     <span className="font-semibold">{p.name}</span>
                   </Link>
                 </li>

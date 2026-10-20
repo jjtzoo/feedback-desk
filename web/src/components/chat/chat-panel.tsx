@@ -1,13 +1,12 @@
 "use client";
 
-import { FileText, Loader2, Paperclip, Send, Users, X } from "lucide-react";
+import { FileText, Loader2, Paperclip, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { BackupForm } from "@/components/chat/backup-form";
 import { ConfirmCard } from "@/components/chat/confirm-card";
 import { DoneView } from "@/components/chat/done-view";
-import { STARTERS } from "@/components/chat/starters";
 import { UsageMeter } from "@/components/chat/usage-meter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,7 +33,6 @@ type Turn = { role: "user" | "agent"; text: string; files?: string[] };
 type Mode = "starting" | "chat" | "fallback" | "done";
 
 const ACCEPT = ".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.webp";
-const POPULAR = ["rake-agent", "staff-admin-portal", "cpd-tracker", "training-portal", "financial-platform"];
 
 function captureContext(): Record<string, string> {
   const ua = navigator.userAgent;
@@ -135,7 +133,6 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
       setChips([]);
       let done: Saved | null = null;
       let fallback = false;
-      let limited: UsageLimit | null = null;
       let drafted = false;
       try {
         await streamChat(path, body, (e) => {
@@ -147,10 +144,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
             setCard({ card: e.card, hash: e.hash });
           }
           else if (e.type === "done") done = { reference: e.reference, assigned_to: e.assigned_to, status: e.status };
-          else if (e.type === "fallback") {
-            fallback = true;
-            if (e.reason === "limit_user" || e.reason === "limit_budget") limited = e.reason === "limit_user" ? "user" : "budget";
-          }
+          else if (e.type === "fallback") fallback = true;
         });
       } catch (e) {
         setError(errorText(e));
@@ -162,7 +156,6 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         setSaved({ saved: done, plusOne: false });
         setMode("done");
       } else if (fallback) {
-        setLimit(limited);
         setMode("fallback");
       } else if (!drafted) {
         input.current?.focus();
@@ -240,18 +233,8 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   return (
     <section aria-label="Chat with the feedback assistant" className="min-w-0 overflow-hidden rounded-3xl border bg-card shadow-card">
       <header className="flex items-center gap-3 border-b px-5 py-4">
-        <AssistantAvatar className="size-12 animate-breathe" />
-        <div className="min-w-0">
-          <p className="font-bold">Feedback assistant</p>
-          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <span className={cn("size-2 rounded-full", mode === "fallback" ? "bg-warning" : "bg-success")} aria-hidden="true" />
-            {mode !== "fallback"
-              ? "Asks a few questions, then sends it to the right person"
-              : limit
-                ? "Assistant paused for today, the form still works"
-                : "Assistant offline, the form still works"}
-          </p>
-        </div>
+        <AssistantAvatar className="size-12" />
+        <p className="font-bold">Feedback assistant</p>
       </header>
 
       {mode === "starting" && (
@@ -285,8 +268,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         <>
           <ol ref={list} className="grid max-h-[60dvh] min-h-56 content-start gap-3 overflow-y-auto p-5" aria-live="polite">
             {turns.map((t, i) => (
-              <li key={i} className={cn("flex animate-fade-up items-end gap-2", t.role === "user" ? "justify-end" : "justify-start")}>
-                {t.role !== "user" && <AssistantAvatar className="mb-0.5" />}
+              <li key={i} className={cn("flex animate-fade-up", t.role === "user" ? "justify-end" : "justify-start")}>
                 <div
                   className={cn(
                     "max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap",
@@ -308,50 +290,8 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
               </li>
             ))}
             {busy && (
-              <li className="flex items-center gap-2 text-sm text-muted-foreground">
-                <AssistantAvatar />
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Thinking…
-              </li>
-            )}
-            {firstMessage && !busy && (
-              <li className="grid gap-4">
-                <div className="flex flex-wrap gap-2">
-                  {STARTERS.map(({ id, icon: Icon, label, text: starter }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        setText(starter);
-                        input.current?.focus();
-                      }}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors hover:border-primary hover:bg-brand-tint"
-                    >
-                      <Icon className="size-4 text-primary" aria-hidden="true" /> {label}
-                    </button>
-                  ))}
-                </div>
-                <div>
-                  <p className="mb-2 text-sm text-muted-foreground">Which tool is it about? (optional)</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {projects
-                      .filter((p) => POPULAR.includes(p.slug) || p.slug === project)
-                      .map((p) => (
-                        <button
-                          key={p.slug}
-                          type="button"
-                          aria-pressed={p.slug === project}
-                          onClick={() => setProject(p.slug === project ? null : p.slug)}
-                          className={cn(
-                            "min-h-11 rounded-full bg-secondary px-3.5 text-sm font-medium hover:bg-muted",
-                            p.slug === project && "bg-primary text-primary-foreground hover:bg-primary",
-                          )}
-                        >
-                          {p.name}
-                        </button>
-                      ))}
-                    <span className="self-center px-1 text-sm text-muted-foreground">or just mention it</span>
-                  </div>
-                </div>
+              <li className="text-sm text-muted-foreground">
+                Thinking…
               </li>
             )}
             {chips.length > 0 && !busy && (
@@ -361,7 +301,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                     key={c.value}
                     type="button"
                     onClick={() => void send(c.value)}
-                    className="min-h-11 rounded-full border px-4 text-sm font-medium hover:border-primary hover:bg-brand-tint"
+                    className="min-h-11 rounded-full border px-4 text-sm font-medium hover:bg-muted"
                   >
                     {c.label}
                   </button>
@@ -370,9 +310,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
             )}
             {duplicates.length > 0 && !busy && (
               <li className="rounded-2xl border border-dashed p-4">
-                <p className="flex items-center gap-2 text-sm font-semibold">
-                  <Users className="size-4 text-primary" aria-hidden="true" /> Someone may have raised this already
-                </p>
+                <p className="text-sm font-semibold">Someone may have raised this already</p>
                 <ul className="mt-2 grid gap-2">
                   {duplicates.map((d) => (
                     <li key={d.reference} className="flex flex-wrap items-center justify-between gap-2">
@@ -399,7 +337,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
           <form onSubmit={onSubmit} className="border-t bg-muted/40 p-3 sm:p-4">
             {(files.length > 0 || selected) && (
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {selected && !firstMessage && (
+                {selected && (
                   <span className="inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs font-medium">About {selected.name}</span>
                 )}
                 {files.map((f) => (
@@ -460,7 +398,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                 <Send /> <span className="sr-only sm:not-sr-only">Send</span>
               </Button>
             </div>
-            <p className="mt-2 px-1 text-xs text-muted-foreground">Enter sends, Shift+Enter for a new line. Files: PDF, Word, Excel, images, up to 10 MB.</p>
+            {firstMessage && <p className="mt-2 px-1 text-xs text-muted-foreground">Enter to send, Shift+Enter for a new line</p>}
             {allowance && <UsageMeter allowance={allowance} />}
           </form>
         </>

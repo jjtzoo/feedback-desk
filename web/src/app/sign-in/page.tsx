@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
@@ -83,14 +83,11 @@ function SignIn() {
           {options && !options.google && (
             <p className="mt-2 text-sm text-muted-foreground">Google sign-in is not yet configured on this server.</p>
           )}
-          <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
-            <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> Only redadair.com.au accounts can sign in.
-          </p>
 
           {options?.dev_login && people.length > 0 && (
             <div className="mt-8 rounded-2xl border border-dashed bg-card p-4">
               <p className="text-sm font-semibold">Local development sign-in</p>
-              <p className="mb-3 text-xs text-muted-foreground">Placeholder people from the seed. This only exists locally (spec D23).</p>
+              <p className="mb-3 text-xs text-muted-foreground">Seed people. Local only (spec D23).</p>
               <ul className="grid gap-1">
                 {people.map((p) => (
                   <li key={p.email}>
@@ -100,7 +97,7 @@ function SignIn() {
                       disabled={busy !== null}
                       className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-muted disabled:opacity-60"
                     >
-                      <span className="grid size-8 place-items-center rounded-full bg-brand-tint text-xs font-bold text-brand-text">{initials(p.name)}</span>
+                      <span className="grid size-8 place-items-center rounded-full bg-muted text-xs font-bold">{initials(p.name)}</span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">{p.name}</span>
                         <span className="block truncate text-xs text-muted-foreground">{p.email}</span>

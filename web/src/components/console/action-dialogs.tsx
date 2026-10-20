@@ -22,7 +22,7 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
   },
   resolve: {
     title: "Resolve",
-    description: "Say briefly what was done. It becomes the last entry on the staff tracker.",
+    description: "It becomes the last entry on the staff tracker.",
     field: "What was done",
     button: "Resolve",
     required: true,

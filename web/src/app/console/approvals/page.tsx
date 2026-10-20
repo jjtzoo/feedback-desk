@@ -1,17 +1,16 @@
 "use client";
 
-import { Bot, CircleSlash, Gavel, MessageCircleQuestion } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
+import { PriorityBadge, StatusBadge } from "@/components/badges";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
 import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorText, type Detail } from "@/lib/api";
-import { age } from "@/lib/format";
+import { WORK_TYPE_LABEL, age } from "@/lib/format";
 
 /** Approvals queue for Admins (brief §4.5): P1 first, a recommendation on every item, one decision is enough. */
 export default function ApprovalsPage() {
@@ -67,45 +66,41 @@ export default function ApprovalsPage() {
     <div className="mx-auto grid max-w-4xl gap-4 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-extrabold">Approvals</h1>
-        <p className="text-sm text-muted-foreground">Approve means we&apos;ll do it; decline means we won&apos;t, and the person is told why. One Admin&apos;s decision is enough.</p>
+        <p className="text-sm text-muted-foreground">One Admin&apos;s decision is enough.</p>
       </div>
       {error && <p className="text-destructive" role="alert">{error}</p>}
       {!items && !error && <Skeleton className="h-40 rounded-3xl" aria-busy="true" />}
-      {items?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">No items awaiting approval. New items appear here once the agent has routed them.</p>}
+      {items?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">No items awaiting approval. New items appear here once routed.</p>}
       {items?.map((i) => (
-        <article key={i.reference} className={`rounded-3xl border bg-card p-5 shadow-card ${i.priority === "P1" ? "border-[1.5px] border-primary/70" : ""}`}>
+        <article key={i.reference} className="rounded-3xl border bg-card p-5 shadow-card">
           <div className="flex flex-wrap items-center gap-1.5">
-            <Link href={`/console?inbox=open&item=${i.reference}`} className="font-mono text-sm font-semibold text-brand-text hover:underline">
+            <Link href={`/console?inbox=open&item=${i.reference}`} className="font-mono text-sm font-semibold hover:underline">
               {i.reference}
             </Link>
-            <WorkTypeBadge workType={i.work_type} />
             <PriorityBadge showCode priority={i.priority} />
             <StatusBadge status={i.status} />
             <span className="ml-auto font-mono text-xs text-muted-foreground">{age(i.created_at)}</span>
           </div>
           <h2 className="mt-2 text-lg font-bold">{i.title}</h2>
           <p className="text-sm text-muted-foreground">
-            {i.project?.name ?? "Tool to confirm"} · {i.area ?? "area not given"} · from {i.submitter_name} · owner {i.assignee?.name ?? "not set"}
+            {i.work_type && `${WORK_TYPE_LABEL[i.work_type]} · `}{i.project?.name ?? "Tool to confirm"} · {i.area ?? "area not given"} · from {i.submitter_name} · owner {i.assignee?.name ?? "not set"}
           </p>
           {i.dev_brief.problem && <p className="mt-3">{i.dev_brief.problem}</p>}
           {i.ai_recommendation?.decision && (
-            <p className="mt-3 flex gap-2 rounded-2xl bg-muted p-3 text-sm">
-              <Bot className="mt-0.5 size-4 shrink-0 text-brand-text" aria-hidden="true" />
-              <span>
-                <strong>{i.ai_recommendation.decision.replace("_", " ")}</strong>: {i.ai_recommendation.reason} Effort {i.effort ?? "?"}, impact{" "}
-                {(i.impact ?? "unknown").replace("_", " ")}.
-              </span>
+            <p className="mt-3 rounded-2xl bg-muted p-3 text-sm">
+              <strong>{i.ai_recommendation.decision.replace("_", " ")}</strong>: {i.ai_recommendation.reason} Effort {i.effort ?? "?"}, impact{" "}
+              {(i.impact ?? "unknown").replace("_", " ")}.
             </p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
             <Button className="h-11 rounded-xl px-5" disabled={busy === i.reference} onClick={() => void approve(i.reference)}>
-              <Gavel /> Approve
+              Approve
             </Button>
             <Button variant="outline" className="h-11 rounded-xl" onClick={() => setDialog({ kind: "decline", ref: i.reference })}>
-              <CircleSlash /> Decline
+              Decline
             </Button>
             <Button variant="ghost" className="h-11 rounded-xl" onClick={() => setDialog({ kind: "ask", ref: i.reference })}>
-              <MessageCircleQuestion /> Ask for info
+              Ask for info
             </Button>
           </div>
         </article>

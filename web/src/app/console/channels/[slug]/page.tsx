@@ -1,18 +1,17 @@
 "use client";
 
-import { ArrowLeft, Loader2, Pin, PinOff, Send } from "lucide-react";
+import { ArrowLeft, Loader2, Pin, PinOff } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import { StatusBadge } from "@/components/badges";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorText, type Channel, type ChannelMessage } from "@/lib/api";
-import { initials, when } from "@/lib/format";
+import { STATUS_LABEL, initials, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** Turns #FB-0139 into a live chip and @name into a highlight. */
@@ -25,13 +24,13 @@ function Body({ text, chips }: { text: string; chips: Channel["chips"] }) {
         if (ref) {
           const chip = chips[ref];
           return (
-            <Link key={i} href={`/console?inbox=all&item=${ref}`} className="mx-0.5 inline-flex items-center gap-1.5 rounded-full border bg-card py-0.5 pr-1 pl-2 align-middle text-xs hover:border-primary/40">
-              <span className="font-mono font-semibold text-brand-text">{ref}</span>
-              {chip ? <StatusBadge status={chip.status} className="h-5 px-2 text-[11px]" /> : <span className="text-muted-foreground">unknown</span>}
+            <Link key={i} href={`/console?inbox=all&item=${ref}`} className="mx-0.5 inline-flex items-center gap-1.5 rounded-full border bg-card py-0.5 pr-1 pl-2 align-middle text-xs hover:bg-muted/50">
+              <span className="font-mono font-semibold">{ref}</span>
+              <span className="text-muted-foreground">{chip ? STATUS_LABEL[chip.status] : "unknown"}</span>
             </Link>
           );
         }
-        if (part.startsWith("@")) return <span key={i} className="rounded bg-brand-tint px-1 font-semibold text-brand-text">{part}</span>;
+        if (part.startsWith("@")) return <span key={i} className="font-semibold">{part}</span>;
         return <Fragment key={i}>{part}</Fragment>;
       })}
     </p>
@@ -96,10 +95,8 @@ export default function ChannelPage() {
       {!channel && !error && <Skeleton className="h-60 rounded-3xl" />}
 
       {pinned.length > 0 && (
-        <section className="grid gap-2 rounded-3xl border-[1.5px] border-primary/30 bg-card p-4 shadow-card" aria-label="Pinned">
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-brand-text">
-            <Pin className="size-4" aria-hidden="true" /> Pinned
-          </p>
+        <section className="grid gap-2 rounded-3xl border bg-card p-4 shadow-card" aria-label="Pinned">
+          <p className="text-sm font-semibold text-muted-foreground">Pinned</p>
           {pinned.map((m) => (
             <Message key={m.id} m={m} chips={channel?.chips ?? {}} onPin={() => void pin(m)} />
           ))}
@@ -136,7 +133,7 @@ export default function ChannelPage() {
           className="min-h-12 flex-1 rounded-xl"
         />
         <Button type="submit" className="h-12 rounded-xl px-5" disabled={busy || !text.trim()}>
-          {busy ? <Loader2 className="animate-spin" /> : <Send />} Post
+          {busy && <Loader2 className="animate-spin" />} Post
         </Button>
       </form>
     </div>
@@ -147,7 +144,7 @@ function Message({ m, chips, onPin }: { m: ChannelMessage; chips: Channel["chips
   return (
     <div className={cn("group flex gap-3 rounded-2xl p-3 hover:bg-muted/50")}>
       <Avatar className="size-9">
-        <AvatarFallback className="bg-brand-tint text-xs font-bold text-brand-text">{initials(m.author_name)}</AvatarFallback>
+        <AvatarFallback className="bg-muted text-xs font-bold">{initials(m.author_name)}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1 text-sm">
         <p className="text-xs text-muted-foreground">

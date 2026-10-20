@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 
-import { StageBadge } from "@/components/badges";
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { STARTERS } from "@/components/chat/starters";
 import { useMe } from "@/components/me";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, type MyItem, type Project } from "@/lib/api";
 import { age } from "@/lib/format";
@@ -61,7 +61,7 @@ function Landing() {
       <section className="bg-primary text-primary-foreground">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-8 pb-28 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           <div>
-            <p className="inline-flex rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">Welcome, {firstName} · REDADAIR Digital Team</p>
+            <p className="text-sm font-semibold text-white/80">Hi {firstName}</p>
             <h1 className="mt-4 max-w-[17ch] text-4xl leading-[1.05] font-extrabold sm:text-5xl">
               Tell us what&apos;s{" "}
               <span className="rounded-xl bg-card px-2 text-primary [box-decoration-break:clone]">not working</span>, or what could work better
@@ -80,7 +80,7 @@ function Landing() {
           {/* A taste of the conversation. Decorative; the real one is on /chat. */}
           <div aria-hidden="true" className="hidden animate-fade-up rounded-3xl bg-card p-5 text-card-foreground shadow-card lg:block">
             <div className="flex items-center gap-3 border-b pb-4">
-              <AssistantAvatar className="size-11 animate-breathe" />
+              <AssistantAvatar className="size-11" />
               <div>
                 <p className="font-bold">Feedback assistant</p>
                 <p className="text-sm text-muted-foreground">Asks a few questions, then sends it on</p>
@@ -107,9 +107,9 @@ function Landing() {
               <li key={id} style={rise(i)} className="animate-fade-up">
                 <Link
                   href={`/chat?start=${id}`}
-                  className="lift grid h-full gap-3 rounded-3xl border bg-card p-5 shadow-card hover:border-primary/40"
+                  className="lift grid h-full gap-3 rounded-3xl border bg-card p-5 shadow-card hover:border-foreground/20"
                 >
-                  <span className="grid size-11 place-items-center rounded-xl bg-brand-tint text-brand-text" aria-hidden="true">
+                  <span className="grid size-11 place-items-center rounded-xl bg-muted text-foreground" aria-hidden="true">
                     <Icon className="size-5" />
                   </span>
                   <span>
@@ -123,34 +123,31 @@ function Landing() {
         </section>
 
         {projects.length > 0 && (
-          <section aria-labelledby="tools-heading">
-            <h2 id="tools-heading" className="text-lg font-bold">
+          <section aria-labelledby="tools-heading" className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <h2 id="tools-heading" className="text-sm font-semibold">
               Already know which tool?
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">Pick it and the assistant starts with that tool in mind.</p>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              {GROUPS.map((g) => {
-                const list = projects.filter((p) => p.project_group === g.key);
-                if (list.length === 0) return null;
-                return (
-                  <div key={g.key} className="min-w-0">
-                    <h3 className="text-sm font-semibold text-muted-foreground">{g.label}</h3>
-                    <ul className="mt-2 flex flex-wrap gap-1.5">
+            <Select onValueChange={(slug) => router.push(`/chat?project=${encodeURIComponent(slug)}`)}>
+              <SelectTrigger className="h-11 w-64 rounded-xl" aria-labelledby="tools-heading">
+                <SelectValue placeholder="Choose a tool" />
+              </SelectTrigger>
+              <SelectContent>
+                {GROUPS.map((g) => {
+                  const list = projects.filter((p) => p.project_group === g.key);
+                  if (list.length === 0) return null;
+                  return (
+                    <SelectGroup key={g.key}>
+                      <SelectLabel>{g.label}</SelectLabel>
                       {list.map((p) => (
-                        <li key={p.slug}>
-                          <Link
-                            href={`/chat?project=${encodeURIComponent(p.slug)}`}
-                            className="inline-flex min-h-11 items-center rounded-full bg-secondary px-3.5 text-sm font-medium hover:bg-muted"
-                          >
-                            {p.name}
-                          </Link>
-                        </li>
+                        <SelectItem key={p.slug} value={p.slug}>
+                          {p.name}
+                        </SelectItem>
                       ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
+                    </SelectGroup>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           </section>
         )}
 
@@ -162,7 +159,7 @@ function Landing() {
             <ol className="mt-4 grid gap-4">
               {STEPS.map((s, i) => (
                 <li key={s.title} style={rise(i + 1)} className="grid animate-fade-up grid-cols-[2.25rem_minmax(0,1fr)] gap-3">
-                  <span className="grid size-9 place-items-center rounded-xl bg-primary font-extrabold text-primary-foreground" aria-hidden="true">
+                  <span className="grid size-9 place-items-center rounded-full bg-muted font-bold text-foreground" aria-hidden="true">
                     {i + 1}
                   </span>
                   <span className="text-sm leading-relaxed text-muted-foreground">
@@ -179,7 +176,7 @@ function Landing() {
               <h2 id="recent" className="text-lg font-bold">
                 Your recent feedback
               </h2>
-              <Link href="/my" className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-semibold text-brand-text hover:underline">
+              <Link href="/my" className="inline-flex min-h-11 items-center gap-1 rounded-md text-sm font-semibold text-muted-foreground hover:text-foreground hover:underline">
                 View all <ArrowRight className="size-4" aria-hidden="true" />
               </Link>
             </div>
@@ -219,7 +216,7 @@ function Landing() {
                         {r.reference} · {age(r.updated_at)}
                       </span>
                     </span>
-                    <StageBadge stage={r.stage} />
+                    <span className="shrink-0 text-sm">{r.status_text}</span>
                   </Link>
                 </li>
               ))}
@@ -229,13 +226,13 @@ function Landing() {
 
         <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2">
-            <ShieldCheck className="size-4 text-primary" aria-hidden="true" /> Visible only to the Digital Team
+            <ShieldCheck className="size-4" aria-hidden="true" /> Visible only to the Digital Team
           </span>
           <span className="inline-flex items-center gap-2">
-            <Users className="size-4 text-primary" aria-hidden="true" /> Every item has an owner and an approver
+            <Users className="size-4" aria-hidden="true" /> Every item has an owner and an approver
           </span>
           <span className="inline-flex items-center gap-2">
-            <Link2 className="size-4 text-primary" aria-hidden="true" /> Every item has a reference and a tracker
+            <Link2 className="size-4" aria-hidden="true" /> Every item has a reference and a tracker
           </span>
         </div>
       </div>

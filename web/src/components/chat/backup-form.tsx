@@ -80,8 +80,7 @@ export function BackupForm({
       <Alert>
         <TriangleAlert className="text-warning" />
         <AlertDescription>
-          <strong className="text-foreground">{NOTICE[limit ?? "offline"]}</strong> Answer these and the Digital team still gets your feedback. What
-          you typed is kept below.
+          <strong className="text-foreground">{NOTICE[limit ?? "offline"]}</strong> Answer these and the Digital team still gets your feedback.
         </AlertDescription>
       </Alert>
       <div className="grid gap-2">
@@ -131,7 +130,7 @@ export function BackupForm({
               key={h.value}
               className={cn(
                 "flex min-h-11 cursor-pointer items-center rounded-full border px-4 text-sm font-medium has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-ring",
-                howMuch === h.value && "border-primary bg-brand-tint text-brand-text",
+                howMuch === h.value && "border-foreground bg-muted",
               )}
             >
               <input type="radio" name="how-much" value={h.value} className="sr-only" checked={howMuch === h.value} onChange={() => setHowMuch(h.value)} />

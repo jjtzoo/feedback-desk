@@ -121,10 +121,10 @@ export default function TrackerPage() {
               My feedback
             </Link>
             <span aria-hidden="true">/</span>
-            <span className="rounded-full bg-primary px-2.5 py-0.5 font-mono font-semibold text-primary-foreground">{t.reference}</span>
+            <span className="font-mono font-semibold text-band-foreground">{t.reference}</span>
           </div>
           <h1 className="mt-4 text-3xl font-extrabold sm:text-4xl">{t.status_text}</h1>
-          {t.expected_by && <p className="mt-1 text-lg text-band-accent">Expected by {day(t.expected_by)}</p>}
+          {t.expected_by && <p className="mt-1 text-lg text-band-foreground">Expected by {day(t.expected_by)}</p>}
           <p className="mt-2 text-band-muted">
             {[t.project ?? "Tool to confirm", t.category].filter(Boolean).join(" · ")}
           </p>
@@ -167,7 +167,7 @@ export default function TrackerPage() {
               {t.merged_into ? (
                 <>
                   Merged into{" "}
-                  <Link className="font-mono font-semibold text-brand-text underline" href={`/track/${t.merged_into}`}>
+                  <Link className="font-mono font-semibold underline" href={`/track/${t.merged_into}`}>
                     {t.merged_into}
                   </Link>
                   . Follow that one for updates.
@@ -188,7 +188,7 @@ export default function TrackerPage() {
               {t.assignee ? (
                 <div className="mt-3 flex items-center gap-3">
                   <Avatar className="size-11">
-                    <AvatarFallback className="bg-brand-tint font-bold text-brand-text">{initials(t.assignee.name)}</AvatarFallback>
+                    <AvatarFallback className="bg-muted font-bold">{initials(t.assignee.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{t.assignee.name}</p>
@@ -211,14 +211,12 @@ export default function TrackerPage() {
               </h2>
               <p className="mt-2 font-semibold">{t.title}</p>
               {t.summary !== t.title && <p className="mt-1 text-sm text-muted-foreground">{t.summary}</p>}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <PriorityBadge priority={t.priority} />
-              </div>
+              <PriorityBadge priority={t.priority} className="mt-3 flex w-fit" />
               {t.attachments.length > 0 && (
                 <ul className="mt-4 grid gap-1.5">
                   {t.attachments.map((a) => (
                     <li key={a.id}>
-                      <a href={`/api/files/${a.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md text-sm text-brand-text hover:underline">
+                      <a href={`/api/files/${a.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-md text-sm underline-offset-4 hover:underline">
                         <FileText className="size-4" aria-hidden="true" /> {a.file_name} · {fileSize(a.size_bytes)}
                       </a>
                     </li>
@@ -240,8 +238,8 @@ export default function TrackerPage() {
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
             {t.latest_update && (
-              <section className="rounded-3xl border-[1.5px] border-primary/30 bg-card p-5 shadow-card" aria-labelledby="latest">
-                <h2 id="latest" className="text-sm font-semibold text-brand-text">
+              <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="latest">
+                <h2 id="latest" className="text-sm font-semibold text-muted-foreground">
                   Latest update
                 </h2>
                 <p className="mt-2 whitespace-pre-wrap">{t.latest_update.body}</p>
@@ -260,7 +258,7 @@ export default function TrackerPage() {
                   <li key={`${h.at}-${i}`} className="relative grid grid-cols-[1.25rem_1fr] gap-3 pb-5 last:pb-0">
                     {i < history.length - 1 && <span className="absolute top-4 left-[9px] h-full w-0.5 bg-border" aria-hidden="true" />}
                     <span
-                      className={cn("relative mt-1 size-[18px] rounded-full border-4 border-card", i === 0 ? "bg-primary" : "bg-muted-foreground/40")}
+                      className={cn("relative mt-1 size-[18px] rounded-full border-4 border-card", i === 0 ? "bg-foreground" : "bg-muted-foreground/40")}
                       aria-hidden="true"
                     />
                     <div className={cn(i > 0 && "text-muted-foreground")}>

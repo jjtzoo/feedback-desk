@@ -1,16 +1,15 @@
 "use client";
 
-import { Lightbulb, Sparkles, Star, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorText, type Release, type WorkType } from "@/lib/api";
 import { day } from "@/lib/format";
 
-const SECTIONS: { key: WorkType; title: string; icon: typeof Wrench }[] = [
-  { key: "new_feature", title: "New", icon: Lightbulb },
-  { key: "improvement", title: "Improved", icon: Sparkles },
-  { key: "fix", title: "Fixed", icon: Wrench },
+const SECTIONS: { key: WorkType; title: string }[] = [
+  { key: "new_feature", title: "New" },
+  { key: "improvement", title: "Improved" },
+  { key: "fix", title: "Fixed" },
 ];
 
 /** What's new (brief §4.8.4): published Friday releases per project, newest first. */
@@ -29,7 +28,7 @@ export default function WhatsNewPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <h1 className="text-3xl font-extrabold">What&apos;s new</h1>
-      <p className="mt-1 text-muted-foreground">Changes to our tools each week, many of them from your feedback.</p>
+      <p className="mt-1 text-muted-foreground">Changes to our tools each week.</p>
 
       {projects.length > 1 && (
         <div className="mt-6 flex flex-wrap gap-1.5" role="group" aria-label="Filter by tool">
@@ -39,7 +38,7 @@ export default function WhatsNewPage() {
               type="button"
               aria-pressed={project === slug}
               onClick={() => setProject(slug)}
-              className={`min-h-11 rounded-full px-3.5 text-sm font-medium ${project === slug ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-muted"}`}
+              className={`min-h-11 rounded-full px-3.5 text-sm font-medium ${project === slug ? "bg-foreground text-background" : "bg-secondary hover:bg-muted"}`}
             >
               {name}
             </button>
@@ -62,23 +61,19 @@ export default function WhatsNewPage() {
               <h2 className="text-xl font-bold">{r.project.name}</h2>
               <p className="text-sm text-muted-foreground">Week ending {day(r.week_ending)}</p>
             </header>
-            {SECTIONS.map(({ key, title, icon: Icon }) => {
+            {SECTIONS.map(({ key, title }) => {
               const items = r.items.filter((i) => i.work_type === key);
               if (!items.length) return null;
               return (
                 <section key={key} className="mt-5">
-                  <h3 className="flex items-center gap-2 text-sm font-semibold text-brand-text">
-                    <Icon className="size-4" aria-hidden="true" /> {title}
-                  </h3>
+                  <h3 className="text-sm font-semibold text-muted-foreground">{title}</h3>
                   <ul className="mt-2 grid gap-3">
                     {items.map((i) => (
-                      <li key={i.id} className="border-l-2 border-primary/30 pl-4">
+                      <li key={i.id} className="border-l-2 pl-4">
                         <p className="flex flex-wrap items-center gap-2 font-semibold">
                           {i.title}
                           {i.yours && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-brand-tint px-2 py-0.5 text-xs text-brand-text">
-                              <Star className="size-3" aria-hidden="true" /> From your feedback
-                            </span>
+                            <span className="text-xs font-normal text-muted-foreground">From your feedback</span>
                           )}
                         </p>
                         {i.body && <p className="text-sm text-muted-foreground">{i.body}</p>}

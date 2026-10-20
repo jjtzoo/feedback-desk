@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, Pencil } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { PriorityBadge } from "@/components/badges";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ export function ConfirmCard({
     ["Summary", card.summary !== card.title ? card.summary : ""],
   ];
   return (
-    <section aria-labelledby="confirm-title" className="animate-fade-up rounded-2xl border-[1.5px] border-primary/30 bg-card p-4 shadow-card sm:p-5">
+    <section aria-labelledby="confirm-title" className="animate-fade-up rounded-2xl border bg-card p-4 shadow-card sm:p-5">
       <h3 id="confirm-title" tabIndex={-1} className="text-base font-bold outline-none">
         Here&apos;s what I&apos;ll send. Is this right?
       </h3>
@@ -45,10 +45,10 @@ export function ConfirmCard({
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button className="h-11 rounded-xl px-5 text-base" onClick={onConfirm} disabled={busy}>
-          {busy ? <Loader2 className="animate-spin" /> : <Check />} Confirm
+          {busy && <Loader2 className="animate-spin" />} Confirm
         </Button>
         <Button variant="outline" className="h-11 rounded-xl px-5 text-base" onClick={onChange} disabled={busy}>
-          <Pencil /> Change
+          Change
         </Button>
       </div>
     </section>

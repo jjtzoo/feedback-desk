@@ -1,10 +1,9 @@
 "use client";
 
-import { ChevronRight, Inbox, MessageSquarePlus } from "lucide-react";
+import { ChevronRight, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { StageBadge } from "@/components/badges";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +28,7 @@ export default function MyFeedbackPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-extrabold">My feedback</h1>
-          <p className="mt-1 text-muted-foreground">Everything you&apos;ve sent or added a comment to, and where each one is up to.</p>
+          <p className="mt-1 text-muted-foreground">Everything you&apos;ve sent or followed.</p>
         </div>
         <Button asChild className="h-11 rounded-xl px-5">
           <Link href="/chat">
@@ -59,11 +58,9 @@ export default function MyFeedbackPage() {
         </div>
       )}
       {items?.length === 0 && (
-        <div className="mt-10 grid justify-items-center gap-3 rounded-3xl border border-dashed p-12 text-center">
-          <Inbox className="size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="font-semibold">No feedback yet</p>
-          <p className="max-w-sm text-sm text-muted-foreground">Feedback you submit appears here with its reference and current stage.</p>
-        </div>
+        <p className="mt-10 rounded-3xl border border-dashed p-10 text-center text-muted-foreground">
+          No feedback yet. Anything you send appears here.
+        </p>
       )}
       {[
         { title: "Open", list: open },
@@ -80,22 +77,21 @@ export default function MyFeedbackPage() {
                   <li key={i.reference}>
                     <Link
                       href={`/track/${i.reference}`}
-                      className="flex items-center gap-4 rounded-2xl border bg-card p-4 shadow-card transition-colors hover:border-primary/40"
+                      className="flex items-center gap-4 rounded-2xl border bg-card p-4 shadow-card transition-colors hover:border-foreground/30"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="flex flex-wrap items-center gap-2">
-                          <span className="font-mono text-sm font-semibold text-brand-text">{i.reference}</span>
-                          {i.following && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium">Following</span>}
+                          <span className="font-mono text-sm font-semibold">{i.reference}</span>
+                          {i.following && <span className="text-xs text-muted-foreground">Following</span>}
                         </span>
                         <span className="mt-1 block truncate font-semibold">{i.title}</span>
                         <span className="text-sm text-muted-foreground">
-                          {i.project ?? "Tool to confirm"} · {i.status_text} ·{" "}
+                          {i.project ?? "Tool to confirm"} · <span className="text-foreground">{i.status_text}</span> ·{" "}
                           <time dateTime={i.updated_at} title={when(i.updated_at)}>
                             updated {age(i.updated_at)} ago
                           </time>
                         </span>
                       </span>
-                      <StageBadge stage={i.stage} className="hidden sm:inline-flex" />
                       <ChevronRight className="size-5 text-muted-foreground" aria-hidden="true" />
                     </Link>
                   </li>

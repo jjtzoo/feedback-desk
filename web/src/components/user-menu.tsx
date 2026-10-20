@@ -1,6 +1,5 @@
 "use client";
 
-import { LayoutDashboard, LogOut, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -40,7 +39,7 @@ export function UserMenu({ tone = "light" }: { tone?: "light" | "dark" }) {
           aria-label={`Account: ${me.name}`}
         >
           <Avatar className="size-8">
-            <AvatarFallback className="bg-brand-tint text-xs font-bold text-brand-text">{initials(me.name)}</AvatarFallback>
+            <AvatarFallback className="bg-muted text-xs font-bold">{initials(me.name)}</AvatarFallback>
           </Avatar>
           <span className="hidden max-w-32 truncate text-sm font-semibold sm:inline">{me.name}</span>
         </Button>
@@ -55,19 +54,19 @@ export function UserMenu({ tone = "light" }: { tone?: "light" | "dark" }) {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild className="min-h-11">
           <Link href="/chat">
-            <MessageSquarePlus /> Give feedback
+            Give feedback
           </Link>
         </DropdownMenuItem>
         {me.role !== "staff" && (
           <DropdownMenuItem asChild className="min-h-11">
             <Link href="/console">
-              <LayoutDashboard /> Open the console
+              Open the console
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={signOut} className="min-h-11">
-          <LogOut /> Sign out
+          Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
