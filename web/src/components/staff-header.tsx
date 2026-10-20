@@ -10,9 +10,9 @@ import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/chat", label: "Give feedback" },
-  { href: "/my", label: "My feedback" },
-  { href: "/whats-new", label: "What's new" },
+  { href: "/chat", label: "Give feedback", tour: "nav-chat" },
+  { href: "/my", label: "My feedback", tour: "nav-my" },
+  { href: "/whats-new", label: "What's new", tour: "nav-whats-new" },
 ];
 
 /** The tracker belongs to My feedback, so that item stays highlighted there. */
@@ -36,6 +36,7 @@ export function StaffHeader() {
                 <Link
                   key={n.href}
                   href={n.href}
+                  data-tour={n.tour}
                   aria-current={active ? "page" : undefined}
                   className={cn(
                     "rounded-full px-3.5 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
@@ -49,8 +50,12 @@ export function StaffHeader() {
           </nav>
           <div className="ml-auto flex items-center gap-1">
             <GuideButton area="staff" />
-            <NotificationBell />
-            <UserMenu />
+            <div data-tour="bell">
+              <NotificationBell />
+            </div>
+            <div data-tour="user-menu">
+              <UserMenu />
+            </div>
           </div>
         </div>
         <nav aria-label="Main" className="grid grid-cols-3 gap-1 px-3 pb-2 md:hidden">
@@ -60,6 +65,7 @@ export function StaffHeader() {
               <Link
                 key={n.href}
                 href={n.href}
+                data-tour={n.tour}
                 aria-current={active ? "page" : undefined}
                 className={cn(
                   "grid min-h-11 place-items-center rounded-full px-2 text-center text-[13px] font-semibold whitespace-nowrap text-muted-foreground",

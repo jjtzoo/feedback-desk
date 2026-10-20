@@ -34,6 +34,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           <Link
             key={href}
             href={href}
+            data-tour={`console-${label.toLowerCase()}`}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
