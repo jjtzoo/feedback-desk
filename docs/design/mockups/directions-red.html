@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Landing page: red directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9eaec; font-family: system-ui, sans-serif; color: #111; }
+  .page-title { max-width: 1240px; margin: 32px auto 8px; padding: 0 20px; font-size: 15px; color: #444; }
+  .dir { max-width: 1240px; margin: 0 auto 56px; padding: 0 20px; }
+  .label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 12px; }
+  .label b { font-size: 22px; white-space: nowrap; }
+  .label span { color: #555; }
+
+  .frame {
+    --red: #d0101b; --red-press: #a80c15; --red-tint: #fff1f1; --red-text: #b00d17;
+    --ink: #14161a; --muted: #5b616b; --line: #e6e8ec; --line-strong: #cfd3da; --bg: #f6f7f9; --surface: #fff; --chip: #f1f2f5;
+    --r: 16px; --r-sm: 10px; --shadow: 0 1px 2px rgba(20,22,26,.06), 0 8px 24px rgba(20,22,26,.08);
+    background: var(--bg); color: var(--ink); font-family: "Plus Jakarta Sans", sans-serif; border-radius: 14px; overflow: hidden; border: 1px solid #d5d7db;
+  }
+  .stripe { height: 4px; background: var(--red); }
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 68px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; letter-spacing: -.01em; }
+  .mark { width: 32px; height: 32px; border-radius: 9px; background: var(--red); display: grid; place-items: center; color: #fff; }
+  .top nav { display: flex; align-items: center; gap: 22px; font-size: 15px; font-weight: 500; }
+  .top nav a { color: var(--muted); text-decoration: none; }
+  .btn-outline { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--ink); color: var(--ink) !important; font-weight: 600; }
+
+  .hero { padding: 64px 32px 112px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 16px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  h1 { margin: 0; font-weight: 800; font-size: 52px; line-height: 1.05; letter-spacing: -.025em; max-width: 17ch; }
+  .lead { margin: 18px 0 0; font-size: 19px; line-height: 1.55; max-width: 54ch; }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; margin-top: -72px; padding: 0 32px 48px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow); }
+  .chat-head { display: flex; align-items: center; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .avatar { width: 42px; height: 42px; border-radius: 12px; background: var(--red-tint); color: var(--red); display: grid; place-items: center; }
+  .chat-head b { display: block; font-size: 16px; }
+  .chat-head small { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
+  .msgs { padding: 22px; display: grid; gap: 16px; min-height: 180px; align-content: start; }
+  .bubble { margin: 0; justify-self: start; background: var(--chip); border-radius: 16px 16px 16px 4px; padding: 12px 16px; font-size: 16px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; font-weight: 500; padding: 0 16px; min-height: 44px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; transition: border-color .15s, background .15s; }
+  .chips button svg { color: var(--red); }
+  .chips button:hover { border-color: var(--red); background: var(--red-tint); }
+  .apps { padding: 0 22px 18px; }
+  .apps p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+  .chips.small button { font-size: 14px; min-height: 36px; padding: 0 12px; background: var(--chip); border-color: transparent; }
+  .composer { display: flex; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--line); }
+  .composer textarea { flex: 1; font: inherit; font-size: 16px; min-height: 54px; resize: none; padding: 15px 16px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+  .send { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-weight: 700; font-size: 16px; padding: 0 24px; min-height: 54px; border: 0; border-radius: 12px; background: var(--red); color: #fff; cursor: pointer; }
+  .send:hover { background: var(--red-press); }
+
+  aside { display: grid; gap: 24px; align-content: start; }
+  aside .card { padding: 22px; }
+  aside h2 { margin: 0 0 16px; font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .steps ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+  .steps li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; font-size: 15px; line-height: 1.45; color: var(--muted); }
+  .steps li b { display: block; color: var(--ink); font-weight: 700; }
+  .num { width: 34px; height: 34px; border-radius: 10px; background: var(--red); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 15px; }
+  .lookup p { margin: 0 0 12px; font-size: 15px; color: var(--muted); }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; min-width: 0; font: inherit; font-size: 15px; min-height: 44px; padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--line-strong); }
+  .ghost { font: inherit; font-weight: 600; font-size: 15px; padding: 0 16px; min-height: 44px; border-radius: var(--r-sm); border: 1.5px solid var(--ink); background: transparent; color: var(--ink); white-space: nowrap; }
+  .mono { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--ink); background: var(--chip); padding: 1px 6px; border-radius: 6px; }
+  .trust { display: flex; flex-wrap: wrap; gap: 24px; padding: 0 32px 40px; color: var(--muted); font-size: 14px; }
+  .trust span { display: inline-flex; align-items: center; gap: 8px; }
+  .trust svg { color: var(--red); }
+  .foot { padding: 20px 32px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); background: var(--surface); }
+
+  /* D: bold red hero */
+  .d .hero { background: var(--red); color: #fff; }
+  .d .eyebrow { background: rgba(255,255,255,.16); color: #fff; }
+  .d .lead { color: #ffe3e3; }
+  /* E: charcoal hero, red-led */
+  .d h1 em { font-style: normal; background: #fff; color: var(--red); padding: 0 .14em; border-radius: 10px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .e .hero { background: var(--ink); color: #fff; }
+  .e .eyebrow { background: var(--red); color: #fff; }
+  .e .lead { color: #c4c9d1; }
+  .e h1 em { font-style: normal; color: #ff4d55; }
+
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } h1 { font-size: 36px; } .top nav a:not(.btn-outline) { display: none; } .hero { padding: 40px 20px 96px; } .grid, .trust { padding-left: 16px; padding-right: 16px; } }
+</style>
+</head>
+<body>
+<p class="page-title">Two red-led directions with a modern layout. Same content; the difference is how much red the hero carries.</p>
+
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-bug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 1 1 6 0v1.1"/><path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.5 9C4.6 8.8 3 7.1 3 5M6 13H2M3 21c0-2.1 1.7-3.9 3.8-4M20.97 5c0 2.1-1.6 3.8-3.5 4M22 13h-4M17.2 17c2.1.1 3.8 1.9 3.8 4"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"/><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></symbol>
+  <symbol id="i-idea" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6M10 22h4"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+</svg>
+
+<template id="landing">
+  <div class="frame">
+    <div class="stripe"></div>
+    <header class="top">
+      <span class="logo"><span class="mark"><svg width="18" height="18"><use href="#i-chat"/></svg></span>Feedback Desk</span>
+      <nav><a href="#">Follow up on feedback</a><a class="btn-outline" href="#">IT team sign in</a></nav>
+    </header>
+    <div class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Redadair group IT</p>
+        <h1>Tell us what's <em>not working</em>, or what would help</h1>
+        <p class="lead">Problems, access requests and ideas about any group app. It takes about two minutes, and you get a reference so you can see where it's up to.</p>
+      </div>
+    </div>
+    <div class="wrap grid">
+      <section class="card">
+        <div class="chat-head"><span class="avatar"><svg width="20" height="20"><use href="#i-chat"/></svg></span><div><b>Feedback assistant</b><small><span class="dot"></span>Online. Asks a few questions, then sends it to the IT team</small></div></div>
+        <div class="msgs">
+          <p class="bubble">Hi. What would you like us to know?</p>
+          <div class="chips">
+            <button><svg width="16" height="16"><use href="#i-bug"/></svg>Something's broken</button>
+            <button><svg width="16" height="16"><use href="#i-key"/></svg>I need access</button>
+            <button><svg width="16" height="16"><use href="#i-idea"/></svg>I have an idea</button>
+            <button><svg width="16" height="16"><use href="#i-help"/></svg>How do I…?</button>
+          </div>
+        </div>
+        <div class="apps">
+          <p>Which app is it about? (optional)</p>
+          <div class="chips small"><button>CPD Tracker</button><button>Staff Admin portal</button><button>Training portal</button><button>Financial Platform</button><button>Rake</button><button>All 14 apps</button></div>
+        </div>
+        <div class="composer"><textarea placeholder="Or describe it in your own words"></textarea><button class="send"><svg width="18" height="18"><use href="#i-send"/></svg>Send</button></div>
+      </section>
+      <aside>
+        <section class="card steps">
+          <h2>What happens next</h2>
+          <ol>
+            <li><span class="num">1</span><span><b>Tell us in your own words</b>The assistant asks only what the team needs.</span></li>
+            <li><span class="num">2</span><span><b>Check the summary</b>Nothing is sent until you confirm it.</span></li>
+            <li><span class="num">3</span><span><b>Track it</b>You get a reference like <span class="mono">FD-0137</span> and a link to its status.</span></li>
+          </ol>
+        </section>
+        <section class="card lookup">
+          <h2>Follow up on something you sent</h2>
+          <p>Enter your work email and we'll send you a link to all your feedback.</p>
+          <div class="row"><input placeholder="sam.lee@redadair.com.au" /><button class="ghost">Email me a link</button></div>
+        </section>
+      </aside>
+    </div>
+    <div class="trust">
+      <span><svg width="16" height="16"><use href="#i-shield"/></svg>Only the IT team sees your feedback</span>
+      <span><svg width="16" height="16"><use href="#i-clock"/></svg>One shared queue, so nothing waits on one person</span>
+      <span><svg width="16" height="16"><use href="#i-link"/></svg>Every item gets a tracking link</span>
+    </div>
+    <div class="foot">Feedback goes to the Redadair group IT team. Chats are processed by Google's Gemini model.</div>
+  </div>
+</template>
+
+<section class="dir d"><div class="label"><b>D. Bold red</b><span>Red hero band, red mark and stripe, red Send. Unmistakably the brand.</span></div></section>
+<section class="dir e"><div class="label"><b>E. Red-led</b><span>Charcoal hero with red highlights: stripe, mark, badge, the key words, numbers and Send.</span></div></section>
+
+<script>
+  const tpl = document.getElementById("landing");
+  document.querySelectorAll(".dir").forEach((d) => d.appendChild(tpl.content.cloneNode(true)));
+</script>
+</body>
+</html>

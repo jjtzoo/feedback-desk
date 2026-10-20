@@ -1,0 +1,4 @@
+# Admin overrides checked before owner routing (brief §5.3). project: null = any project.
+# Interim: access requests go to Chris until the IT Admin is named (spec v3 D20).
+routing_rules:
+  - {project: null, category: access_request, assignee: chris@redadair.example, priority_order: 10}

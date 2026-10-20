@@ -1,0 +1,22 @@
+# What never goes to Google Cloud (company handover manual §9, §10). Not secret management:
+# secrets live in Secret Manager. Images are built from backend/ and web/ (see their own files).
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+.claude/
+docs/
+crumb/
+ticketing app.md
+deploy/rendered/
+**/node_modules/
+**/.venv/
+**/__pycache__/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.pytest_cache/
+backend/.localdb/
+backend/.uploads/
+web/.next/
+*.log

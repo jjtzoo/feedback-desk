@@ -1,0 +1,82 @@
+# Cloud Run service for the API (spec v3 D29, D30). A template: deploy.sh / deploy.ps1 fill the
+# ${...} values from deploy/<env>.env and write the result to deploy/rendered/<env>/ for review
+# before applying it. No secrets here: they come from Secret Manager by reference.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: ${API_SERVICE}
+  labels:
+    project: feedback
+    environment: ${DEPLOY_ENV}
+    application: api
+    owner: digital-team
+    purpose: feedback-api
+    deployment-type: cloud-run-service
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      labels:
+        project: feedback
+        environment: ${DEPLOY_ENV}
+        application: api
+        owner: digital-team
+        purpose: feedback-api
+        deployment-type: cloud-run-service
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/cpu-throttling: "true"  # request-based billing
+        run.googleapis.com/startup-cpu-boost: "true"
+        run.googleapis.com/cloudsql-instances: ${CLOUDSQL_INSTANCE}
+    spec:
+      serviceAccountName: ${API_SA}
+      timeoutSeconds: 300
+      containerConcurrency: 80
+      containers:
+        - image: ${API_IMAGE}
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          startupProbe:
+            httpGet:
+              path: /api/health
+            periodSeconds: 5
+            failureThreshold: 24
+          env:
+            - {name: APP_ENV, value: "${DEPLOY_ENV}"}
+            - {name: APP_BASE_URL, value: "${APP_BASE_URL}"}
+            - {name: COOKIE_SECURE, value: "true"}
+            - {name: ALLOWED_DOMAINS, value: "${ALLOWED_DOMAINS}"}
+            - {name: DEV_LOGIN, value: "false"}
+            - {name: GOOGLE_OAUTH_CLIENT_ID, value: "${GOOGLE_OAUTH_CLIENT_ID}"}
+            - {name: MODEL_PROVIDER, value: "${MODEL_PROVIDER}"}
+            - {name: MODEL_NAME, value: "${MODEL_NAME}"}
+            - {name: GOOGLE_CLOUD_PROJECT, value: "${PROJECT_ID}"}
+            - {name: GOOGLE_CLOUD_LOCATION, value: "${REGION}"}
+            - {name: STORAGE_BACKEND, value: gcs}
+            - {name: GCS_BUCKET, value: "${GCS_BUCKET}"}
+            - {name: EMAIL_BACKEND, value: "${EMAIL_BACKEND}"}
+            - {name: SMTP_HOST, value: "${SMTP_HOST}"}
+            - {name: SMTP_PORT, value: "${SMTP_PORT}"}
+            - {name: SMTP_STARTTLS, value: "${SMTP_STARTTLS}"}
+            - {name: SMTP_USERNAME, value: "${SMTP_USERNAME}"}
+            - {name: MAIL_FROM, value: "${MAIL_FROM}"}
+            - {name: GMAIL_SENDER, value: "${GMAIL_SENDER}"}
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-database-url, key: latest}}
+            - name: SECRET_KEY
+              valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-secret-key, key: latest}}
+            - name: GOOGLE_API_KEY
+              valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-google-api-key, key: latest}}
+            - name: GOOGLE_OAUTH_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-oauth-client-secret, key: latest}}
+            - name: SMTP_PASSWORD
+              valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-smtp-password, key: latest}}
+            - name: JOB_TOKEN
+              valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-job-token, key: latest}}
+${TRAFFIC_BLOCK}

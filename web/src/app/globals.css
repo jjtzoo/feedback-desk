@@ -1,0 +1,188 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/* Feedback visual direction (spec v3 D17): modern and red-led. Red is the one brand colour:
+   primary actions, the top stripe, the logo mark, key highlights. Components read these
+   tokens only; no hex values in components. */
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-jakarta);
+  --font-mono: var(--font-jetbrains);
+  --font-heading: var(--font-jakarta);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-band: var(--band);
+  --color-band-foreground: var(--band-foreground);
+  --color-band-muted: var(--band-muted);
+  --color-band-accent: var(--band-accent);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-text: var(--brand-text);
+  --color-success: var(--success);
+  --color-success-tint: var(--success-tint);
+  --color-warning: var(--warning);
+  --color-warning-tint: var(--warning-tint);
+  --color-info: var(--info);
+  --color-info-tint: var(--info-tint);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+  --shadow-card: 0 1px 2px rgb(20 22 26 / 0.06), 0 8px 24px rgb(20 22 26 / 0.08);
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: #f6f7f9;
+  --foreground: #14161a;
+  --card: #ffffff;
+  --card-foreground: #14161a;
+  --popover: #ffffff;
+  --popover-foreground: #14161a;
+  --primary: #d0101b; /* the brand red: one primary action per view */
+  --primary-foreground: #ffffff;
+  --secondary: #f1f2f5;
+  --secondary-foreground: #14161a;
+  --muted: #f1f2f5;
+  --muted-foreground: #5b616b;
+  --accent: #fff1f1; /* red tint behind red text and hovers */
+  --accent-foreground: #b00d17;
+  --destructive: #b00d17;
+  --border: #e6e8ec;
+  --input: #cfd3da;
+  --ring: #d0101b;
+  --band: #14161a; /* charcoal header and hero band (mockup E) */
+  --band-foreground: #ffffff;
+  --band-muted: #c4c9d1;
+  --band-accent: #ff4d55; /* red text on the charcoal band (6.1:1) */
+  --brand-tint: #fff1f1;
+  --brand-text: #b00d17;
+  --success: #15803d;
+  --success-tint: #dcfce7;
+  --warning: #b45309;
+  --warning-tint: #fef3c7;
+  --info: #1d4ed8;
+  --info-tint: #e8effd;
+  /* Chart series, validated with the dataviz palette script (light and dark). */
+  --series-1: #2a78d6;
+  --series-2: #1baf7a;
+}
+
+.dark {
+  --background: #0f1114;
+  --foreground: #f2f3f5;
+  --card: #181b20;
+  --card-foreground: #f2f3f5;
+  --popover: #1d2026;
+  --popover-foreground: #f2f3f5;
+  --primary: #d0101b; /* solid red buttons keep white text in both themes */
+  --primary-foreground: #ffffff;
+  --secondary: #23272e;
+  --secondary-foreground: #f2f3f5;
+  --muted: #23272e;
+  --muted-foreground: #a3a9b3;
+  --accent: #3a1416;
+  --accent-foreground: #ff8a90;
+  --destructive: #ff6b72;
+  --border: #2a2e35;
+  --input: #3a3f48;
+  --ring: #ff5a62;
+  --band: #000000;
+  --band-foreground: #ffffff;
+  --band-muted: #b4bac3;
+  --band-accent: #ff5a62;
+  --brand-tint: #3a1416;
+  --brand-text: #ff8a90;
+  --success: #4ade80;
+  --success-tint: #12301d;
+  --warning: #f5b041;
+  --warning-tint: #3a2a10;
+  --info: #93b4ff;
+  --info-tint: #17233d;
+  --series-1: #3987e5;
+  --series-2: #199e70;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    min-height: 100dvh;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@utility shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility animate-fade-up {
+  animation: fade-up 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 120ms !important;
+    transition-duration: 120ms !important;
+    transform: none !important;
+  }
+}

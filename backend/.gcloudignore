@@ -1,0 +1,14 @@
+# Build context for the API image: only what runs in the cloud.
+.venv/
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.localdb/
+.uploads/
+tests/
+evals/
+scripts/
+.env
+.env.*
+*.log

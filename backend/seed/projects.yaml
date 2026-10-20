@@ -1,0 +1,48 @@
+# The intranet catalogue the agent recognises at launch (brief §3). Edited later on the
+# admin page; this file only seeds an empty database. owner is a digital_staff email.
+projects:
+  - {slug: it-asset, name: IT Asset, group: platforms, owner: darlene@redadair.example,
+     description: Register of laptops, phones and other IT equipment issued to staff.,
+     keywords: [laptop, hardware, equipment, asset, device], aliases: [asset register, it assets]}
+  - {slug: staff-admin-portal, name: Staff Admin Portal, group: platforms, owner: marc@redadair.example,
+     description: Staff records, leave and HR admin.,
+     keywords: [leave, hr, payslip, staff record, timesheet], aliases: [staff admin, admin portal, hr portal]}
+  - {slug: training-portal, name: Training Portal, group: platforms, owner: marc@redadair.example,
+     description: Courses and training records.,
+     keywords: [course, training, module, induction], aliases: [training]}
+  - {slug: cpd-tracker, name: CPD Tracker, group: platforms, owner: mario@redadair.example,
+     description: Continuing professional development points and certificates.,
+     keywords: [cpd, points, certificate, professional development], aliases: [cpd]}
+  - {slug: financial-platform, name: Financial Platform, group: platforms, owner: mario@redadair.example,
+     description: Invoices, expenses and financial reports.,
+     keywords: [invoice, expense, finance, budget, report], aliases: [finance, financial]}
+  - {slug: workflow-atlas, name: REDADAIR Workflow Atlas, group: platforms, owner: darlene@redadair.example,
+     description: Process maps and workflow guides.,
+     keywords: [workflow, process, procedure], aliases: [workflow atlas, atlas]}
+  - {slug: adair-epm-portal, name: ADAIR EPM Portal, group: platforms, owner: mario@redadair.example,
+     description: Emergency planning and management portal for ADAIR.,
+     keywords: [emergency plan, evacuation, epm], aliases: [epm, epm portal]}
+  - {slug: flipbook, name: Flipbook, group: platforms, owner: marc@redadair.example,
+     description: Page-turning documents and brochures.,
+     keywords: [flipbook, brochure, pages], aliases: [flip book]}
+  - {slug: fpows-portal, name: FPOWS Portal, group: platforms, owner: marc@redadair.example,
+     description: FPOWS portal.,
+     keywords: [fpows], aliases: [fpows]}
+  - {slug: afss-portal, name: AFSS Portal, group: platforms, owner: darlene@redadair.example,
+     description: Annual fire safety statements.,
+     keywords: [afss, fire safety statement, annual statement], aliases: [afss]}
+  - {slug: goformz-extension-portal, name: GoFormz Extension Portal, group: platforms, owner: marc@redadair.example,
+     description: Extensions for GoFormz forms.,
+     keywords: [goformz, form, inspection form], aliases: [goformz, go formz]}
+  - {slug: agents-platform, name: Agents Platform (REDADAIR Helpers), group: agents, owner: marc@redadair.example,
+     description: The platform that hosts REDADAIR's helper agents.,
+     keywords: [helper, helpers, agents platform], aliases: [redadair helpers, helpers]}
+  - {slug: rake-agent, name: RAKE Agent, group: agents, owner: darlene@redadair.example,
+     description: RAKE, the policy and knowledge assistant.,
+     keywords: [rake, policy answer, knowledge], aliases: [rake, blaze]}
+  - {slug: fire-safety-blog-agent, name: Fire Safety Blog Agent, group: agents, owner: darlene@redadair.example,
+     description: Agent that drafts fire safety blog posts.,
+     keywords: [blog, post, article], aliases: [blog agent, blog]}
+  - {slug: intranet, name: Intranet site itself, group: other, owner: marc@redadair.example,
+     description: The REDADAIR intranet home page and navigation.,
+     keywords: [intranet, home page, tile, navigation, menu], aliases: [intranet]}

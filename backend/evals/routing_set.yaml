@@ -1,0 +1,50 @@
+# The Sprint 2 gate test set (brief §9): 40 labelled items. A first draft written by the
+# developer on 2026-10-20 for Marc to correct and extend; labels are what a person on the
+# Digital team would expect. Gate: 85 % project, 85 % work type, 80 % assignee (Gemini).
+#
+# message: what the staff member types first
+# answers: replies to the agent's follow-up questions, in order (used only if it asks)
+# project: expected project slug, or general
+# work_type: fix | improvement | new_feature | no_change
+# assignee: expected first assignee's name, or "needs review"
+items:
+  - {message: "RAKE gives a blank answer when I ask about annual leave.", answers: ["It's annoying", "I expected an answer but got an empty box"], project: rake-agent, work_type: fix, assignee: Darlene}
+  - {message: "The CPD Tracker won't save my certificate upload, error 500 every time.", answers: ["Blocking my work", "I expected it to save but got error 500"], project: cpd-tracker, work_type: fix, assignee: Mario}
+  - {message: "Staff Admin Portal sign-in loops back to the login page on my iPhone.", answers: ["Blocking my work", "I expected the dashboard but got the sign-in page again"], project: staff-admin-portal, work_type: fix, assignee: Marc}
+  - {message: "Flipbook pages are blank on the safety brochure.", answers: ["It's annoying", "I expected pages but got white screens"], project: flipbook, work_type: fix, assignee: Marc}
+  - {message: "The Financial Platform invoice report shows last month's totals.", answers: ["It's annoying"], project: financial-platform, work_type: fix, assignee: Mario}
+  - {message: "IT Asset lists a laptop I returned in July as still assigned to me.", answers: ["It's a nice-to-have"], project: it-asset, work_type: fix, assignee: Darlene}
+  - {message: "The AFSS Portal is really slow to load the statement list, takes ages.", answers: ["It's annoying"], project: afss-portal, work_type: fix, assignee: Darlene}
+  - {message: "ADAIR EPM Portal crashes when I open an evacuation plan.", answers: ["Blocking my work", "I expected the plan to open but the page crashed"], project: adair-epm-portal, work_type: fix, assignee: Mario}
+  - {message: "GoFormz Extension Portal doesn't sync the inspection form, it's stuck on pending.", answers: ["Blocking my work", "I expected it to sync but it stays pending"], project: goformz-extension-portal, work_type: fix, assignee: Marc}
+  - {message: "The Fire Safety Blog Agent keeps writing posts with the wrong company name.", answers: ["It's annoying"], project: fire-safety-blog-agent, work_type: fix, assignee: Darlene}
+  - {message: "Workflow Atlas shows an old version of the hot works procedure.", answers: ["It's annoying"], project: workflow-atlas, work_type: fix, assignee: Darlene}
+  - {message: "The FPOWS Portal search returns nothing even for known jobs.", answers: ["Blocking my work", "I expected results but got none"], project: fpows-portal, work_type: fix, assignee: Marc}
+  - {message: "Training Portal module video won't play, it's broken.", answers: ["It's annoying", "I expected the video but got a spinner"], project: training-portal, work_type: fix, assignee: Marc}
+  - {message: "The helpers on the Agents Platform time out after a minute.", answers: ["It's annoying"], project: agents-platform, work_type: fix, assignee: Marc}
+  - {message: "The intranet home page tile for Flipbook goes to a 404.", answers: ["It's annoying"], project: flipbook, work_type: fix, assignee: Marc}
+  - {message: "It would be nice if CPD Tracker could export my points to a spreadsheet.", answers: ["It's a nice-to-have"], project: cpd-tracker, work_type: new_feature, assignee: Mario}
+  - {message: "Could you add a dark mode to the Training Portal?", answers: ["It's a nice-to-have"], project: training-portal, work_type: new_feature, assignee: Marc}
+  - {message: "Please add a filter by site to the IT Asset list.", answers: ["It's annoying"], project: it-asset, work_type: new_feature, assignee: Darlene}
+  - {message: "RAKE answers would be better if they linked to the policy page.", answers: ["It's a nice-to-have"], project: rake-agent, work_type: improvement, assignee: Darlene}
+  - {message: "The Financial Platform expense form could be faster to fill in on a phone.", answers: ["It's annoying"], project: financial-platform, work_type: improvement, assignee: Mario}
+  - {message: "The Staff Admin Portal leave form is confusing, too many clicks.", answers: ["It's annoying"], project: staff-admin-portal, work_type: improvement, assignee: Marc}
+  - {message: "Workflow Atlas is hard to find things in, the menu is unclear.", answers: ["It's annoying"], project: workflow-atlas, work_type: improvement, assignee: Darlene}
+  - {message: "The AFSS Portal would help more if it emailed me before statements are due.", answers: ["It's a nice-to-have"], project: afss-portal, work_type: new_feature, assignee: Darlene}
+  - {message: "Can we have a way to bulk upload forms to the GoFormz Extension Portal?", answers: ["It's annoying"], project: goformz-extension-portal, work_type: new_feature, assignee: Marc}
+  - {message: "I need access to the Financial Platform to approve invoices.", answers: [], project: financial-platform, work_type: no_change, assignee: Chris}
+  - {message: "Please give me access to the ADAIR EPM Portal, I've joined the ADAIR team.", answers: [], project: adair-epm-portal, work_type: no_change, assignee: Chris}
+  - {message: "Need a login for the Training Portal for our new starter.", answers: [], project: training-portal, work_type: no_change, assignee: Chris}
+  - {message: "How do I reset my CPD points for the new year?", answers: [], project: cpd-tracker, work_type: no_change, assignee: Mario}
+  - {message: "Where can I find the brochure templates in Flipbook?", answers: [], project: flipbook, work_type: no_change, assignee: Marc}
+  - {message: "Thanks for the new RAKE search, awesome work.", answers: [], project: rake-agent, work_type: no_change, assignee: Darlene}
+  - {message: "Loving the new IT Asset layout, really good.", answers: [], project: it-asset, work_type: no_change, assignee: Darlene}
+  - {message: "The blog agent's last post was brilliant, well done.", answers: [], project: fire-safety-blog-agent, work_type: no_change, assignee: Darlene}
+  - {message: "Something on the system is off, the numbers look weird.", answers: ["Not sure", "It's annoying"], project: general, work_type: fix, assignee: needs review}
+  - {message: "The new page is confusing.", answers: ["Not sure", "It's annoying"], project: general, work_type: improvement, assignee: needs review}
+  - {message: "Payslips in the Staff Admin Portal show the wrong super amount.", answers: ["Blocking my work"], project: staff-admin-portal, work_type: fix, assignee: Marc}
+  - {message: "Rake keeps saying it can't find the fire door policy even though it exists.", answers: ["It's annoying", "I expected the policy but got a not-found message"], project: rake-agent, work_type: fix, assignee: Darlene}
+  - {message: "The CPD Tracker certificate list has duplicate records for my course.", answers: ["It's a nice-to-have"], project: cpd-tracker, work_type: fix, assignee: Mario}
+  - {message: "Invoices in the finance platform are missing the ABN.", answers: ["Blocking my work"], project: financial-platform, work_type: fix, assignee: Mario}
+  - {message: "The intranet menu is clunky on my phone.", answers: ["It's annoying"], project: intranet, work_type: improvement, assignee: Marc}
+  - {message: "It would help if the helpers platform remembered my last question.", answers: ["It's a nice-to-have"], project: agents-platform, work_type: improvement, assignee: Marc}

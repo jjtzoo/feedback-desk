@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Landing page directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #e9eaec; font-family: system-ui, sans-serif; color: #111; }
+  .page-title { max-width: 1240px; margin: 32px auto 8px; padding: 0 20px; font-size: 15px; color: #444; }
+  .dir { max-width: 1240px; margin: 0 auto 48px; padding: 0 20px; }
+  .label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 12px; }
+  .label b { white-space: nowrap; }
+  .label b { font-size: 22px; }
+  .label span { color: #555; }
+  .frame { background: var(--bg); color: var(--ink); font-family: var(--font); border-radius: 12px; overflow: hidden; border: 1px solid #d5d7db; }
+
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 0 32px; height: 64px; background: var(--top-bg); color: var(--top-ink); border-bottom: 1px solid var(--top-line); }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  .mark { width: 28px; height: 28px; border-radius: var(--r-sm); background: var(--accent); display: grid; place-items: center; color: #fff; font-size: 13px; }
+  .top nav { display: flex; gap: 24px; font-size: 15px; }
+  .top nav a { color: inherit; text-decoration: none; opacity: .85; }
+  .top nav a.signin { opacity: 1; font-weight: 600; }
+
+  .hero { background: var(--hero-bg); color: var(--hero-ink); padding: 56px 32px 96px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  .eyebrow { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--eyebrow); letter-spacing: .02em; }
+  h1 { margin: 0; font-family: var(--head-font); font-weight: var(--head-weight); font-size: 46px; line-height: 1.1; letter-spacing: -.01em; max-width: 18ch; text-transform: var(--head-case); }
+  .lead { margin: 16px 0 0; font-size: 19px; line-height: 1.5; max-width: 52ch; color: var(--hero-muted); }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; margin-top: -64px; padding: 0 32px 40px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+  .chat { display: grid; }
+  .chat-head { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--soft); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .chat-head b { display: block; font-size: 16px; }
+  .chat-head small { color: var(--muted); font-size: 13px; }
+  .msgs { padding: 20px; display: grid; gap: 14px; min-height: 180px; align-content: start; }
+  .bubble { margin: 0; justify-self: start; background: var(--soft); border-radius: var(--r) var(--r) var(--r) 4px; padding: 12px 16px; font-size: 16px; max-width: 80%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font: inherit; font-size: 15px; padding: 10px 16px; min-height: 44px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); cursor: pointer; }
+  .chips button:hover { border-color: var(--accent); }
+  .apps { padding: 0 20px 16px; }
+  .apps p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+  .chips.small button { font-size: 14px; padding: 6px 12px; min-height: 36px; background: var(--chip); border-color: transparent; }
+  .composer { display: flex; gap: 10px; padding: 16px 20px; border-top: 1px solid var(--line); background: var(--composer); border-radius: 0 0 var(--r) var(--r); }
+  .composer textarea { flex: 1; font: inherit; font-size: 16px; min-height: 52px; resize: none; padding: 14px; border-radius: var(--r-sm); border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+  .primary { font: inherit; font-weight: 600; font-size: 16px; padding: 0 22px; min-height: 52px; border: 0; border-radius: var(--r-sm); background: var(--accent); color: #fff; cursor: pointer; }
+
+  aside { display: grid; gap: 24px; align-content: start; }
+  aside .card { padding: 20px; }
+  aside h2 { margin: 0 0 14px; font-size: 18px; font-family: var(--head-font); font-weight: var(--head-weight); text-transform: var(--h2-case); }
+  .steps ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .steps li { display: grid; grid-template-columns: 32px 1fr; gap: 12px; font-size: 15px; line-height: 1.45; color: var(--muted); }
+  .steps li b { display: block; color: var(--ink); font-weight: 600; }
+  .num { width: 32px; height: 32px; border-radius: 50%; background: var(--soft); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
+  .lookup p { margin: 0 0 12px; font-size: 15px; color: var(--muted); }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; font: inherit; font-size: 15px; min-height: 44px; padding: 0 12px; border-radius: var(--r-sm); border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+  .ghost { font: inherit; font-weight: 600; font-size: 15px; padding: 0 16px; min-height: 44px; border-radius: var(--r-sm); border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; }
+  .mono { font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 14px; }
+  .foot { padding: 20px 32px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+
+  .a { --font: "Plus Jakarta Sans", sans-serif; --head-font: var(--font); --head-weight: 700; --head-case: none; --h2-case: none;
+       --bg: #f5f6fa; --surface: #fff; --ink: #0f1b2d; --muted: #586377; --line: #e3e7ef; --line-strong: #cdd3de;
+       --accent: #e5484d; --accent-ink: #1e3a8a; --soft: #eaf0fb; --chip: #eef1f7; --composer: #fafbfd;
+       --top-bg: #0f1b2d; --top-ink: #fff; --top-line: #0f1b2d; --hero-bg: #0f1b2d; --hero-ink: #fff; --hero-muted: #c3cbd9; --eyebrow: #ff8f8f;
+       --r: 16px; --r-sm: 10px; }
+  .b { --font: "IBM Plex Sans", sans-serif; --head-font: var(--font); --head-weight: 600; --head-case: none; --h2-case: none;
+       --bg: #f4f6f3; --surface: #fff; --ink: #1d2a24; --muted: #5c6b63; --line: #dfe6e0; --line-strong: #c9d3cc;
+       --accent: #2f6f57; --accent-ink: #2f6f57; --soft: #e5efe9; --chip: #e9efeb; --composer: #f9fbf9;
+       --top-bg: #fff; --top-ink: #1d2a24; --top-line: #dfe6e0; --hero-bg: #f4f6f3; --hero-ink: #1d2a24; --hero-muted: #4f5d56; --eyebrow: #2f6f57;
+       --r: 12px; --r-sm: 8px; }
+  .b .hero { padding-bottom: 88px; }
+  .c { --font: "Barlow", sans-serif; --head-font: "Barlow", sans-serif; --head-weight: 600; --head-case: none; --h2-case: none;
+       --bg: #ffffff; --surface: #fff; --ink: #111; --muted: #54595f; --line: #e3e5e8; --line-strong: #c9cdd2;
+       --accent: #e60000; --accent-ink: #b80000; --soft: #f3f4f6; --chip: #f1f2f4; --composer: #fafafa;
+       --top-bg: #1f2226; --top-ink: #fff; --top-line: #1f2226; --hero-bg: #2b2e33; --hero-ink: #fff; --hero-muted: #c9ced4; --eyebrow: #ff6b6b;
+       --r: 10px; --r-sm: 6px; }
+  .c .logo { font-family: "Barlow Condensed", sans-serif; text-transform: uppercase; font-size: 21px; letter-spacing: .02em; }
+  .c .eyebrow { font-family: ui-monospace, monospace; text-transform: uppercase; font-size: 12px; letter-spacing: .08em; }
+
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } h1 { font-size: 34px; } .top nav a:not(.signin) { display: none; } }
+</style>
+</head>
+<body>
+<p class="page-title">Feedback Desk landing page: three directions, same content. Pick one, or mix (for example, B's colours with A's layout).</p>
+
+<template id="landing">
+  <div class="frame">
+    <header class="top">
+      <span class="logo"><span class="mark">FD</span>Feedback Desk</span>
+      <nav><a href="#">Follow up on feedback</a><a class="signin" href="#">IT team sign in</a></nav>
+    </header>
+    <div class="hero">
+      <div class="wrap">
+        <p class="eyebrow">Redadair group IT</p>
+        <h1>Tell us what's not working, or what would help</h1>
+        <p class="lead">Problems, access requests and ideas about any group app. It takes about two minutes, and you get a reference so you can see where it's up to.</p>
+      </div>
+    </div>
+    <div class="wrap grid">
+      <section class="card chat">
+        <div class="chat-head"><span class="avatar">FD</span><div><b>Feedback assistant</b><small>Asks a few questions, then sends it to the IT team</small></div></div>
+        <div class="msgs">
+          <p class="bubble">Hi. What would you like us to know?</p>
+          <div class="chips"><button>Something's broken</button><button>I need access</button><button>I have an idea</button><button>How do I…?</button></div>
+        </div>
+        <div class="apps">
+          <p>Which app is it about? (optional)</p>
+          <div class="chips small"><button>CPD Tracker</button><button>Staff Admin portal</button><button>Training portal</button><button>Financial Platform</button><button>Rake</button><button>All 14 apps</button></div>
+        </div>
+        <div class="composer"><textarea placeholder="Or describe it in your own words"></textarea><button class="primary">Send</button></div>
+      </section>
+      <aside>
+        <section class="card steps">
+          <h2>What happens next</h2>
+          <ol>
+            <li><span class="num">1</span><span><b>Tell us in your own words</b>The assistant asks only what the team needs.</span></li>
+            <li><span class="num">2</span><span><b>Check the summary</b>Nothing is sent until you confirm it.</span></li>
+            <li><span class="num">3</span><span><b>Track it</b>You get a reference like <span class="mono">FD-0137</span> and a link to its status.</span></li>
+          </ol>
+        </section>
+        <section class="card lookup">
+          <h2>Follow up on something you sent</h2>
+          <p>Enter your work email and we'll send you a link to all your feedback.</p>
+          <div class="row"><input placeholder="sam.lee@redadair.com.au" /><button class="ghost">Email me a link</button></div>
+        </section>
+      </aside>
+    </div>
+    <div class="foot">Feedback goes to the Redadair group IT team. Chats are processed by Google's Gemini model.</div>
+  </div>
+</template>
+
+<section class="dir a"><div class="label"><b>A. Harbour</b><span>Navy and coral. Friendly and modern, rounder corners, sentence case.</span></div></section>
+<section class="dir b"><div class="label"><b>B. Clear Sage</b><span>Calm sage green on off-white, IBM Plex Sans. The v1 direction, and it matches the proposal deck.</span></div></section>
+<section class="dir c"><div class="label"><b>C. Signal Red, refined</b><span>Keeps the fire-services red, drops the all-caps headings and black page; red only on Send.</span></div></section>
+
+<script>
+  const tpl = document.getElementById("landing");
+  document.querySelectorAll(".dir").forEach((d) => d.appendChild(tpl.content.cloneNode(true)));
+</script>
+</body>
+</html>

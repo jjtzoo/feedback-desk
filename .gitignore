@@ -1,0 +1,34 @@
+# Secrets and local-only settings (company handover manual §7)
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+backend/.localdb/
+backend/.uploads/
+
+# Node / Next.js
+node_modules/
+web/.next/
+web/out/
+web/test-results/
+
+# Deployment output rendered for review, never committed
+deploy/rendered/
+
+# Local scratch
+.gcloud-empty/
+backups/
+
+# Not part of this project: the separate bakery app (see CLAUDE.md)
+crumb/
+ticketing app.md
+
+# Personal Claude Code settings
+.claude/settings.local.json

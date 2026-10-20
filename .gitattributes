@@ -1,0 +1,6 @@
+# Keep LF in the repository so scripts and YAML work on Linux (Cloud Build, CI, containers).
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary

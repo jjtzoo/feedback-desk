@@ -1,0 +1,97 @@
+# CI on every pull request and push (spec v3 S1-1; company manuals: test before merge).
+# Deploy jobs run only once the repository variables below exist in the company GitHub org
+# (GCP_PROJECT_ID, GCP_WIF_PROVIDER, GCP_DEPLOYER_SA). Staging deploys from `staging`;
+# production deploys from `main` by manual approval through the `production` environment.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [staging, main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: feedback
+          POSTGRES_PASSWORD: ci-only
+          POSTGRES_DB: feedback_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U feedback" --health-interval 5s --health-timeout 3s --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://feedback:ci-only@localhost:5432/feedback_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.13.1"
+      - run: uv sync --frozen
+      - name: Create schemas and the vector extension
+        run: PGPASSWORD=ci-only psql -h localhost -U feedback -d feedback_test -f ../db/init/01-schemas.sql
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run pytest -q
+      - name: requirements.txt matches uv.lock
+        run: |
+          uv export --no-dev --no-hashes --format requirements-txt -o /tmp/requirements.txt -q
+          diff <(grep -v '^#' requirements.txt) <(grep -v '^#' /tmp/requirements.txt)
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  deploy-staging:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/staging' && vars.GCP_PROJECT_ID != ''
+    needs: [backend, web]
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy staging
+        run: yes staging | ./deploy.sh staging
+
+  deploy-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_PROJECT_ID != ''
+    needs: [backend, web]
+    runs-on: ubuntu-latest
+    environment: production  # requires a reviewer's approval in GitHub
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Deploy a no-traffic production candidate (traffic moves after manual verification)
+        run: printf 'production\nno\n' | ./deploy.sh production

@@ -1,0 +1,44 @@
+# Cloud Run service for the web app (Next.js; spec v3 D16, D29, D30). Template filled by the
+# deploy scripts. It forwards /api/* to the API service named in API_ORIGIN.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: ${WEB_SERVICE}
+  labels:
+    project: feedback
+    environment: ${DEPLOY_ENV}
+    application: web
+    owner: digital-team
+    purpose: feedback-web
+    deployment-type: cloud-run-service
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      labels:
+        project: feedback
+        environment: ${DEPLOY_ENV}
+        application: web
+        owner: digital-team
+        purpose: feedback-web
+        deployment-type: cloud-run-service
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/cpu-throttling: "true"  # request-based billing
+    spec:
+      serviceAccountName: ${WEB_SA}
+      timeoutSeconds: 300
+      containerConcurrency: 80
+      containers:
+        - image: ${WEB_IMAGE}
+          ports:
+            - containerPort: 3000
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - {name: API_ORIGIN, value: "${API_URL}"}
+${TRAFFIC_BLOCK}

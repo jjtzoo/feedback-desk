@@ -1,0 +1,25 @@
+# Digital Staff and Admins (brief §3). Emails are placeholders until Chris sends the
+# real list (ask 6); the redadair.example domain is only accepted in local development.
+# role: digital | admin. Interim triage lead: Marc (spec v3 D20).
+digital_staff:
+  - google_email: marc@redadair.example
+    name: Marc
+    role: admin
+    is_triage_lead: true
+    skills: [agents, platforms, triage]
+  - google_email: chris@redadair.example
+    name: Chris
+    role: admin
+    skills: [it-admin, access]
+  - google_email: mike@redadair.example
+    name: Mike
+    role: admin
+    skills: []
+  - google_email: darlene@redadair.example
+    name: Darlene
+    role: digital
+    skills: [agents, platforms, cloud]
+  - google_email: mario@redadair.example
+    name: Mario
+    role: digital
+    skills: [platforms, finance, data]
