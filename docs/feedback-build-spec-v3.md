@@ -491,7 +491,7 @@ Four one-week sprints, one per brief phase. Points are relative size, not hours;
 
 ### Build status (2026-10-20)
 
-Built locally against this spec, ahead of the sprint gates; nothing deployed, nothing committed yet.
+Built against this spec, ahead of the sprint gates; committed on a working branch, nothing deployed.
 
 | Area | Status |
 | --- | --- |
@@ -499,7 +499,7 @@ Built locally against this spec, ahead of the sprint gates; nothing deployed, no
 | Sign-in and roles (S1-3) | Built and tested: Google OAuth flow with the domain checked on every request, a local sign-in picker (D23), roles from `digital_staff`. Needs the OAuth client (ask 2) to test against Google. |
 | Admin page (S1-4) | Built: projects, Digital Staff, routing rules. |
 | Agent, router, brief, duplicates, attachments, backup form (S2-1 to S2-8) | Built and tested on the stub model; Word/Excel text, content-type checks, macro rejection, PII masking, abuse flag, cost log. Needs the AI Studio key (ask 3) to score the routing gate. |
-| Routing test set (S2-9) | A 40-item draft in `backend/evals/routing_set.yaml` and a runner; Marc to correct the labels; the stub scores 75 % / 70 % / 75 % (keyword baseline, not the gate). |
+| Routing test set (S2-9) | A 40-item draft in `backend/evals/routing_set.yaml` and a runner; Marc to correct the labels; the stub scores 97.5 % / 87.5 % / 100 % (keyword baseline on draft labels, not the gate). |
 | Console, approvals, tracker, notifications, channels, dashboard, digest (S3-1 to S3-7) | Built and tested end to end; board drag-and-drop, list and cards views; in-app bell over SSE with polling fallback; email through Mailpit locally. |
 | Friday releases (S4-1) | Built: drafter, owner review, publish, What's new, contributor notifications. The drafter assembles from sources; AI rewording comes with the key. |
 | Deployment (S1-1, S4-2) | Written, not run: `deploy.sh`, `deploy.ps1`, Cloud Run YAML, worker job, scheduler, CI workflow. Needs Google Cloud access (asks 1, 9) and the company GitHub repository (ask 5). Agent Engine deployment still to do once access exists. |

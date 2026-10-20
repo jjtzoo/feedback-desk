@@ -12,6 +12,7 @@ import argparse
 from pathlib import Path
 
 import pgserver
+from sqlalchemy.engine import make_url
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 DEFAULT_DATA_DIR = BACKEND_DIR / ".localdb"
@@ -27,9 +28,11 @@ def start(data_dir: Path = DEFAULT_DATA_DIR, database: str = "feedback", fresh: 
         exists = ""
     if "(1 row)" not in exists:
         server.psql(f'CREATE DATABASE "{database}";')
-    uri = server.get_uri().rsplit("/", 1)[0] + f"/{database}"
-    _run_init(uri)
-    return uri.replace("postgresql://", "postgresql+asyncpg://", 1)
+    # On Linux and macOS the URI names a Unix socket in its query (?host=/path), so swap the database
+    # by parsing rather than by splitting on "/".
+    url = make_url(server.get_uri()).set(database=database)
+    _run_init(url.render_as_string(hide_password=False))
+    return url.set(drivername="postgresql+asyncpg").render_as_string(hide_password=False)
 
 
 def _run_init(uri: str) -> None:
