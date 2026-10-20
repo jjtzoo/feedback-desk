@@ -18,11 +18,18 @@ export const CATEGORY_LABEL: Record<Category, string> = {
   praise: "Praise",
 };
 
+export const PRIORITY_WORD: Record<Priority, string> = {
+  P1: "Blocking",
+  P2: "Major",
+  P3: "Minor",
+  P4: "Nice-to-have",
+};
+
 export const PRIORITY_LABEL: Record<Priority, string> = {
-  P1: "P1 · Blocking",
-  P2: "P2 · Major",
-  P3: "P3 · Minor",
-  P4: "P4 · Nice-to-have",
+  P1: `P1 · ${PRIORITY_WORD.P1}`,
+  P2: `P2 · ${PRIORITY_WORD.P2}`,
+  P3: `P3 · ${PRIORITY_WORD.P3}`,
+  P4: `P4 · ${PRIORITY_WORD.P4}`,
 };
 
 export const STATUS_LABEL: Record<Status, string> = {

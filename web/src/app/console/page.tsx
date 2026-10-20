@@ -242,7 +242,7 @@ function Work() {
                       <WorkTypeBadge workType={c.work_type} />
                     </TableCell>
                     <TableCell>
-                      <PriorityBadge priority={c.priority} />
+                      <PriorityBadge showCode priority={c.priority} />
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={c.status} />
@@ -266,7 +266,7 @@ function Work() {
 }
 
 function Empty() {
-  return <p className="p-10 text-center text-sm text-muted-foreground">Nothing here. New feedback lands in this view as soon as it&apos;s routed.</p>;
+  return <p className="p-10 text-center text-sm text-muted-foreground">No items in this view. New feedback appears here as soon as it is routed.</p>;
 }
 
 function FilterSelect({ label, all, value, options, onChange }: { label: string; all: string; value: string | null; options: [string, string][]; onChange: (v: string | null) => void }) {

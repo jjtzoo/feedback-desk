@@ -2,9 +2,10 @@
 
 import { ChevronRight, Inbox, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { StageBadge } from "@/components/badges";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorText, type MyItem } from "@/lib/api";
@@ -15,9 +16,10 @@ export default function MyFeedbackPage() {
   const [items, setItems] = useState<MyItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     api.get<MyItem[]>("/my/feedback").then(setItems).catch((e: unknown) => setError(errorText(e)));
   }, []);
+  useEffect(load, [load]);
 
   const open = items?.filter((i) => i.stage !== "closed") ?? [];
   const closed = items?.filter((i) => i.stage === "closed") ?? [];
@@ -36,7 +38,19 @@ export default function MyFeedbackPage() {
         </Button>
       </div>
 
-      {error && <p className="mt-8 text-destructive" role="alert">{error}</p>}
+      {error && (
+        <Alert variant="destructive" className="mt-8">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            {error}
+            <Button variant="outline" className="h-11 rounded-xl" onClick={() => {
+                setError(null);
+                load();
+              }}>
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       {!items && !error && (
         <div className="mt-8 grid gap-3" aria-busy="true">
           {[0, 1, 2].map((i) => (
@@ -47,8 +61,8 @@ export default function MyFeedbackPage() {
       {items?.length === 0 && (
         <div className="mt-10 grid justify-items-center gap-3 rounded-3xl border border-dashed p-12 text-center">
           <Inbox className="size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="font-semibold">Nothing here yet</p>
-          <p className="max-w-sm text-sm text-muted-foreground">When you send feedback, it shows up here with its reference and progress.</p>
+          <p className="font-semibold">No feedback yet</p>
+          <p className="max-w-sm text-sm text-muted-foreground">Feedback you submit appears here with its reference and current stage.</p>
         </div>
       )}
       {[

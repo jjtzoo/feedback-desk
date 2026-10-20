@@ -43,7 +43,7 @@ function ColumnView({ column, onOpen }: { column: Column; onOpen: (ref: string) 
         )}
       </header>
       <div className="grid content-start gap-2">
-        {column.items.length === 0 && <p className="rounded-2xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">Nothing here</p>}
+        {column.items.length === 0 && <p className="rounded-2xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">No items</p>}
         {column.items.map((card) => (
           <DraggableCard key={card.reference} card={card} onOpen={() => onOpen(card.reference)} />
         ))}

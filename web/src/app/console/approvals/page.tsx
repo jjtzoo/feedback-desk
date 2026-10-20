@@ -71,7 +71,7 @@ export default function ApprovalsPage() {
       </div>
       {error && <p className="text-destructive" role="alert">{error}</p>}
       {!items && !error && <Skeleton className="h-40 rounded-3xl" aria-busy="true" />}
-      {items?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">Nothing waiting. New items appear here once the agent has routed them.</p>}
+      {items?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">No items awaiting approval. New items appear here once the agent has routed them.</p>}
       {items?.map((i) => (
         <article key={i.reference} className={`rounded-3xl border bg-card p-5 shadow-card ${i.priority === "P1" ? "border-[1.5px] border-primary/70" : ""}`}>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -79,7 +79,7 @@ export default function ApprovalsPage() {
               {i.reference}
             </Link>
             <WorkTypeBadge workType={i.work_type} />
-            <PriorityBadge priority={i.priority} />
+            <PriorityBadge showCode priority={i.priority} />
             <StatusBadge status={i.status} />
             <span className="ml-auto font-mono text-xs text-muted-foreground">{age(i.created_at)}</span>
           </div>

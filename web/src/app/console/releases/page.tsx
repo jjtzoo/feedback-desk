@@ -60,7 +60,7 @@ export default function ReleasesPage() {
       </div>
       {error && <p className="text-destructive" role="alert">{error}</p>}
       {!releases && !error && <Skeleton className="h-40 rounded-3xl" />}
-      {releases?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">No releases yet. The first drafts appear on Friday.</p>}
+      {releases?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">No releases yet. The first draft is prepared on Friday.</p>}
       <ul className="grid gap-2">
         {releases?.map((r) => (
           <li key={r.id}>

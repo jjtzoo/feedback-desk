@@ -25,7 +25,7 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
       <span className="flex flex-wrap items-center gap-1.5 pr-4">
         <span className="font-mono text-xs font-semibold text-brand-text">{card.reference}</span>
         <WorkTypeBadge workType={card.work_type} className="h-5 px-2 text-[11px]" />
-        <PriorityBadge priority={card.priority} className="h-5 px-2 text-[11px]" />
+        <PriorityBadge showCode priority={card.priority} className="h-5 px-2 text-[11px]" />
         {card.flagged && (
           <span className="inline-flex h-5 items-center gap-1 rounded-full bg-destructive/10 px-2 text-[11px] font-semibold text-destructive">
             <Flag className="size-3" aria-hidden="true" /> Flagged

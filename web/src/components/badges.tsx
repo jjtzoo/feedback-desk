@@ -14,14 +14,15 @@ import {
 } from "lucide-react";
 
 import type { Priority, Stage, Status, WorkType } from "@/lib/api";
-import { STAGE_LABEL, STATUS_LABEL, WORK_TYPE_LABEL } from "@/lib/format";
+import { PRIORITY_LABEL, PRIORITY_WORD, STAGE_LABEL, STATUS_LABEL, WORK_TYPE_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // Every badge pairs a word with an icon, so status never relies on colour (fire-services-ui).
 
 const base = "inline-flex h-6 items-center gap-1 rounded-full px-2.5 text-xs font-semibold whitespace-nowrap";
 
-export function PriorityBadge({ priority, className }: { priority: Priority | null; className?: string }) {
+/** Staff see the word ("Major"); the console passes `showCode` for "P2 · Major". */
+export function PriorityBadge({ priority, showCode = false, className }: { priority: Priority | null; showCode?: boolean; className?: string }) {
   if (!priority) return null;
   const styles: Record<Priority, string> = {
     P1: "border-[1.5px] border-primary bg-brand-tint text-brand-text",
@@ -33,7 +34,7 @@ export function PriorityBadge({ priority, className }: { priority: Priority | nu
   return (
     <span className={cn(base, styles[priority], className)}>
       <Icon className="size-3.5" aria-hidden="true" />
-      {priority}
+      {showCode ? PRIORITY_LABEL[priority] : PRIORITY_WORD[priority]}
     </span>
   );
 }

@@ -122,7 +122,7 @@ export function ItemPanel({
               <div className="flex flex-wrap items-center gap-1.5 pr-8">
                 <span className="font-mono text-sm font-semibold text-brand-text">{item.reference}</span>
                 <WorkTypeBadge workType={item.work_type} />
-                <PriorityBadge priority={item.priority} />
+                <PriorityBadge showCode priority={item.priority} />
                 <StatusBadge status={item.status} />
               </div>
               <SheetTitle className="mt-2 text-xl leading-snug font-bold">{item.title}</SheetTitle>

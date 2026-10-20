@@ -87,7 +87,7 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
           )}
         </div>
         <ul className="max-h-[60vh] divide-y overflow-y-auto" aria-live="polite">
-          {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing yet. Updates on your feedback show up here.</li>}
+          {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted-foreground">No updates yet. Progress on your feedback appears here.</li>}
           {items.map((n) => (
             <li key={n.id}>
               <Link href={n.link} onClick={() => readOne(n)} className="flex gap-3 px-4 py-3 hover:bg-muted">

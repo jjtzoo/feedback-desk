@@ -18,7 +18,7 @@ The palette is drawn from redmen.com.au (a Sydney fire protection company): brig
 | Dial | Value | Meaning here |
 | --- | --- | --- |
 | DESIGN_VARIANCE | 3 | Predictable grids. People scan these screens under time pressure; layouts stay where they expect them. Marketing or landing pages may go to 5. |
-| MOTION_INTENSITY | 2 | CSS hover, press and short state transitions only. No looping or decorative animation. |
+| MOTION_INTENSITY | 4 | Apple-style: springy entrances, press and lift feedback, staggered lists. One calm idle loop (the assistant avatar). Raised from 2 at the user's request, 2026-10-20. |
 | VISUAL_DENSITY | 4 public screens, 7 staff screens | Forms and status pages breathe; queues and lists are compact, separated by lines instead of cards. |
 
 Follow these unless the user asks for something else in chat. Do not ask the user to edit this file.
@@ -130,11 +130,11 @@ Build every state, not only the happy path (taste-skill rule 5):
 
 ## 7. Motion
 
-- Transitions on `opacity` and `transform` only, 150 to 200 ms, `cubic-bezier(0.2, 0, 0, 1)`.
-- Allowed: button press, sheet and menu open, a new queue row fading in, a badge changing state.
-- Not allowed: looping animations, parallax, scroll hijack, magnetic buttons, particle effects, pulsing red dots. A pulsing red element in a fire services app reads as an alarm.
-- `prefers-reduced-motion: reduce`: remove transform motion, keep opacity fades at 150 ms or less.
-- No motion library. CSS transitions are enough at this intensity.
+- Animate `opacity` and `transform` only. Entrances use the spring curve `--ease-spring` (about 400 ms, one soft overshoot); hover, press and state changes stay 150 to 320 ms.
+- Allowed: spring entrances for messages, cards and steps; a 60 ms stagger on short lists (`--i`); press scale (0.98) on buttons and cards; a 2 px lift on hover for tappable rows (`lift`); sheet and menu open; a badge changing state; the assistant avatar's slow idle swell (`animate-breathe`, 5 s, 5 % scale).
+- Not allowed: other looping animations, parallax, scroll hijack, magnetic buttons, particle effects, pulsing red dots. A pulsing red element in a fire services app reads as an alarm.
+- `prefers-reduced-motion: reduce`: no transform motion, no idle loop, opacity fades at 120 ms.
+- No motion library. CSS easing curves and keyframes cover this intensity.
 
 ## 8. Copy
 

@@ -35,7 +35,7 @@ function BarList({ title, rows }: { title: string; rows: { label: string; count:
         {title}
       </h2>
       {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">Nothing open.</p>
+        <p className="mt-3 text-sm text-muted-foreground">No open items.</p>
       ) : (
         <ul className="mt-4 grid gap-2.5">
           {rows.map((r) => (

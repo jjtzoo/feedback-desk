@@ -63,9 +63,9 @@ function SignIn() {
             <h1 className="text-4xl leading-tight font-extrabold">
               Tell us what&apos;s <span className="text-band-accent">not working</span>, or what would help.
             </h1>
-            <p className="mt-4 text-lg text-band-muted">Every piece of feedback gets a reference, an owner and a tracker you can follow like a parcel.</p>
+            <p className="mt-4 text-lg text-band-muted">Every submission receives a reference, a named owner and a tracker, so you always know where it stands.</p>
           </div>
-          <p className="text-sm text-band-muted">REDADAIR Digital team</p>
+          <p className="text-sm text-band-muted">REDADAIR Digital Team</p>
         </section>
 
         <section className="flex items-center justify-center p-6">
@@ -74,7 +74,7 @@ function SignIn() {
               <BrandMark /> Feedback
             </div>
             <h2 className="text-2xl font-bold">Sign in</h2>
-            <p className="mt-1 text-muted-foreground">Use your REDADAIR Google account. No password to remember.</p>
+            <p className="mt-1 text-muted-foreground">Sign in with your REDADAIR Google account. No separate password is needed.</p>
 
             {error && (
               <Alert variant="destructive" className="mt-6">
@@ -95,7 +95,7 @@ function SignIn() {
               </Button>
             )}
             {options && !options.google && (
-              <p className="mt-2 text-sm text-muted-foreground">Google sign-in isn&apos;t set up on this server yet.</p>
+              <p className="mt-2 text-sm text-muted-foreground">Google sign-in is not yet configured on this server.</p>
             )}
             <p className="mt-4 flex items-start gap-2 text-sm text-muted-foreground">
               <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> Only redadair.com.au accounts can sign in.

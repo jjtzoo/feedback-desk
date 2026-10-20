@@ -1,8 +1,9 @@
 "use client";
 
-import { Bug, FileText, HelpCircle, KeyRound, Lightbulb, Loader2, MessageSquareText, Paperclip, Send, Users, X } from "lucide-react";
+import { Bug, FileText, HelpCircle, KeyRound, Lightbulb, Loader2, Paperclip, Send, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
+import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { BackupForm } from "@/components/chat/backup-form";
 import { ConfirmCard } from "@/components/chat/confirm-card";
 import { DoneView } from "@/components/chat/done-view";
@@ -108,6 +109,11 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [turns, card, duplicates, chips, busy]);
 
+  // When the confirm card appears, move focus to it so keyboard and screen-reader users land on it.
+  useEffect(() => {
+    if (card) document.getElementById("confirm-title")?.focus();
+  }, [card]);
+
   const sid = start?.session_id ?? null;
   const userTyped = turns.filter((t) => t.role === "user").map((t) => t.text).join("\n\n");
 
@@ -118,12 +124,16 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
       setChips([]);
       let done: Saved | null = null;
       let fallback = false;
+      let drafted = false;
       try {
         await streamChat(path, body, (e) => {
           if (e.type === "message") setTurns((t) => [...t, { role: "agent", text: e.text }]);
           else if (e.type === "chips") setChips(e.options);
           else if (e.type === "duplicates") setDuplicates(e.candidates);
-          else if (e.type === "draft") setCard({ card: e.card, hash: e.hash });
+          else if (e.type === "draft") {
+            drafted = true;
+            setCard({ card: e.card, hash: e.hash });
+          }
           else if (e.type === "done") done = { reference: e.reference, assigned_to: e.assigned_to, status: e.status };
           else if (e.type === "fallback") fallback = true;
         });
@@ -137,7 +147,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
         setMode("done");
       } else if (fallback) {
         setMode("fallback");
-      } else {
+      } else if (!drafted) {
         input.current?.focus();
       }
     },
@@ -213,9 +223,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
   return (
     <section aria-label="Chat with the feedback assistant" className="min-w-0 overflow-hidden rounded-3xl border bg-card shadow-card">
       <header className="flex items-center gap-3 border-b px-5 py-4">
-        <span className="grid size-11 place-items-center rounded-xl bg-brand-tint text-brand-text" aria-hidden="true">
-          <MessageSquareText className="size-5" />
-        </span>
+        <AssistantAvatar className="size-12 animate-breathe" />
         <div className="min-w-0">
           <p className="font-bold">Feedback assistant</p>
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -253,9 +261,10 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
 
       {mode === "chat" && (
         <>
-          <ol ref={list} className="grid max-h-[60vh] min-h-56 content-start gap-3 overflow-y-auto p-5" aria-live="polite">
+          <ol ref={list} className="grid max-h-[60dvh] min-h-56 content-start gap-3 overflow-y-auto p-5" aria-live="polite">
             {turns.map((t, i) => (
-              <li key={i} className={cn("flex animate-fade-up", t.role === "user" ? "justify-end" : "justify-start")}>
+              <li key={i} className={cn("flex animate-fade-up items-end gap-2", t.role === "user" ? "justify-end" : "justify-start")}>
+                {t.role !== "user" && <AssistantAvatar className="mb-0.5" />}
                 <div
                   className={cn(
                     "max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap",
@@ -278,6 +287,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
             ))}
             {busy && (
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                <AssistantAvatar />
                 <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Thinking…
               </li>
             )}
@@ -310,7 +320,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
                           aria-pressed={p.slug === project}
                           onClick={() => setProject(p.slug === project ? null : p.slug)}
                           className={cn(
-                            "min-h-9 rounded-full bg-secondary px-3 text-sm font-medium hover:bg-muted",
+                            "min-h-11 rounded-full bg-secondary px-3.5 text-sm font-medium hover:bg-muted",
                             p.slug === project && "bg-primary text-primary-foreground hover:bg-primary",
                           )}
                         >
@@ -347,7 +357,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
                       <span className="text-sm">
                         <span className="font-mono font-semibold">{d.reference}</span> · {d.title}
                       </span>
-                      <Button variant="outline" size="lg" className="rounded-xl" onClick={() => void plusOne(d.reference)}>
+                      <Button variant="outline" size="lg" className="h-11 rounded-xl" onClick={() => void plusOne(d.reference)}>
                         Add my comment there instead
                       </Button>
                     </li>
@@ -407,7 +417,8 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
                 rows={1}
                 maxLength={2000}
                 value={text}
-                disabled={busy}
+                readOnly={busy}
+                aria-busy={busy}
                 placeholder={firstMessage ? "Describe it in your own words" : "Type your reply"}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {
@@ -424,7 +435,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
                 className="h-12 shrink-0 rounded-xl px-5 text-base"
                 disabled={busy || !text.trim()}
               >
-                <Send /> <span className="hidden sm:inline">Send</span>
+                <Send /> <span className="sr-only sm:not-sr-only">Send</span>
               </Button>
             </div>
             <p className="mt-2 px-1 text-xs text-muted-foreground">Enter sends, Shift+Enter for a new line. Files: PDF, Word, Excel, images, up to 10 MB.</p>
