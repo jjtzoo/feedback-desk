@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { PriorityBadge } from "@/components/badges";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +27,8 @@ export default function TrackerPage() {
   const [showAll, setShowAll] = useState(false);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [muteError, setMuteError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api
@@ -42,12 +45,13 @@ export default function TrackerPage() {
     e.preventDefault();
     if (!reply.trim()) return;
     setSending(true);
+    setSendError(null);
     try {
       setT(await api.post<Tracker>(`/feedback/${ref}/replies`, { body: reply }));
       setReply("");
       toast.success("Added. The owner has been told.");
     } catch (err) {
-      toast.error(errorText(err));
+      setSendError(errorText(err, "We couldn't send that. Your reply is still here, so you can try again."));
     } finally {
       setSending(false);
     }
@@ -55,8 +59,14 @@ export default function TrackerPage() {
 
   async function toggleMute() {
     if (!t) return;
-    await api.post(`/feedback/${ref}/mute`, { muted: !t.muted }).catch(() => undefined);
-    setT({ ...t, muted: !t.muted });
+    setMuteError(null);
+    try {
+      await api.post(`/feedback/${ref}/mute`, { muted: !t.muted });
+      setT({ ...t, muted: !t.muted });
+      toast.success(t.muted ? "Notifications are back on for this item." : "Muted. You won't get updates for this item.");
+    } catch (err) {
+      setMuteError(errorText(err, "We couldn't change that. Please try again."));
+    }
   }
 
   if (error?.notFound) {
@@ -70,7 +80,27 @@ export default function TrackerPage() {
       </div>
     );
   }
-  if (error) return <p className="mx-auto max-w-4xl px-4 py-10 text-destructive">{error.text}</p>;
+  if (error) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-10">
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            {error.text}
+            <Button
+              variant="outline"
+              className="h-11 rounded-xl"
+              onClick={() => {
+                setError(null);
+                load();
+              }}
+            >
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
   if (!t) {
     return (
       <div className="mx-auto grid max-w-4xl gap-4 px-4 py-10" aria-busy="true">
@@ -87,7 +117,7 @@ export default function TrackerPage() {
       <section className="bg-band text-band-foreground">
         <div className="mx-auto max-w-4xl px-4 pt-8 pb-20 sm:px-6">
           <div className="flex flex-wrap items-center gap-2 text-sm text-band-muted">
-            <Link href="/my" className="rounded hover:text-band-foreground">
+            <Link href="/my" className="inline-flex min-h-11 items-center rounded hover:text-band-foreground">
               My feedback
             </Link>
             <span aria-hidden="true">/</span>
@@ -96,7 +126,7 @@ export default function TrackerPage() {
           <h1 className="mt-4 text-3xl font-extrabold sm:text-4xl">{t.status_text}</h1>
           {t.expected_by && <p className="mt-1 text-lg text-band-accent">Expected by {day(t.expected_by)}</p>}
           <p className="mt-2 text-band-muted">
-            {[t.project ?? "Tool to confirm", t.category, t.priority].filter(Boolean).join(" · ")}
+            {[t.project ?? "Tool to confirm", t.category].filter(Boolean).join(" · ")}
           </p>
         </div>
       </section>
@@ -201,6 +231,11 @@ export default function TrackerPage() {
               {t.muted ? <BellOff /> : <Bell />}
               {t.muted ? "Unmute this item" : "Mute notifications for this item"}
             </Button>
+            {muteError && (
+              <p className="text-sm text-destructive" role="alert">
+                {muteError}
+              </p>
+            )}
           </div>
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
@@ -239,7 +274,7 @@ export default function TrackerPage() {
                 ))}
               </ol>
               {t.history.length > PREVIEW_ENTRIES && (
-                <Button variant="link" className="mt-2 px-0" onClick={() => setShowAll((s) => !s)}>
+                <Button variant="link" className="mt-2 h-auto min-h-11 px-0" onClick={() => setShowAll((s) => !s)}>
                   {showAll ? "Show less" : `See full history (${t.history.length})`}
                 </Button>
               )}
@@ -254,6 +289,11 @@ export default function TrackerPage() {
                   {t.stage === "resolved" ? "Still not right? Replying reopens it." : "The owner is notified straight away."}
                 </p>
                 <Textarea id="reply" rows={3} value={reply} maxLength={4000} onChange={(e) => setReply(e.target.value)} className="mt-3 rounded-xl text-base" />
+                {sendError && (
+                  <p className="mt-2 text-sm text-destructive" role="alert">
+                    {sendError}
+                  </p>
+                )}
                 <Button type="submit" className="mt-3 h-11 rounded-xl px-5" disabled={sending || !reply.trim()}>
                   {sending ? <Loader2 className="animate-spin" /> : <Send />} Send
                 </Button>

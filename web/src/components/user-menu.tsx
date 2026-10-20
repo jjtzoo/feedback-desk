@@ -53,20 +53,20 @@ export function UserMenu({ tone = "light" }: { tone?: "light" | "dark" }) {
           </span>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild className="min-h-11">
           <Link href="/">
             <MessageSquarePlus /> Give feedback
           </Link>
         </DropdownMenuItem>
         {me.role !== "staff" && (
-          <DropdownMenuItem asChild>
+          <DropdownMenuItem asChild className="min-h-11">
             <Link href="/console">
               <LayoutDashboard /> Open the console
             </Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={signOut}>
+        <DropdownMenuItem onSelect={signOut} className="min-h-11">
           <LogOut /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>

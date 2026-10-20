@@ -14,6 +14,13 @@ const NAV = [
   { href: "/whats-new", label: "What's new" },
 ];
 
+/** The tracker belongs to My feedback, so that item stays highlighted there. */
+function isActive(href: string, path: string): boolean {
+  if (href === "/") return path === "/";
+  if (href === "/my") return path.startsWith("/my") || path.startsWith("/track");
+  return path.startsWith(href);
+}
+
 export function StaffHeader() {
   const path = usePathname();
   return (
@@ -24,7 +31,7 @@ export function StaffHeader() {
           <Brand />
           <nav aria-label="Main" className="ml-4 hidden items-center gap-1 md:flex">
             {NAV.map((n) => {
-              const active = n.href === "/" ? path === "/" : path.startsWith(n.href);
+              const active = isActive(n.href, path);
               return (
                 <Link
                   key={n.href}
@@ -45,16 +52,16 @@ export function StaffHeader() {
             <UserMenu />
           </div>
         </div>
-        <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-3 pb-2 md:hidden">
+        <nav aria-label="Main" className="grid grid-cols-3 gap-1 px-3 pb-2 md:hidden">
           {NAV.map((n) => {
-            const active = n.href === "/" ? path === "/" : path.startsWith(n.href);
+            const active = isActive(n.href, path);
             return (
               <Link
                 key={n.href}
                 href={n.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "shrink-0 rounded-full px-3.5 py-2 text-sm font-semibold text-muted-foreground",
+                  "grid min-h-11 place-items-center rounded-full px-2 text-center text-[13px] font-semibold whitespace-nowrap text-muted-foreground",
                   active && "bg-brand-tint text-brand-text",
                 )}
               >

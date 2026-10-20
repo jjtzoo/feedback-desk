@@ -13,7 +13,7 @@ export function BrandMark({ className }: { className?: string }) {
 
 export function Brand({ href = "/", tone = "light" }: { href?: string; tone?: "light" | "dark" }) {
   return (
-    <Link href={href} className="flex items-center gap-2.5 rounded-md text-lg font-extrabold tracking-tight">
+    <Link href={href} className="flex min-h-11 items-center gap-2.5 rounded-md text-lg font-extrabold tracking-tight">
       <BrandMark />
       <span className={tone === "dark" ? "text-band-foreground" : "text-foreground"}>Feedback</span>
     </Link>

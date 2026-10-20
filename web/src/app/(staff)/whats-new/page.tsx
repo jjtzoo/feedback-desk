@@ -39,7 +39,7 @@ export default function WhatsNewPage() {
               type="button"
               aria-pressed={project === slug}
               onClick={() => setProject(slug)}
-              className={`min-h-9 rounded-full px-3.5 text-sm font-medium ${project === slug ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-muted"}`}
+              className={`min-h-11 rounded-full px-3.5 text-sm font-medium ${project === slug ? "bg-primary text-primary-foreground" : "bg-secondary hover:bg-muted"}`}
             >
               {name}
             </button>

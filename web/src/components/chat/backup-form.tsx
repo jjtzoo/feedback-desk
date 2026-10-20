@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2, Send } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { CircleAlert, Loader2, Send, TriangleAlert } from "lucide-react";
+import { useRef, useState, type FormEvent } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -39,11 +39,13 @@ export function BackupForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [detailsError, setDetailsError] = useState(false);
+  const detailsField = useRef<HTMLTextAreaElement>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!details.trim()) {
       setDetailsError(true);
+      detailsField.current?.focus();
       return;
     }
     setBusy(true);
@@ -68,6 +70,7 @@ export function BackupForm({
   return (
     <form onSubmit={submit} className="grid gap-5 p-5 sm:p-6" noValidate>
       <Alert>
+        <TriangleAlert className="text-warning" />
         <AlertDescription>
           <strong className="text-foreground">The assistant isn&apos;t available right now.</strong> Answer these and the Digital team still gets your
           feedback. What you typed is kept below.
@@ -75,11 +78,12 @@ export function BackupForm({
       </Alert>
       <div className="grid gap-2">
         <Label htmlFor="fb-project">Which tool is it about?</Label>
-        <Select value={project} onValueChange={setProject}>
+        <Select value={project || "none"} onValueChange={(v) => setProject(v === "none" ? "" : v)}>
           <SelectTrigger id="fb-project" className="h-11 w-full rounded-xl">
             <SelectValue placeholder="Not sure" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="none">Not sure</SelectItem>
             {projects.map((p) => (
               <SelectItem key={p.slug} value={p.slug}>
                 {p.name}
@@ -89,10 +93,11 @@ export function BackupForm({
         </Select>
       </div>
       <div className="grid gap-2">
-        <Label htmlFor="fb-details">What happened, or what would you like?</Label>
+        <Label htmlFor="fb-details">What happened, or what would you like? (required)</Label>
         <p className="text-sm text-muted-foreground">For a problem: what you did, what you expected, and what happened instead.</p>
         <Textarea
           id="fb-details"
+          ref={detailsField}
           rows={6}
           maxLength={4000}
           value={details}
@@ -101,9 +106,14 @@ export function BackupForm({
             setDetailsError(false);
           }}
           aria-invalid={detailsError || undefined}
+          aria-describedby={detailsError ? "fb-details-error" : undefined}
           className="rounded-xl text-base"
         />
-        {detailsError && <p className="text-sm text-destructive">Tell us what happened or what you need.</p>}
+        {detailsError && (
+          <p id="fb-details-error" className="flex items-center gap-1.5 text-sm text-destructive">
+            <CircleAlert className="size-4 shrink-0" aria-hidden="true" /> Tell us what happened or what you need.
+          </p>
+        )}
       </div>
       <fieldset className="grid gap-2">
         <legend className="text-sm font-medium">How much is it affecting your work?</legend>
