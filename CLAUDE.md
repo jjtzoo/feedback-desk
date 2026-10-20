@@ -37,6 +37,7 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 ## UI
 
 Visual direction D17: modern and red-led (landing page mockup D, everything else mockup E; `docs/design/mockups/directions-red.html`). Use shadcn/ui components; load the `fire-services-ui` skill for its structure and accessibility rules, but follow D17 for colour and type until the skill is updated. Mobile first, keyboard-usable, AA contrast, status never by colour alone.
+Brand assets (Puff logo, icons, Sig) live in `web/public/brand/`; wiring and rules: `docs/design/smoke-signal-integration.md` (D37, open).
 
 ## Not part of this project
 

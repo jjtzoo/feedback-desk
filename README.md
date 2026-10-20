@@ -6,6 +6,7 @@ A chat-style agent where any REDADAIR staff member gives feedback on the intrane
 - **How it fits together:** [docs/architecture.md](docs/architecture.md)
 - **Deploying:** [docs/deployment.md](docs/deployment.md) (checklists, rollback)
 - **Company standards it follows:** [docs/standards/](docs/standards/)
+- **Brand:** the app shows as Smoke Signal with Sig, its assistant, on the `ui/smoke-signal-brand` branch while D37 is open (the intranet tile stays Feedback). Assets: `web/public/brand/`; plan: [docs/design/smoke-signal-integration.md](docs/design/smoke-signal-integration.md)
 
 ## Main technologies
 

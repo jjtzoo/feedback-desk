@@ -18,7 +18,7 @@ The palette is drawn from redmen.com.au (a Sydney fire protection company): brig
 | Dial | Value | Meaning here |
 | --- | --- | --- |
 | DESIGN_VARIANCE | 3 | Predictable grids. People scan these screens under time pressure; layouts stay where they expect them. Marketing or landing pages may go to 5. |
-| MOTION_INTENSITY | 4 | Apple-style: springy entrances, press and lift feedback, staggered lists. No idle loops; the assistant avatar is static. Raised from 2 at the user's request, 2026-10-20. |
+| MOTION_INTENSITY | 4 | Apple-style: springy entrances, press and lift feedback, staggered lists. No idle loops, with one exception: the assistant avatar, Sig (D37), swells slowly (5 s, scale 1 to 1.04) only in its Ready state, and not at all under reduced motion. Sig is flat in the product (`SigAvatar`) and 3D (at least 96 px tall) only for large moments such as empty states, the landing page and internal comms; Puff, not Sig, is the logo. Raised from 2 at the user's request, 2026-10-20. |
 | VISUAL_DENSITY | 4 public screens, 7 staff screens | Forms and status pages breathe; queues and lists are compact, separated by lines instead of cards. |
 
 Follow these unless the user asks for something else in chat. Do not ask the user to edit this file.
