@@ -199,6 +199,22 @@
   }
 }
 
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+/* Sig's idle swell (D37): the only new looping motion. It stops under reduced motion. */
+@utility animate-breathe {
+  animation: breathe 5s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -217,7 +233,8 @@
 
   /* Loops stop; the static icon or skeleton fill stays. */
   .animate-spin,
-  .animate-pulse {
+  .animate-pulse,
+  .animate-breathe {
     animation: none !important;
   }
 }

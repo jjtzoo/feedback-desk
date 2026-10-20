@@ -19,13 +19,13 @@ type Step = { title: string; body: string; target?: string; path?: string; roles
 const STEPS: Record<Area, Step[]> = {
   staff: [
     {
-      title: "Welcome to Feedback",
+      title: "Welcome to Smoke Signal",
       body: "Report a problem, ask for access or suggest an idea for any intranet platform or agent. This tour shows you where everything is.",
       path: "/",
     },
     {
       title: "Start here",
-      body: "Pick the card that fits. The assistant asks up to three short questions, then shows a summary. Nothing is sent until you select Confirm.",
+      body: "Pick the card that fits. Sig, the assistant, asks up to three short questions, then shows a summary. Nothing is sent until you select Confirm.",
       target: "start-cards",
       path: "/",
     },

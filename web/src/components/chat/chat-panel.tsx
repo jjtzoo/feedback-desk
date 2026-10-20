@@ -3,10 +3,10 @@
 import { FileText, Loader2, Paperclip, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { BackupForm } from "@/components/chat/backup-form";
 import { ConfirmCard } from "@/components/chat/confirm-card";
 import { DoneView } from "@/components/chat/done-view";
+import { SigAvatar, type SigState } from "@/components/chat/sig-avatar";
 import { UsageMeter } from "@/components/chat/usage-meter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -229,12 +229,18 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const projects: Project[] = start?.projects ?? [];
   const firstMessage = turns.filter((t) => t.role === "user").length === 0;
   const selected = projects.find((p) => p.slug === project);
+  const sig: SigState = mode === "fallback" ? "offline" : mode === "done" ? "sent" : busy ? "writing" : "ready";
 
   return (
-    <section aria-label="Chat with the feedback assistant" className="min-w-0 overflow-hidden rounded-3xl border bg-card shadow-card">
+    <section aria-label="Chat with Sig, the feedback assistant" className="min-w-0 overflow-hidden rounded-3xl border bg-card shadow-card">
       <header className="flex items-center gap-3 border-b px-5 py-4">
-        <AssistantAvatar className="size-12" />
-        <p className="font-bold">Feedback assistant</p>
+        <SigAvatar state={sig} className="size-12" />
+        <div>
+          <p className="flex items-center gap-2 font-bold">
+            Sig <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">AI</span>
+          </p>
+          <p className="text-sm text-muted-foreground">{sig === "offline" ? "Not available right now" : "Smoke Signal's feedback assistant"}</p>
+        </div>
       </header>
 
       {mode === "starting" && (
@@ -275,7 +281,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                     t.role === "user" ? "rounded-br-md bg-band text-band-foreground" : "rounded-bl-md bg-muted",
                   )}
                 >
-                  <span className="sr-only">{t.role === "user" ? "You: " : "Assistant: "}</span>
+                  <span className="sr-only">{t.role === "user" ? "You: " : "Sig: "}</span>
                   {t.text}
                   {t.files && t.files.length > 0 && (
                     <span className="mt-1.5 flex flex-wrap gap-1.5">
@@ -290,9 +296,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
               </li>
             ))}
             {busy && (
-              <li className="text-sm text-muted-foreground">
-                Thinking…
-              </li>
+              <li className="text-sm text-muted-foreground">Sig is writing…</li>
             )}
             {chips.length > 0 && !busy && (
               <li className="flex flex-wrap gap-1.5" aria-label="Quick answers">

@@ -86,7 +86,7 @@ export function StaffFooter() {
   return (
     <footer className="mt-auto border-t bg-card">
       <p className="mx-auto max-w-6xl px-4 py-5 text-sm text-muted-foreground sm:px-6">
-        Feedback goes to the REDADAIR Digital team. Chats are processed by Google&apos;s Gemini model. Passwords, card numbers and tax file
+        Feedback goes to the REDADAIR Digital team. Sig is an AI assistant, and chats are processed by Google&apos;s Gemini model. Passwords, card numbers and tax file
         numbers are removed before anything is saved.
       </p>
     </footer>

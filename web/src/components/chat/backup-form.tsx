@@ -18,12 +18,12 @@ const HOW_MUCH = [
 ] as const;
 
 const NOTICE: Record<UsageLimit | "offline", string> = {
-  offline: "The assistant isn't available right now.",
-  user: "You've used today's assistant allowance. It resets tomorrow.",
-  budget: "The assistant is paused for today to keep costs in check.",
+  offline: "Sig isn't available right now.",
+  user: "You've used today's allowance with Sig. It resets tomorrow.",
+  budget: "Sig is paused for today to keep costs in check.",
 };
 
-/** When the assistant is down: a simple form so feedback is never lost (brief §8). */
+/** When Sig is down: a simple form so feedback is never lost (brief §8). */
 export function BackupForm({
   projects,
   initialProject,

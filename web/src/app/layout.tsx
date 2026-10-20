@@ -11,11 +11,9 @@ const jakarta = Plus_Jakarta_Sans({ variable: "--font-jakarta", subsets: ["latin
 const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["500"] });
 
 export const metadata: Metadata = {
-  title: { default: "Feedback", template: "%s · Feedback" },
+  title: { default: "Smoke Signal", template: "%s · Smoke Signal" },
   description: "Tell the REDADAIR Digital team what's not working, or what would help, and track it like a parcel.",
-  icons: {
-    icon: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23D0101B'/%3E%3Cpath d='M9 10h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-8l-5 4v-4H9a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z' fill='white'/%3E%3C/svg%3E",
-  },
+  icons: { icon: "/brand/smoke-signal-icon.svg", apple: "/brand/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowRight, Link2, ShieldCheck, Users } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState, type CSSProperties } from "react";
 
-import { AssistantAvatar } from "@/components/chat/assistant-avatar";
+import { SigAvatar } from "@/components/chat/sig-avatar";
 import { STARTERS } from "@/components/chat/starters";
 import { useMe } from "@/components/me";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,7 +17,7 @@ import { api, type MyItem, type Project } from "@/lib/api";
 import { age } from "@/lib/format";
 
 const STEPS = [
-  { title: "Describe it in your own words", body: "The assistant asks only what the team needs to act on it. You can attach a screenshot." },
+  { title: "Describe it in your own words", body: "Sig, the assistant, asks only what the team needs to act on it. You can attach a screenshot." },
   { title: "Review and confirm", body: "Nothing is submitted until you select Confirm." },
   { title: "Follow its progress", body: "You receive a reference such as FB-0137, a named owner and a tracker showing each stage." },
 ];
@@ -80,14 +81,16 @@ function Landing() {
           {/* A taste of the conversation. Decorative; the real one is on /chat. */}
           <div aria-hidden="true" className="hidden animate-fade-up rounded-3xl bg-card p-5 text-card-foreground shadow-card lg:block">
             <div className="flex items-center gap-3 border-b pb-4">
-              <AssistantAvatar className="size-11" />
+              <SigAvatar className="size-11" />
               <div>
-                <p className="font-bold">Feedback assistant</p>
+                <p className="flex items-center gap-2 font-bold">
+                  Sig <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">AI</span>
+                </p>
                 <p className="text-sm text-muted-foreground">Asks a few questions, then sends it on</p>
               </div>
             </div>
             <div className="mt-4 grid gap-3 text-[15px]">
-              <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-4 py-2.5">G&apos;day! What&apos;s on your mind?</p>
+              <p className="max-w-[85%] rounded-2xl rounded-bl-md bg-muted px-4 py-2.5">G&apos;day, I&apos;m Sig. Spotted something?</p>
               <p className="ml-auto max-w-[85%] rounded-2xl rounded-br-md bg-band px-4 py-2.5 text-band-foreground">
                 The RAKE Agent times out on big PDFs.
               </p>
@@ -204,7 +207,10 @@ function Landing() {
               </Alert>
             )}
             {recent?.length === 0 && (
-              <p className="mt-3 text-sm text-muted-foreground">No feedback submitted yet. Anything you send will appear here with its progress.</p>
+              <div className="mt-3 grid justify-items-center gap-3 text-center">
+                <Image src="/brand/sig/sig-3d.svg" alt="" width={80} height={96} unoptimized />
+                <p className="text-sm text-muted-foreground">No feedback submitted yet. Anything you send will appear here with its progress.</p>
+              </div>
             )}
             <ul className="mt-3 divide-y">
               {recent?.map((r) => (

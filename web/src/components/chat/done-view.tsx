@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
 
+import { SigAvatar } from "@/components/chat/sig-avatar";
 import { Button } from "@/components/ui/button";
 import type { Saved } from "@/lib/api";
 
@@ -14,7 +15,8 @@ export function DoneView({ saved, plusOne, onAgain }: { saved: Saved; plusOne: b
   const waiting = saved.status === "awaiting_approval" || saved.status === "needs_review";
   return (
     <section className="animate-fade-up p-6 sm:p-8" aria-live="polite">
-      <h2 ref={heading} tabIndex={-1} className="text-2xl font-extrabold outline-none">
+      <SigAvatar state="sent" className="size-14" />
+      <h2 ref={heading} tabIndex={-1} className="mt-4 text-2xl font-extrabold outline-none">
         {plusOne ? "Added to " : "Sent. Your reference is "}
         <span className="font-mono">{saved.reference}</span>
       </h2>

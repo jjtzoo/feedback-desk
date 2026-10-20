@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight, MessageSquarePlus } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -58,9 +59,10 @@ export default function MyFeedbackPage() {
         </div>
       )}
       {items?.length === 0 && (
-        <p className="mt-10 rounded-3xl border border-dashed p-10 text-center text-muted-foreground">
-          No feedback yet. Anything you send appears here.
-        </p>
+        <div className="mt-10 grid justify-items-center gap-4 rounded-3xl border border-dashed p-10 text-center text-muted-foreground">
+          <Image src="/brand/sig/sig-3d.svg" alt="" width={100} height={120} unoptimized />
+          <p>No feedback yet. Anything you send appears here.</p>
+        </div>
       )}
       {[
         { title: "Open", list: open },

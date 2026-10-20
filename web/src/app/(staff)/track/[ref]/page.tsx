@@ -35,7 +35,7 @@ export default function TrackerPage() {
       .get<Tracker>(`/feedback/${ref}/tracker`)
       .then((data) => {
         setT(data);
-        document.title = `${data.reference}: ${data.status_text} · Feedback`;
+        document.title = `${data.reference}: ${data.status_text} · Smoke Signal`;
       })
       .catch((e: unknown) => setError({ notFound: e instanceof ApiError && e.status === 404, text: errorText(e) }));
   }, [ref]);
