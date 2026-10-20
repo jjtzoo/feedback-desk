@@ -13,6 +13,7 @@ from app.errors import NotFound
 from app.models import Attachment, Feedback, FeedbackFollower
 from app.models.enums import STAGE_OF
 from app.schemas import (
+    AllowanceOut,
     AttachmentOut,
     MuteIn,
     MyItemOut,
@@ -23,7 +24,7 @@ from app.schemas import (
     TimelineOut,
     TrackerOut,
 )
-from app.services import catalog, files, notifications, releases
+from app.services import catalog, files, notifications, releases, usage
 from app.services import feedback as feedback_service
 
 router = APIRouter(tags=["staff"])
@@ -32,6 +33,13 @@ router = APIRouter(tags=["staff"])
 @router.get("/projects", response_model=list[ProjectOut])
 async def projects(db: Db, user: CurrentUser) -> list[ProjectOut]:
     return [ProjectOut.model_validate(p) for p in await catalog.list_projects(db)]
+
+
+@router.get("/usage/me", response_model=AllowanceOut)
+async def my_usage(db: Db, user: CurrentUser) -> AllowanceOut:
+    """The signed-in person's assistant allowance today (D36)."""
+    a = await usage.allowance(db, user.email)
+    return AllowanceOut(used_tokens=a.used_tokens, limit_tokens=a.limit_tokens, percent=a.percent, blocked=a.blocked)
 
 
 @router.get("/my/feedback", response_model=list[MyItemOut])

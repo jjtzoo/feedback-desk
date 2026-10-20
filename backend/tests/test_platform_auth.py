@@ -18,6 +18,7 @@ from tests.conftest import MARC, STAFF, signed_in
 
 TABLES = {
     "projects",
+    "model_usage",
     "digital_staff",
     "routing_rules",
     "feedback",
@@ -39,7 +40,7 @@ TABLES = {
 
 async def test_health(anon: httpx.AsyncClient) -> None:
     body = (await anon.get("/api/health")).json()
-    assert body["database"] == "ok" and body["migration"] == "0001"
+    assert body["database"] == "ok" and body["migration"] == "0002"
     assert body["model"]["provider"] == "stub" and body["environment"] == "test"
 
 

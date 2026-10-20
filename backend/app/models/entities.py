@@ -16,6 +16,7 @@ from sqlalchemy import (
     Index,
     Integer,
     MetaData,
+    Numeric,
     PrimaryKeyConstraint,
     Sequence,
     String,
@@ -41,6 +42,7 @@ from app.models.enums import (
     STAFF_ROLES,
     STATUSES,
     TARGET_TYPES,
+    USAGE_KINDS,
     WORK_TYPES,
     check_in,
 )
@@ -379,3 +381,27 @@ class JobRun(Base):
     name: Mapped[str] = mapped_column(String(50), primary_key=True)
     last_slot: Mapped[str] = mapped_column(String(40))
     ran_at: Mapped[datetime] = _now()
+
+
+class ModelUsage(Base):
+    """One row per model call (chat turn, embedding): tokens and estimated cost, for the daily
+    limits and the console's AI usage panel. Holds no message text."""
+
+    __tablename__ = "model_usage"
+    __table_args__ = (
+        CheckConstraint(check_in("kind", USAGE_KINDS), name="kind"),
+        Index(None, "created_at"),
+        Index(None, "user_email", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _id()
+    user_email: Mapped[str | None] = mapped_column(String(320))
+    session_id: Mapped[str | None] = mapped_column(String(128))
+    kind: Mapped[str] = mapped_column(String(10))
+    model: Mapped[str] = mapped_column(String(100))
+    calls: Mapped[int] = mapped_column(Integer, default=1, server_default=text("1"))
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    estimated: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    cost_aud: Mapped[float] = mapped_column(Numeric(10, 5), default=0, server_default=text("0"))
+    created_at: Mapped[datetime] = _stamped()

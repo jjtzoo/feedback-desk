@@ -31,9 +31,10 @@ from app.schemas import (
     ReplyIn,
     SimilarOut,
     UpdateIn,
+    UsageSummaryOut,
     ViewIn,
 )
-from app.services import console
+from app.services import console, usage
 
 router = APIRouter(prefix="/console", tags=["console"])
 
@@ -264,3 +265,9 @@ async def decline(ref: str, body: DeclineIn, db: Db, user: AdminUser) -> DetailO
 async def ask_info(ref: str, body: AskInfoIn, db: Db, user: AdminUser) -> DetailOut:
     await console.ask_info(db, user, ref, body.question, body.ask)
     return await _detail(db, user, ref)
+
+
+@router.get("/usage", response_model=UsageSummaryOut)
+async def usage_summary(db: Db, user: DigitalUser) -> UsageSummaryOut:
+    """AI usage against the spend guards (D36). Per-person rows are for Admins only."""
+    return UsageSummaryOut.model_validate(await usage.summary(db, user))

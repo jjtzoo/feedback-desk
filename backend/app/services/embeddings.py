@@ -20,6 +20,7 @@ from app.config import get_settings
 from app.models import Feedback, FeedbackEmbedding
 from app.models.entities import EMBEDDING_DIM
 from app.models.enums import OPEN_STATUSES
+from app.services import usage
 
 log = logging.getLogger(__name__)
 
@@ -130,7 +131,10 @@ async def embed(text: str) -> tuple[list[float], str]:
         norm = math.sqrt(sum(v * v for v in values)) or 1.0
         return [v / norm for v in values]
 
-    return await asyncio.to_thread(call), model
+    vector = await asyncio.to_thread(call)
+    # The Gemini API reports no token count for embeddings; record an estimate (D36).
+    await usage.record(kind="embedding", model=model, input_tokens=usage.estimate_tokens(text), estimated=True)
+    return vector, model
 
 
 async def store(db: AsyncSession, feedback_id: uuid.UUID, text: str) -> None:

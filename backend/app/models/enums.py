@@ -53,6 +53,7 @@ STAGE_OF = {
 
 CHANNELS = ("chat", "fallback")
 AUTHOR_TYPES = ("staff", "digital", "agent", "system")
+USAGE_KINDS = ("chat", "embedding")
 MESSAGE_TYPES = ("chat", "reply", "note", "progress", "follow_up")
 ACTOR_TYPES = ("system", "agent", "staff", "digital", "admin")
 RELEASE_STATUSES = ("draft", "approved", "published")

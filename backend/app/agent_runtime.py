@@ -16,6 +16,7 @@ from google.genai import types
 from agent.agent import build_agent
 from agent.model import ModelChoice, resolve
 from app.config import get_settings
+from app.services import usage
 from app.services.actors import User
 
 log = logging.getLogger(__name__)
@@ -94,16 +95,34 @@ async def get_state(user: User, session_id: str) -> dict[str, Any] | None:
 async def run_turn(
     user: User, session_id: str, parts: list[types.Part], state_delta: dict[str, Any]
 ) -> AsyncIterator[str]:
-    """Send one user message (text and file parts); yield each piece of text the agent says."""
+    """Send one user message (text and file parts); yield each piece of text the agent says.
+    The tokens each model call reports are recorded once the turn ends, even if it is cut short (D36)."""
     message = types.Content(role="user", parts=parts)
-    async for event in get_runner().run_async(
-        user_id=user.email, session_id=session_id, new_message=message, state_delta=state_delta
-    ):
-        if event.partial or not event.content or event.author == "user":
-            continue
-        for part in event.content.parts or []:
-            if part.text and not part.thought:
-                yield part.text
+    calls = input_tokens = output_tokens = 0
+    try:
+        async for event in get_runner().run_async(
+            user_id=user.email, session_id=session_id, new_message=message, state_delta=state_delta
+        ):
+            if not event.partial and event.usage_metadata is not None:
+                calls += 1
+                input_tokens += int(event.usage_metadata.prompt_token_count or 0)
+                output_tokens += int(event.usage_metadata.candidates_token_count or 0)
+            if event.partial or not event.content or event.author == "user":
+                continue
+            for part in event.content.parts or []:
+                if part.text and not part.thought:
+                    yield part.text
+    finally:
+        if calls:
+            await usage.record(
+                kind="chat",
+                model=model_choice().name,
+                calls=calls,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                user_email=user.email,
+                session_id=session_id,
+            )
 
 
 async def update_state(user: User, session_id: str, delta: dict[str, Any]) -> None:

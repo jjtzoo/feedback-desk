@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     # For the cost log (brief §8: under AUD 0.05 per item). AUD per million tokens; check current prices.
     model_price_input_aud_per_m: float = 0.45
     model_price_output_aud_per_m: float = 3.80
+    embedding_price_aud_per_m: float = 0.23
     project_confidence_gate: float = 0.7
 
     # Files (D10). local = a folder; gcs = a private Cloud Storage bucket.
@@ -83,6 +84,11 @@ class Settings(BaseSettings):
     max_agent_turns: int = 12
     max_questions: int = 3
     chat_sessions_per_user_per_hour: int = 20
+    # Model spend guards (D36). Days and months run in `timezone`. 0 turns a limit off.
+    # When a limit is reached, new chats and messages go to the backup form; nothing is lost.
+    daily_tokens_per_user: int = 150_000
+    daily_budget_aud: float = 5.0
+    monthly_budget_aud: float = 60.0
 
     @property
     def domains(self) -> list[str]:

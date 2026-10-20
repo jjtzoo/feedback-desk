@@ -147,6 +147,8 @@ class ChatStartIn(BaseModel):
 
 class ChatStartOut(Out):
     mode: Literal["chat", "fallback"]
+    # Set when a spend guard sent this chat to the backup form (D36).
+    limit: Literal["user", "budget"] | None = None
     session_id: str | None = None
     greeting: str | None = None
     project: ProjectOut | None = None
@@ -476,3 +478,42 @@ class HealthOut(Out):
     database: str
     migration: str | None
     model: dict[str, str | bool]
+
+
+# --- model usage (D36) --------------------------------------------------------------------
+
+
+class AllowanceOut(Out):
+    used_tokens: int
+    limit_tokens: int
+    percent: int
+    blocked: Literal["user", "budget"] | None
+
+
+class UsageTotalsOut(BaseModel):
+    calls: int
+    tokens: int
+    cost_aud: float
+
+
+class UsageDayOut(UsageTotalsOut):
+    day: date
+
+
+class UsagePersonOut(BaseModel):
+    email: str
+    name: str
+    tokens: int
+    cost_aud: float
+    limit_reached: bool
+
+
+class UsageSummaryOut(BaseModel):
+    today: UsageTotalsOut
+    month: UsageTotalsOut
+    daily_budget_aud: float
+    monthly_budget_aud: float
+    daily_tokens_per_user: int
+    avg_cost_per_item_aud: float | None
+    history: list[UsageDayOut]
+    people: list[UsagePersonOut]
