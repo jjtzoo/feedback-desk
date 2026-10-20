@@ -102,15 +102,9 @@ async def dev_users(db: Db) -> list[DevUserOut]:
     staff = await db.scalars(
         select(DigitalStaff).where(DigitalStaff.active.is_(True)).order_by(DigitalStaff.role, DigitalStaff.name)
     )
-    people = [
+    return [
         DevUserOut(email=p.google_email, name=p.name, role="admin" if p.role == "admin" else "digital") for p in staff
     ]
-    domain = s.domains[-1]
-    people += [
-        DevUserOut(email=f"sam.lee@{domain}", name="Sam Lee", role="staff"),
-        DevUserOut(email=f"priya.nair@{domain}", name="Priya Nair", role="staff"),
-    ]
-    return people
 
 
 @router.post("/auth/dev/sign-in", status_code=204)
