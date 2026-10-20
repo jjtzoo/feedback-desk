@@ -36,7 +36,9 @@ class Settings(BaseSettings):
 
     # Model (D8)
     model_provider: Literal["auto", "gemini", "vertex", "stub", "none"] = "auto"
-    model_name: str = "gemini-2.5-flash"
+    # The cheapest Gemini model open to new keys that passes the routing gate (D36);
+    # gemini-2.5-flash is the fallback. (2.5 Flash-Lite is closed to new users.)
+    model_name: str = "gemini-3.1-flash-lite"
     embedding_model: str = "gemini-embedding-001"
     agent_turn_timeout_seconds: float = 20.0
     google_api_key: str = ""
@@ -46,9 +48,13 @@ class Settings(BaseSettings):
     google_cloud_location: str = "australia-southeast1"
     google_application_credentials: str = ""
     duplicate_threshold: float = 0.85
-    # For the cost log (brief §8: under AUD 0.05 per item). AUD per million tokens; check current prices.
-    model_price_input_aud_per_m: float = 0.45
-    model_price_output_aud_per_m: float = 3.80
+    # For the cost log (brief §8: under AUD 0.05 per item). AUD per million tokens for model_name;
+    # check current prices (3.1 Flash-Lite USD 0.25 / 1.50 on 2026-10-21; 2.5 Flash USD 0.30 / 2.50).
+    model_price_input_aud_per_m: float = 0.38
+    model_price_output_aud_per_m: float = 2.28
+    # Caps on each model call (D36): a short reply, no hidden "thinking" tokens (billed as output).
+    model_max_output_tokens: int = 1024
+    model_thinking_budget: int = 0
     embedding_price_aud_per_m: float = 0.23
     project_confidence_gate: float = 0.7
 
@@ -86,7 +92,7 @@ class Settings(BaseSettings):
     chat_sessions_per_user_per_hour: int = 20
     # Model spend guards (D36). Days and months run in `timezone`. 0 turns a limit off.
     # When a limit is reached, new chats and messages go to the backup form; nothing is lost.
-    daily_tokens_per_user: int = 150_000
+    daily_tokens_per_user: int = 300_000
     daily_budget_aud: float = 5.0
     monthly_budget_aud: float = 60.0
 

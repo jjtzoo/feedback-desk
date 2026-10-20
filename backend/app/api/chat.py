@@ -69,6 +69,8 @@ async def start_session(body: ChatStartIn, user: CurrentUser, db: Db) -> ChatSta
     choice = runtime.model_choice()
     if choice.provider == "none" or not choice.configured:
         return ChatStartOut(mode="fallback", project=project_out, projects=project_list)
+    # Spend guards (D36) are checked only when a chat starts: a chat in progress always finishes
+    # (it is already capped by max_messages_per_session), and over a limit the backup form takes it.
     allowance = await usage.allowance(db, user.email)
     if allowance.blocked:
         return ChatStartOut(mode="fallback", limit=allowance.blocked, project=project_out, projects=project_list)
@@ -91,17 +93,12 @@ async def upload(session_id: str, user: CurrentUser, db: Db, file: UploadFile = 
 
 
 @router.post("/chat/sessions/{session_id}/messages")
-async def send_message(session_id: str, body: MessageIn, user: CurrentUser, db: Db) -> EventSourceResponse:
+async def send_message(session_id: str, body: MessageIn, user: CurrentUser) -> EventSourceResponse:
     state = await _state(user, session_id)
     settings = get_settings()
     messages = int(state.get("messages") or 0)
     if messages >= settings.max_messages_per_session:
         raise ServiceError("rate_limited", "This chat has reached its message limit. Use the form instead.", 429)
-    # Spend guards (D36): mid-chat, hand over to the backup form, which keeps what they typed.
-    # Confirm is never blocked, so a finished summary can always be sent.
-    allowance = await usage.allowance(db, user.email)
-    if allowance.blocked:
-        return EventSourceResponse(_limited(allowance.blocked))
     parts = await _message_parts(user, session_id, mask(body.text), body.attachment_ids)
     delta = {"messages": messages + 1, "user_turns": int(state.get("user_turns") or 0) + 1}
     return EventSourceResponse(_stream(user, session_id, parts, delta))
@@ -217,11 +214,6 @@ async def _message_parts(user: User, session_id: str, text: str, ids: list[uuid.
 
 def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False, default=str)}
-
-
-async def _limited(limit: str) -> AsyncIterator[dict[str, str]]:
-    yield _sse("fallback", {"reason": f"limit_{limit}"})
-    yield _sse("end", {})
 
 
 async def _stream(

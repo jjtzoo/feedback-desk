@@ -5,9 +5,11 @@ from pathlib import Path
 
 from google.adk.agents import LlmAgent
 from google.adk.agents.readonly_context import ReadonlyContext
+from google.genai import types
 
 from agent import callbacks, tools
 from agent.model import ModelChoice, build_model
+from app.config import get_settings
 
 INSTRUCTION = (Path(__file__).parent / "instruction.md").read_text(encoding="utf-8")
 
@@ -28,10 +30,17 @@ def instruction(ctx: ReadonlyContext) -> str:
 
 
 def build_agent(choice: ModelChoice) -> LlmAgent:
+    s = get_settings()
+    # Every call stays small (D36): replies are a sentence or two plus tool calls.
+    config = types.GenerateContentConfig(
+        max_output_tokens=s.model_max_output_tokens,
+        thinking_config=types.ThinkingConfig(thinking_budget=s.model_thinking_budget),
+    )
     return LlmAgent(
         name="feedback_agent",
         model=build_model(choice),
         instruction=instruction,
+        generate_content_config=config,
         tools=[tools.list_projects, tools.update_draft, tools.find_duplicates, tools.submit_feedback],
         before_tool_callback=callbacks.before_tool,
         before_model_callback=callbacks.before_model,

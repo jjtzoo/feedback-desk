@@ -5,7 +5,7 @@ import pytest
 
 from app.config import get_settings
 from app.services import usage
-from tests.conftest import MARC, STAFF, first, parse_sse, say, start_chat
+from tests.conftest import MARC, STAFF, first, say, start_chat, texts
 
 
 async def spend(email: str | None, input_tokens: int, output_tokens: int = 0) -> None:
@@ -39,19 +39,19 @@ async def test_user_limit_sends_new_chats_to_the_backup_form(
     assert r.json()["mode"] == "fallback" and r.json()["limit"] == "user"
 
 
-async def test_limit_reached_mid_chat_hands_over_to_the_form(
-    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    limits(monkeypatch, DAILY_TOKENS_PER_USER="1000")
+async def test_a_chat_in_progress_always_finishes(staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    limits(monkeypatch, DAILY_TOKENS_PER_USER="1000", DAILY_BUDGET_AUD="0.0001")
     sid = await start_chat(staff)
-    await spend(STAFF, 1000)
-    r = await staff.post(f"/api/chat/sessions/{sid}/messages", json={"text": "RAKE is broken", "attachment_ids": []})
-    assert first(parse_sse(r.text), "fallback") == {"reason": "limit_user"}
+    await spend(STAFF, 5000)  # over both limits after the chat started
+    events = await say(staff, sid, "RAKE is broken")
+    assert first(events, "fallback") is None and texts(events)
 
 
 async def test_daily_budget_stops_everyone(staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    limits(monkeypatch, DAILY_BUDGET_AUD="0.01")
-    await spend(MARC, 10_000, 2_000)  # about AUD 0.012 at the default prices
+    limits(
+        monkeypatch, DAILY_BUDGET_AUD="0.01", MODEL_PRICE_INPUT_AUD_PER_M="0.45", MODEL_PRICE_OUTPUT_AUD_PER_M="3.80"
+    )
+    await spend(MARC, 10_000, 2_000)  # AUD 0.0121
     r = await staff.post("/api/chat/sessions", json={"project_slug": None, "context": {}})
     assert r.json()["limit"] == "budget"
 
@@ -64,8 +64,9 @@ async def test_zero_turns_a_limit_off(staff: httpx.AsyncClient, monkeypatch: pyt
 
 
 async def test_console_usage_is_for_the_digital_team_and_people_for_admins(
-    staff: httpx.AsyncClient, darlene: httpx.AsyncClient, marc: httpx.AsyncClient
+    staff: httpx.AsyncClient, darlene: httpx.AsyncClient, marc: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    limits(monkeypatch, MODEL_PRICE_INPUT_AUD_PER_M="0.45", MODEL_PRICE_OUTPUT_AUD_PER_M="3.80")
     await spend(STAFF, 1_000_000, 100_000)
     await usage.record(kind="embedding", model="gemini-embedding-001", input_tokens=400, estimated=True)
 

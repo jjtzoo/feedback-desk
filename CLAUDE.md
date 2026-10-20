@@ -11,7 +11,7 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 ## Stack
 
 - Backend `backend/`: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async) + Alembic, PostgreSQL + pgvector (version per D31), uv. Business rules in `app/services/`; routers in `app/api/` stay thin.
-- Agent `backend/agent/`: Google ADK, one LlmAgent with tools `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`; Gemini Flash via AI Studio key, Vertex AI by config; a scripted stub model until the key arrives (D8, D23). Separate package so it can deploy to Agent Engine; never import FastAPI there.
+- Agent `backend/agent/`: Google ADK, one LlmAgent with tools `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`; Gemini 3.1 Flash-Lite (2.5 Flash fallback, D36) via AI Studio key, Vertex AI by config; a scripted stub model until the key arrives (D8, D23). Separate package so it can deploy to Agent Engine; never import FastAPI there.
 - Frontend `web/`: Next.js (App Router) + React + TypeScript + Tailwind + shadcn/ui (D16). Staff area `/` (landing) and `/chat`, console `/console`. Calls the API only.
 - Not used: Redis, Prisma, RAG Engine, Cloud Spanner, MCP servers (D26, D34).
 - Google Cloud australia-southeast1: Cloud Run (services for api and web, a job for the worker), Cloud SQL, Cloud Storage, Secret Manager, Artifact Registry, Cloud Scheduler (D29, D30, D33).
