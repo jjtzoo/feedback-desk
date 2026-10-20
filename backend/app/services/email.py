@@ -14,7 +14,7 @@ from app.config import Settings
 from app.models import Notification
 
 FOOTER = (
-    "\n\n--\nFeedback, REDADAIR Digital team.\n"
+    "\n\n--\nSmoke Signal, REDADAIR Digital team.\n"
     "Reply in the app rather than to this email; open the link above. "
     "You can mute an item from its page."
 )

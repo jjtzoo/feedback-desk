@@ -22,7 +22,7 @@ from app.services.actors import User
 log = logging.getLogger(__name__)
 
 APP_NAME = "feedback"
-GREETING = "G'day! What's on your mind? Tell me what's not working, or what would make one of our tools better."
+GREETING = "G'day, I'm Sig. Spotted something? Tell me what's not working, or what would make one of our tools better."
 
 _runner: Runner | None = None
 _sessions: BaseSessionService | None = None

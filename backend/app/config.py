@@ -74,7 +74,7 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_starttls: bool = False
-    mail_from: str = "Feedback <noreply@redadair.example>"
+    mail_from: str = "Smoke Signal <noreply@redadair.example>"
     gmail_sender: str = ""
 
     # Scheduled jobs (Cloud Scheduler calls /api/jobs/* with this token in production).
