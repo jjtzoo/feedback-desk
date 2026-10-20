@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { api, errorText, type Project, type Saved } from "@/lib/api";
+import { api, errorText, type Project, type Saved, type UsageLimit } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const HOW_MUCH = [
@@ -17,11 +17,18 @@ const HOW_MUCH = [
   { value: "nice_to_have", label: "Nice-to-have" },
 ] as const;
 
+const NOTICE: Record<UsageLimit | "offline", string> = {
+  offline: "The assistant isn't available right now.",
+  user: "You've used today's assistant allowance. It resets tomorrow.",
+  budget: "The assistant is paused for today to keep costs in check.",
+};
+
 /** When the assistant is down: a simple form so feedback is never lost (brief §8). */
 export function BackupForm({
   projects,
   initialProject,
   initialDetails,
+  limit,
   sessionId,
   context,
   onSaved,
@@ -29,6 +36,7 @@ export function BackupForm({
   projects: Project[];
   initialProject: string | null;
   initialDetails: string;
+  limit: UsageLimit | null;
   sessionId: string | null;
   context: Record<string, string>;
   onSaved: (s: Saved) => void;
@@ -72,8 +80,8 @@ export function BackupForm({
       <Alert>
         <TriangleAlert className="text-warning" />
         <AlertDescription>
-          <strong className="text-foreground">The assistant isn&apos;t available right now.</strong> Answer these and the Digital team still gets your
-          feedback. What you typed is kept below.
+          <strong className="text-foreground">{NOTICE[limit ?? "offline"]}</strong> Answer these and the Digital team still gets your feedback. What
+          you typed is kept below.
         </AlertDescription>
       </Alert>
       <div className="grid gap-2">

@@ -149,6 +149,7 @@ The agent can also answer `general` when nothing fits; general items go to Needs
 | D33 | Background work runs as a Cloud Run **job** (`feedback-worker-<env>`, `python -m app.worker --once`) that Cloud Scheduler starts every minute: it sends due emails and runs the daily digest and Friday drafter when their slot comes. With min 0 instances a loop in a service would not keep running. Locally the worker loops. | Deployment manual §8, §16. | |
 | D34 | Not used by this project: RAG Engine, Cloud Spanner, MCP servers, Redis. Duplicate search uses pgvector in Cloud SQL (D26). Documented so nobody provisions them by default. | Deployment manual §20 to §31. | |
 | D35 | Production domain: a subdomain such as `feedback.redadair.com.au`, mapped to the production web service through Cloud Run domain mapping and Cloudflare DNS. **OPEN:** the name, with Chris. Staging never gets the production domain. | Deployment manual §37 to §39. | |
+| D36 | Model spend guards. Every model call writes a `model_usage` row (tokens from Gemini's counts; embeddings estimated at four characters a token; cost in AUD from the configured prices; no message text). Limits, all configurable and 0 to switch off: `DAILY_TOKENS_PER_USER` (150,000), `DAILY_BUDGET_AUD` (5.00), `MONTHLY_BUDGET_AUD` (60.00), days and months in Australia/Sydney. When one is reached, new chats and further messages go to the backup form with a notice; Confirm is never blocked, so nothing is lost. Staff see their allowance under the chat; the console dashboard shows spend against the budgets, cost per item (brief target under AUD 0.05) and, for Admins, the top users today. Decided 2026-10-21 at the developer's request when the AI Studio key arrived; **PROPOSED** limits, Marc to confirm. | Brief §8 (cost per item). | |
 
 ### Asks to Chris (IT Director)
 
@@ -172,7 +173,7 @@ The intake agent talks to the user and classifies; the router decides the assign
 
 | Layer | Choice | Notes |
 | --- | --- | --- |
-| Front end | Next.js + React + TypeScript + Tailwind + shadcn/ui (D16) | One app: `/` staff chat, tracker, My feedback, What's new; `/console` Digital Staff and Admin. Look at RAKE's chat UI for reference, don't copy it in. Reuse shadcn/ui components before writing new ones. |
+| Front end | Next.js + React + TypeScript + Tailwind + shadcn/ui (D16) | One app: `/` staff landing page, `/chat` staff chat, tracker, My feedback, What's new; `/console` Digital Staff and Admin. Look at RAKE's chat UI for reference, don't copy it in. Reuse shadcn/ui components before writing new ones. |
 | Auth | Google OAuth, redadair.com.au only | Role from `digital_staff`; everyone else is Staff. Session cookie: httpOnly, Secure, SameSite=Lax. |
 | API | Python 3.12, FastAPI, Pydantic v2, SSE for chat and notifications | Pydantic schemas for every agent output. Role checked on every call. |
 | Agent | Google ADK, single agent with tools, own package | `adk web` in development, Vertex AI Agent Engine in production. Gemini Flash via AI Studio key (D8). Prompt and project list versioned in the repo and the database. |
@@ -187,7 +188,7 @@ The intake agent talks to the user and classifies; the router decides the assign
 | Not used | Redis, Prisma, RAG Engine, Cloud Spanner, MCP servers (D26, D34) | Documented in `docs/architecture.md`. |
 
 ```
-Staff (intranet tile) ──► Web app (Cloud Run): staff chat, tracker, My feedback, What's new
+Staff (intranet tile) ──► Web app (Cloud Run): staff landing and chat, tracker, My feedback, What's new
 Digital Staff, Admin ──► Web app (Cloud Run): console (board, list, cards, approvals, admin)
                                │
                                ▼
@@ -203,7 +204,7 @@ Digital Staff, Admin ──► Web app (Cloud Run): console (board, list, cards,
 
 ### Behaviour
 
-1. Opens with a short greeting in RAKE's friendly Aussie tone, then lets the user type freely. No forms first. A `?project=` deep link preselects the project.
+1. Opens with a short greeting in RAKE's friendly Aussie tone, then lets the user type freely. No forms first. A `?project=` deep link preselects the project; it is served at `/chat?project=`, and `/?project=` redirects there.
 2. Asks follow-up questions only for what is missing, **at most 3 per conversation**, chosen to fill the developer brief:
    - Which tool is this about? (quick-pick chips when project confidence is under 0.7)
    - What happened, or what would you like? For bugs: what you expected vs what you saw.
@@ -336,6 +337,7 @@ All tables in schema `app` (ADK sessions in schema `adk`). Ids are UUIDs; times 
 | `notifications` | In-app bell; the email is sent from the row | id, recipient_email, feedback_id, type, title, link, read_at, emailed_at, created_at |
 | `notification_mutes` | Per-item mute (PROPOSED) | recipient_email, feedback_id |
 | `project_messages` | Project channels | id, project_id, author_email, body, mentions[], feedback_refs[], pinned, created_at |
+| `model_usage` | One row per model call (D36) | id, user_email, session_id, kind (chat / embedding), model, calls, input_tokens, output_tokens, estimated, cost_aud, created_at |
 | `releases` | Friday releases | id, project_id, week_ending, status (draft / approved / published), approved_by, published_at |
 | `release_items` | Lines in a release | id, release_id, title, body, work_type, source_type, source_id, visible_to_staff |
 | `user_preferences` | Remembered console view (PROPOSED) | email, console_view |
@@ -380,7 +382,8 @@ All under `/api`; errors are `{"error": {"code", "message"}}`. Every route excep
 | Notifications | `GET /notifications`, `GET /notifications/stream` (SSE), `POST /notifications/read`, `POST /feedback/{ref}/mute` | 3 |
 | Channels | `GET/POST /console/projects/{slug}/messages`, pin | 3 |
 | Releases | `GET /console/releases`, `PATCH /console/releases/{id}`, `POST /console/releases/{id}/publish` | 4 |
-| Reports | `GET /console/dashboard` | 3 |
+| Reports | `GET /console/dashboard`, `GET /console/usage` (D36) | 3 |
+| Usage | `GET /usage/me` (the signed-in person's allowance today, D36) | 2 |
 | Ops | `GET /health` (DB, migration, model credentials) | 1 |
 
 ## Project structure
@@ -498,13 +501,15 @@ Built locally against this spec, ahead of the sprint gates; nothing deployed, no
 | Data model, migration, seed (S1-2) | Built. v3 tables, FB- sequence, the brief's 15 projects and owners, interim roles (D20). |
 | Sign-in and roles (S1-3) | Built and tested: Google OAuth flow with the domain checked on every request, a local sign-in picker (D23), roles from `digital_staff`. Needs the OAuth client (ask 2) to test against Google. |
 | Admin page (S1-4) | Built: projects, Digital Staff, routing rules. |
+| Spend guards (D36) | Built and tested: usage ledger, per-person and budget limits, allowance meter in the chat, AI usage panel on the dashboard. Checked against the real Gemini model (one turn about 9,300 tokens). |
+| Guide | A first-visit walkthrough per area (staff, console), filtered by role, reopened from the Guide button in each header. |
 | Agent, router, brief, duplicates, attachments, backup form (S2-1 to S2-8) | Built and tested on the stub model; Word/Excel text, content-type checks, macro rejection, PII masking, abuse flag, cost log. Needs the AI Studio key (ask 3) to score the routing gate. |
 | Routing test set (S2-9) | A 40-item draft in `backend/evals/routing_set.yaml` and a runner; Marc to correct the labels; the stub scores 75 % / 70 % / 75 % (keyword baseline, not the gate). |
 | Console, approvals, tracker, notifications, channels, dashboard, digest (S3-1 to S3-7) | Built and tested end to end; board drag-and-drop, list and cards views; in-app bell over SSE with polling fallback; email through Mailpit locally. |
 | Friday releases (S4-1) | Built: drafter, owner review, publish, What's new, contributor notifications. The drafter assembles from sources; AI rewording comes with the key. |
 | Deployment (S1-1, S4-2) | Written, not run: `deploy.sh`, `deploy.ps1`, Cloud Run YAML, worker job, scheduler, CI workflow. Needs Google Cloud access (asks 1, 9) and the company GitHub repository (ask 5). Agent Engine deployment still to do once access exists. |
 | Pilot and launch (S4-3, S4-4) | Not started. |
-| Checks | Backend: 64 tests, Ruff, mypy strict. Web: ESLint, TypeScript, production build. Screens checked in a browser at desktop and 375 px, light and dark. |
+| Checks | Backend: 70 tests, Ruff, mypy strict. Web: ESLint, TypeScript, production build. Screens checked in a browser at desktop and 375 px, light and dark. |
 
 ## UI
 

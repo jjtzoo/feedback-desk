@@ -7,7 +7,7 @@ How the system fits together, per the company handover manual §17. Decisions (D
 
 | Component | Where | What it does |
 | --- | --- | --- |
-| Web app | `web/` (Next.js App Router, React, TypeScript, Tailwind, shadcn/ui) | Staff area at `/` (chat, My feedback, tracker, What's new) and the console at `/console` (board, approvals, channels, releases, dashboard, admin). It forwards `/api/*` to the API; it never touches the database or the model. |
+| Web app | `web/` (Next.js App Router, React, TypeScript, Tailwind, shadcn/ui) | Staff area: a landing page at `/` (start cards, tool picker, recent feedback), the chat at `/chat` (`?project=` preselects a tool, `?start=` pre-fills a starter), My feedback, tracker, What's new and the console at `/console` (board, approvals, channels, releases, dashboard, admin). It forwards `/api/*` to the API; it never touches the database or the model. |
 | API | `backend/app/` (FastAPI) | Sign-in, every business rule (`app/services/`), the router that assigns owners, approvals, notifications, files, channels, releases, reports. Roles checked on every call. |
 | Agent | `backend/agent/` (Google ADK) | One LlmAgent: talks to staff, classifies, writes the developer brief, calls `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`. Runs in the API process locally; on Vertex AI Agent Engine in production (D7). |
 | Worker | `backend/app/worker.py` | Sends the email for each notification (3 tries), runs the daily digest and the Friday release drafter. A loop locally; a Cloud Run job started every minute by Cloud Scheduler in the cloud (D33). |
@@ -100,6 +100,10 @@ Cloud Run, Artifact Registry, Cloud SQL Admin, Secret Manager, Cloud Storage, Cl
 | Email sending | Cloud Scheduler, every minute | `feedback-worker-<env>` job | Due notification emails |
 | Daily digest | the same job, first run after 8:00 weekdays (Australia/Sydney) | `jobs.run_digest` | Needs review over 24 h to the triage lead; approvals summary to Admins |
 | Friday release drafter | the same job, first run after 9:00 Friday | `jobs.run_release_drafter` | A draft per active project, owner notified |
+
+## Model spend guards (D36)
+
+Every chat turn and embedding call writes an `app.model_usage` row (tokens, estimated AUD cost, no text). `services/usage.py` checks the per-person daily token limit and the daily and monthly budgets before a chat starts and before each message; over a limit, the chat hands over to the backup form. `GET /api/usage/me` feeds the allowance meter under the chat; `GET /api/console/usage` feeds the dashboard's AI usage panel.
 
 `job_runs` makes each slot run once. `/api/jobs/daily-digest` and `/api/jobs/release-drafts` (header `X-Job-Token`) run them on demand.
 

@@ -32,7 +32,7 @@ export default function MyFeedbackPage() {
           <p className="mt-1 text-muted-foreground">Everything you&apos;ve sent or added a comment to, and where each one is up to.</p>
         </div>
         <Button asChild className="h-11 rounded-xl px-5">
-          <Link href="/">
+          <Link href="/chat">
             <MessageSquarePlus /> Give feedback
           </Link>
         </Button>

@@ -54,7 +54,7 @@ export function UserMenu({ tone = "light" }: { tone?: "light" | "dark" }) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild className="min-h-11">
-          <Link href="/">
+          <Link href="/chat">
             <MessageSquarePlus /> Give feedback
           </Link>
         </DropdownMenuItem>

@@ -102,8 +102,12 @@ export interface Duplicate {
   date: string;
 }
 
+export type UsageLimit = "user" | "budget";
+
 export interface ChatStart {
   mode: "chat" | "fallback";
+  /** Set when a spend guard sent this chat to the backup form (D36). */
+  limit: UsageLimit | null;
   session_id: string | null;
   greeting: string | null;
   project: Project | null;
@@ -310,6 +314,30 @@ export interface Release {
   published_at: string | null;
   can_publish: boolean;
   items: ReleaseItem[];
+}
+
+export interface Allowance {
+  used_tokens: number;
+  limit_tokens: number;
+  percent: number;
+  blocked: UsageLimit | null;
+}
+
+export interface UsageTotals {
+  calls: number;
+  tokens: number;
+  cost_aud: number;
+}
+
+export interface UsageSummary {
+  today: UsageTotals;
+  month: UsageTotals;
+  daily_budget_aud: number;
+  monthly_budget_aud: number;
+  daily_tokens_per_user: number;
+  avg_cost_per_item_aud: number | null;
+  history: (UsageTotals & { day: string })[];
+  people: { email: string; name: string; tokens: number; cost_aud: number; limit_reached: boolean }[];
 }
 
 export interface Dashboard {

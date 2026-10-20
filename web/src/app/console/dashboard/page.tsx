@@ -1,13 +1,13 @@
 "use client";
 
-import { Clock3, Gavel, Inbox, Repeat2, TriangleAlert } from "lucide-react";
+import { Clock3, Gavel, Inbox, Repeat2, Sparkles, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api, errorText, type Category, type Dashboard, type WorkType } from "@/lib/api";
+import { api, errorText, type Category, type Dashboard, type UsageSummary, type WorkType } from "@/lib/api";
 import { CATEGORY_LABEL, WORK_TYPE_LABEL, day } from "@/lib/format";
 
 function Stat({ icon: Icon, label, value, note, warn }: { icon: typeof Inbox; label: string; value: string; note?: string; warn?: boolean }) {
@@ -134,12 +134,123 @@ function Weekly({ weeks }: { weeks: Dashboard["weekly"] }) {
   );
 }
 
+const aud = (n: number) => `A$${n < 1 ? n.toFixed(3) : n.toFixed(2)}`;
+const tokens = (n: number) => (n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : String(n));
+
+/** Spend against a budget, as a meter with the numbers in words. */
+function Budget({ label, spent, budget }: { label: string; spent: number; budget: number }) {
+  const percent = budget ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  const high = percent >= 80;
+  return (
+    <div className="grid gap-1.5">
+      <p className="flex items-baseline justify-between gap-2 text-sm">
+        <span className="font-medium text-muted-foreground">{label}</span>
+        <span className="font-mono tabular">
+          {aud(spent)} {budget ? `of ${aud(budget)}` : "(no limit)"}
+        </span>
+      </p>
+      {budget > 0 && (
+        <>
+          <div role="meter" aria-label={`${label} spend`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} className="h-2 overflow-hidden rounded-full bg-muted">
+            <div className={`h-full rounded-full ${high ? "bg-warning" : "bg-series-1"}`} style={{ width: `${percent}%` }} />
+          </div>
+          <p className={`flex items-center gap-1 text-xs ${high ? "font-semibold text-warning" : "text-muted-foreground"}`}>
+            {high && <TriangleAlert className="size-3.5" aria-hidden="true" />}
+            {percent}% used{percent >= 100 ? ". New chats are going to the backup form." : ""}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** AI usage (D36): model spend against the daily and monthly budgets, and who is using it (Admins). */
+function AiUsage({ u }: { u: UsageSummary }) {
+  const max = Math.max(0.0001, ...u.history.map((h) => h.cost_aud));
+  return (
+    <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="ai-usage">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="ai-usage" className="flex items-center gap-2 font-bold">
+          <Sparkles className="size-4 text-primary" aria-hidden="true" /> AI usage
+        </h2>
+        <p className="text-xs text-muted-foreground">Estimated from Gemini token counts. Per-person limit: {tokens(u.daily_tokens_per_user)} tokens a day.</p>
+      </div>
+      <div className="mt-4 grid gap-5 md:grid-cols-2">
+        <Budget label="Today" spent={u.today.cost_aud} budget={u.daily_budget_aud} />
+        <Budget label="This month" spent={u.month.cost_aud} budget={u.monthly_budget_aud} />
+      </div>
+      <dl className="mt-5 grid grid-cols-3 gap-3 text-sm">
+        <div>
+          <dt className="text-muted-foreground">Model calls today</dt>
+          <dd className="font-mono text-xl font-bold tabular">{u.today.calls}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Tokens today</dt>
+          <dd className="font-mono text-xl font-bold tabular">{tokens(u.today.tokens)}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Cost per item (30 days)</dt>
+          <dd className="font-mono text-xl font-bold tabular">{u.avg_cost_per_item_aud === null ? "–" : aud(u.avg_cost_per_item_aud)}</dd>
+          <dd className="text-xs text-muted-foreground">Target: under A$0.05</dd>
+        </div>
+      </dl>
+      <h3 className="mt-6 text-sm font-semibold text-muted-foreground">Last 14 days</h3>
+      <div className="mt-2 grid grid-cols-14 items-end gap-1" role="img" aria-label={`Daily AI spend for the last 14 days, highest ${aud(max)}`}>
+        {u.history.map((h) => (
+          <Tooltip key={h.day}>
+            <TooltipTrigger asChild>
+              <div className="flex h-20 items-end rounded-sm hover:bg-muted/60">
+                <span className="w-full rounded-t-[3px] bg-series-1" style={{ height: `${(h.cost_aud / max) * 100}%`, minHeight: h.calls ? 2 : 0 }} />
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              {day(h.day)}: {aud(h.cost_aud)}, {tokens(h.tokens)} tokens, {h.calls} calls
+            </TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+      {u.people.length > 0 && (
+        <>
+          <h3 className="mt-6 text-sm font-semibold text-muted-foreground">Top users today</h3>
+          <Table className="mt-2">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Person</TableHead>
+                <TableHead className="text-right">Tokens</TableHead>
+                <TableHead className="text-right">Cost</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {u.people.map((p) => (
+                <TableRow key={p.email}>
+                  <TableCell>
+                    <span className="font-medium">{p.name}</span>
+                    {p.limit_reached && (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-tint px-2 py-0.5 text-xs font-semibold text-warning">
+                        <TriangleAlert className="size-3" aria-hidden="true" /> Limit reached
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular">{tokens(p.tokens)}</TableCell>
+                  <TableCell className="text-right font-mono tabular">{aud(p.cost_aud)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </>
+      )}
+    </section>
+  );
+}
+
 /** Dashboard (brief §4.4.6): open items, weekly trend, time to first response, approvals waiting. */
 export default function DashboardPage() {
   const [d, setD] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageSummary | null>(null);
   useEffect(() => {
     api.get<Dashboard>("/console/dashboard").then(setD).catch((e: unknown) => setError(errorText(e)));
+    api.get<UsageSummary>("/console/usage").then(setUsage).catch(() => undefined);
   }, []);
 
   if (error) return <p className="p-6 text-destructive">{error}</p>;
@@ -168,6 +279,7 @@ export default function DashboardPage() {
           note="Target: 10% or less (90% correct)"
         />
       </div>
+      {usage && <AiUsage u={usage} />}
       <div className="grid gap-4 lg:grid-cols-2">
         <Weekly weeks={d.weekly} />
         <BarList title="Open by project" rows={d.open_by_project} />

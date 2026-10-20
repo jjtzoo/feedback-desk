@@ -4,19 +4,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Brand, Stripe } from "@/components/brand";
+import { GuideButton } from "@/components/guide";
 import { NotificationBell } from "@/components/notification-bell";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Give feedback" },
+  { href: "/chat", label: "Give feedback" },
   { href: "/my", label: "My feedback" },
   { href: "/whats-new", label: "What's new" },
 ];
 
 /** The tracker belongs to My feedback, so that item stays highlighted there. */
 function isActive(href: string, path: string): boolean {
-  if (href === "/") return path === "/";
   if (href === "/my") return path.startsWith("/my") || path.startsWith("/track");
   return path.startsWith(href);
 }
@@ -48,6 +48,7 @@ export function StaffHeader() {
             })}
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            <GuideButton area="staff" />
             <NotificationBell />
             <UserMenu />
           </div>

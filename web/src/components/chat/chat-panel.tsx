@@ -1,12 +1,14 @@
 "use client";
 
-import { Bug, FileText, HelpCircle, KeyRound, Lightbulb, Loader2, Paperclip, Send, Users, X } from "lucide-react";
+import { FileText, Loader2, Paperclip, Send, Users, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { BackupForm } from "@/components/chat/backup-form";
 import { ConfirmCard } from "@/components/chat/confirm-card";
 import { DoneView } from "@/components/chat/done-view";
+import { STARTERS } from "@/components/chat/starters";
+import { UsageMeter } from "@/components/chat/usage-meter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +17,7 @@ import {
   ApiError,
   errorText,
   streamChat,
+  type Allowance,
   type Attachment,
   type ChatCard,
   type ChatStart,
@@ -22,6 +25,7 @@ import {
   type Duplicate,
   type Project,
   type Saved,
+  type UsageLimit,
 } from "@/lib/api";
 import { fileSize } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -29,12 +33,6 @@ import { cn } from "@/lib/utils";
 type Turn = { role: "user" | "agent"; text: string; files?: string[] };
 type Mode = "starting" | "chat" | "fallback" | "done";
 
-const STARTERS = [
-  { icon: Bug, label: "Something's broken", text: "Something's broken: " },
-  { icon: KeyRound, label: "I need access", text: "I need access to " },
-  { icon: Lightbulb, label: "I have an idea", text: "It would help if " },
-  { icon: HelpCircle, label: "How do I…?", text: "How do I " },
-];
 const ACCEPT = ".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.webp";
 const POPULAR = ["rake-agent", "staff-admin-portal", "cpd-tracker", "training-portal", "financial-platform"];
 
@@ -52,7 +50,7 @@ function captureContext(): Record<string, string> {
   };
 }
 
-export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
+export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | null; starterText?: string }) {
   const [mode, setMode] = useState<Mode>("starting");
   const [start, setStart] = useState<ChatStart | null>(null);
   const [project, setProject] = useState<string | null>(projectSlug);
@@ -62,16 +60,22 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
   const [card, setCard] = useState<{ card: ChatCard; hash: string } | null>(null);
   const [files, setFiles] = useState<Attachment[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(starterText ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<{ saved: Saved; plusOne: boolean } | null>(null);
   const [round, setRound] = useState(0);
   const [context, setContext] = useState<Record<string, string>>({});
+  const [limit, setLimit] = useState<UsageLimit | null>(null);
+  const [allowance, setAllowance] = useState<Allowance | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLOListElement>(null);
   const started = useRef<string | null>(null);
+
+  const refreshAllowance = useCallback(() => {
+    api.get<Allowance>("/usage/me").then(setAllowance).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const key = `${round}:${project ?? ""}`;
@@ -90,6 +94,8 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
       .post<ChatStart>("/chat/sessions", { project_slug: project, context: ctx })
       .then((s) => {
         setStart(s);
+        setLimit(s.limit);
+        refreshAllowance();
         if (s.mode === "fallback" || !s.session_id) {
           setMode("fallback");
           return;
@@ -101,13 +107,18 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
         if (e instanceof ApiError && e.status === 429) setError(e.message);
         setMode("fallback");
       });
-  }, [project, round]);
+  }, [project, round, refreshAllowance]);
 
   useEffect(() => {
     // Scroll the message list only, never the page.
     const el = list.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [turns, card, duplicates, chips, busy]);
+
+  // Arriving from a start card: put the cursor in the box so the user can finish the sentence.
+  useEffect(() => {
+    if (mode === "chat" && starterText) input.current?.focus();
+  }, [mode, starterText]);
 
   // When the confirm card appears, move focus to it so keyboard and screen-reader users land on it.
   useEffect(() => {
@@ -124,6 +135,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
       setChips([]);
       let done: Saved | null = null;
       let fallback = false;
+      let limited: UsageLimit | null = null;
       let drafted = false;
       try {
         await streamChat(path, body, (e) => {
@@ -135,23 +147,28 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
             setCard({ card: e.card, hash: e.hash });
           }
           else if (e.type === "done") done = { reference: e.reference, assigned_to: e.assigned_to, status: e.status };
-          else if (e.type === "fallback") fallback = true;
+          else if (e.type === "fallback") {
+            fallback = true;
+            if (e.reason === "limit_user" || e.reason === "limit_budget") limited = e.reason === "limit_user" ? "user" : "budget";
+          }
         });
       } catch (e) {
         setError(errorText(e));
       } finally {
         setBusy(false);
+        refreshAllowance();
       }
       if (done) {
         setSaved({ saved: done, plusOne: false });
         setMode("done");
       } else if (fallback) {
+        setLimit(limited);
         setMode("fallback");
       } else if (!drafted) {
         input.current?.focus();
       }
     },
-    [],
+    [refreshAllowance],
   );
 
   async function send(message: string) {
@@ -228,7 +245,11 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
           <p className="font-bold">Feedback assistant</p>
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <span className={cn("size-2 rounded-full", mode === "fallback" ? "bg-warning" : "bg-success")} aria-hidden="true" />
-            {mode === "fallback" ? "Assistant offline, the form still works" : "Asks a few questions, then sends it to the right person"}
+            {mode !== "fallback"
+              ? "Asks a few questions, then sends it to the right person"
+              : limit
+                ? "Assistant paused for today, the form still works"
+                : "Assistant offline, the form still works"}
           </p>
         </div>
       </header>
@@ -247,6 +268,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
             projects={projects}
             initialProject={project}
             initialDetails={userTyped}
+            limit={limit}
             sessionId={sid}
             context={context}
             onSaved={(s) => {
@@ -294,9 +316,9 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
             {firstMessage && !busy && (
               <li className="grid gap-4">
                 <div className="flex flex-wrap gap-2">
-                  {STARTERS.map(({ icon: Icon, label, text: starter }) => (
+                  {STARTERS.map(({ id, icon: Icon, label, text: starter }) => (
                     <button
-                      key={label}
+                      key={id}
                       type="button"
                       onClick={() => {
                         setText(starter);
@@ -439,6 +461,7 @@ export function ChatPanel({ projectSlug }: { projectSlug: string | null }) {
               </Button>
             </div>
             <p className="mt-2 px-1 text-xs text-muted-foreground">Enter sends, Shift+Enter for a new line. Files: PDF, Word, Excel, images, up to 10 MB.</p>
+            {allowance && <UsageMeter allowance={allowance} />}
           </form>
         </>
       )}

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { Brand, Stripe } from "@/components/brand";
+import { GuideButton } from "@/components/guide";
 import { useMe } from "@/components/me";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
         <h1 className="text-2xl font-extrabold">The console is for the Digital team</h1>
         <p className="text-muted-foreground">You can give feedback and follow it from the staff pages.</p>
         <Button asChild className="mx-auto h-11 rounded-xl">
-          <Link href="/">Give feedback</Link>
+          <Link href="/chat">Give feedback</Link>
         </Button>
       </div>
     );
@@ -83,6 +84,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           <Brand href="/console" tone="dark" />
           <span className="hidden rounded-full bg-white/10 px-2.5 py-0.5 text-xs font-semibold sm:inline">Console</span>
           <div className="ml-auto flex items-center gap-1">
+            <GuideButton area="console" tone="dark" />
             <NotificationBell tone="dark" />
             <UserMenu tone="dark" />
           </div>
