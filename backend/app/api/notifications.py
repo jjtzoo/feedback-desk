@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.deps import CurrentUser, Db
+from app.api.deps import CurrentUser, Db, StreamUser
 from app.db import session_scope
 from app.schemas import NotificationOut, NotificationsOut, ReadIn
 from app.services import notifications
@@ -31,7 +31,7 @@ async def read(body: ReadIn, db: Db, user: CurrentUser) -> Response:
 
 
 @router.get("/notifications/stream")
-async def stream(request: Request, user: CurrentUser) -> EventSourceResponse:
+async def stream(request: Request, user: StreamUser) -> EventSourceResponse:
     """Sends {"unread": n} whenever something new arrives. Checks Postgres (no Redis, D26)."""
 
     async def events() -> AsyncIterator[dict[str, str]]:

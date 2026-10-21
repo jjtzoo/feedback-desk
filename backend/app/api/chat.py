@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sse_starlette.sse import EventSourceResponse
 
 from app import agent_runtime as runtime
-from app.api.deps import CurrentUser, Db
+from app.api.deps import CurrentUser, Db, StreamUser
 from app.config import get_settings
 from app.db import session_scope
 from app.errors import Conflict, NotFound, ServiceError
@@ -88,7 +88,7 @@ async def upload(session_id: str, user: CurrentUser, db: Db, file: UploadFile = 
 
 
 @router.post("/chat/sessions/{session_id}/messages")
-async def send_message(session_id: str, body: MessageIn, user: CurrentUser) -> EventSourceResponse:
+async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> EventSourceResponse:
     state = await _state(user, session_id)
     settings = get_settings()
     messages = int(state.get("messages") or 0)
@@ -100,7 +100,7 @@ async def send_message(session_id: str, body: MessageIn, user: CurrentUser) -> E
 
 
 @router.post("/chat/sessions/{session_id}/confirm")
-async def confirm(session_id: str, body: ConfirmIn, user: CurrentUser) -> EventSourceResponse:
+async def confirm(session_id: str, body: ConfirmIn, user: StreamUser) -> EventSourceResponse:
     """The confirm card's button. Confirms only the draft the card showed (D12)."""
     state = await _state(user, session_id)
     draft = state.get("draft") or {}

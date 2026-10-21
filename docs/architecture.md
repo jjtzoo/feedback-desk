@@ -27,7 +27,7 @@ Browser ──HTTPS──► web (Next.js, Cloud Run) ──/api/* proxy──�
 Cloud Scheduler ──every minute──► worker job (Cloud Run job) ──► Cloud SQL, email (ZeptoMail SMTP or Gmail API)
 ```
 
-- **Frontend to backend:** same-origin `/api/*` through the web app, so the session cookie (httpOnly, Secure, SameSite=Lax) works without CORS. Chat and the notification bell use server-sent events.
+- **Frontend to backend:** same-origin `/api/*` through the web app, so the session cookie (httpOnly, Secure, SameSite=Lax) works without CORS. Chat and the notification bell use server-sent events. Those routes resolve the signed-in user in their own short transaction (`stream_user`), so an open tab does not keep a transaction (or a lock on the sign-in tables) open.
 - **Backend to database:** SQLAlchemy async with asyncpg. In Cloud Run the connection goes through the Cloud SQL connector socket in `DATABASE_URL`. Migrations (Alembic) run when the API container starts, so staging migrates before production.
 - **Agent to services:** tools call the same `app/services/` functions as the API; the model never writes to the database directly and never names an assignee (D2).
 - **External services:** Google OAuth (sign-in, redadair.com.au only), Gemini (AI Studio key, or Vertex AI by config), ZeptoMail or Gmail API (D32), Cloudflare DNS for the production domain (D35).
