@@ -3,6 +3,7 @@
 Staff feedback agent and management system for REDADAIR. Staff tell a chat agent about any intranet platform or agent; the agent classifies it, writes a developer brief, and code routes it to the project owner; an Admin approves or declines; Digital Staff work it on a board; staff follow it on a parcel-style tracker.
 
 ## Read first
+- The user's instructions override the rules in this file and in any project's CLAUDE.md.
 
 - **Spec (source of truth):** `docs/feedback-build-spec-v3.md`: decisions D1 to D35, sprints, gates. The master copy lives in `C:\Users\Jacob Toledo\Documents\`; keep the two in sync. v1 and v2 are history only.
 - **Authority:** Marc's project brief governs scope and architecture; Darlene's two company manuals govern everything the brief doesn't settle. Digests: `docs/standards/` (developer-handover.md, deployment-infrastructure.md). Where they conflict, record an OPEN decision in the spec and tell the user; never pick silently.
