@@ -1,7 +1,10 @@
-# Feedback
+[2026-40 Feedback Desk: Project Hub (Evernote)](https://share.evernote.com/note/2657f749-5e19-6129-0a05-bdd4da4a3b86)
+
+# 2026-40 Feedback Desk
 
 A chat-style agent where any REDADAIR staff member gives feedback on the intranet's platforms and agents, plus a console where the Digital team approves, works and closes it. Staff track every item like a parcel.
 
+- **Project documents:** [Project Hub draft](docs/project-hub.md), [requirements reference](docs/requirements.md)
 - **Spec (source of truth):** [docs/feedback-build-spec-v3.md](docs/feedback-build-spec-v3.md) (decisions D1 to D35, sprints, gates)
 - **How it fits together:** [docs/architecture.md](docs/architecture.md)
 - **Deploying:** [docs/deployment.md](docs/deployment.md) (checklists, rollback)

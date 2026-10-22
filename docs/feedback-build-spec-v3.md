@@ -168,6 +168,20 @@ The agent can also answer `general` when nothing fits; general items go to Needs
 | 10 | ZeptoMail access and a verified sending domain (if D32 goes that way), and the production subdomain in Cloudflare (D35) | Sprint 3 / Sprint 4 |
 | 11 | Answers on D31 (PostgreSQL version) and D32 (email provider) | Sprint 1 |
 
+### Deviations register
+
+The company standards are followed in full. The only deviations are for stacks that are not reachable yet, and each one is temporary. Dated 2026-10-21.
+
+| # | Deviation (what is different for now) | Why | Closed when |
+| --- | --- | --- | --- |
+| 1 | Local PostgreSQL (Docker or pgserver) instead of Cloud SQL | Cloud SQL not provisioned; version also open (D31) | Asks 9 and 11 |
+| 2 | The agent runs inside the API process, not on Agent Engine | No Google Cloud access yet | Asks 1 and 9 |
+| 3 | Sign-in uses the local dev picker (D23); Google OAuth is built but untested against Google | No OAuth client yet | Ask 2 |
+| 4 | Email is switched off or goes to Mailpit locally | No Gmail API account or ZeptoMail access; provider open (D32) | Asks 4 and 10 |
+| 5 | The Gemini key is held in a git-ignored local `.env` | Secret Manager not available yet; the key never goes in code, `.env.example` or YAML | Asks 1 and 3 |
+| 6 | Work is on feature branches cut from `feat/v3-build` | The company GitHub repo, `staging` and branch protection do not exist yet | Ask 5 |
+| 7 | Deployment scripts, CI workflow and Cloud Run YAML are written but not run | No Google Cloud access or company repo | Asks 1, 5 and 9 |
+
 ## Stack and architecture
 
 The intake agent talks to the user and classifies; the router decides the assignee in plain code. Everything writes to one Postgres database.
@@ -209,7 +223,7 @@ Digital Staff, Admin ──► Web app (Cloud Run): console (board, list, cards,
 2. Asks follow-up questions only for what is missing, **at most 3 per conversation**, chosen to fill the developer brief:
    - Which tool is this about? (quick-pick chips when project confidence is under 0.7)
    - What happened, or what would you like? For bugs: what you expected vs what you saw.
-   - How much is this affecting your work? (blocking, annoying, nice-to-have)
+   - How much is this affecting your work? (blocking, slowing me down, nice-to-have)
    - If it can't tell the work type: does this exist today but isn't working, or is it something new?
 3. Reads attachments (error screenshots, wrong reports, sample spreadsheets) to understand and classify.
 4. Searches for duplicates in the same project and, on a likely match, offers "+1 and comment" on the existing item.
@@ -240,7 +254,7 @@ The agent returns strict JSON validated against a Pydantic schema. Project candi
 | `area` | Short free text, e.g. login page, leave report, chat answers |
 | `work_type` | fix · improvement · new_feature · no_change (question, access request, praise) |
 | `category` | bug · performance · data_issue · usability · feature_request · access_request · question · praise |
-| `priority` | P1 blocking work · P2 major annoyance · P3 minor · P4 nice-to-have |
+| `priority` | P1 blocking work · P2 major (a real problem, but work can continue) · P3 minor · P4 nice-to-have |
 | `impact` | one person · a team · company-wide (raised as duplicates come in) |
 | `effort` | S (hours) · M (days) · L (a week or more) |
 | `recommendation` | implement · decline · needs more info, with one sentence of reasoning |
@@ -503,7 +517,9 @@ Built locally against this spec, ahead of the sprint gates; nothing deployed, no
 | Sign-in and roles (S1-3) | Built and tested: Google OAuth flow with the domain checked on every request, a local sign-in picker (D23), roles from `digital_staff`. Needs the OAuth client (ask 2) to test against Google. |
 | Admin page (S1-4) | Built: projects, Digital Staff, routing rules. |
 | Spend guards (D36) | Built and tested: usage ledger, per-person and budget limits, allowance meter in the chat, AI usage panel on the dashboard. Checked against the real Gemini model. |
-| Guide | A spotlight tour per area (staff, console) that highlights each real control in turn, filtered by role, ending on the Guide button that reopens it; Skip tour on every step, Esc to leave, opens by itself on a first visit. |
+| Guide | A spotlight tour per area (staff, console), filtered by role, ending on the Guide button that reopens it. A step with something to click shows OK; the control then pulses and only it works; clicking it does its normal job and a "Try it out" card waits for Next. Skip this step and Skip tour always; Esc to leave; opens by itself on a first visit. |
+| Navigation | Digital Staff and Admins land on the console after sign-in, Staff on the chat. A Console button in the staff header (Digital Staff and Admins) and a Smoke Signal home button in the console header; the account menu holds who you are and Sign out. An API address opened in the browser shows a "You can't open that" page, not JSON. |
+| Chat uploads | Paperclip or drag and drop onto the chat. Size and count are refused in the browser before upload; type, contents, size and count are checked again by the API. |
 | Agent, router, brief, duplicates, attachments, backup form (S2-1 to S2-8) | Built and tested on the stub model; Word/Excel text, content-type checks, macro rejection, PII masking, abuse flag, cost log. Needs the AI Studio key (ask 3) to score the routing gate. |
 | Routing test set (S2-9) | A 40-item draft in `backend/evals/routing_set.yaml` and a runner; Marc to correct the labels. On Gemini 3.1 Flash-Lite (2026-10-21): 97.5 % project, 97.5 % work type, 100 % assignee, every brief complete: gate passed on the draft labels. The stub scores 75 % / 70 % / 75 % (keyword baseline). |
 | Console, approvals, tracker, notifications, channels, dashboard, digest (S3-1 to S3-7) | Built and tested end to end; board drag-and-drop, list and cards views; in-app bell over SSE with polling fallback; email through Mailpit locally. |

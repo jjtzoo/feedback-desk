@@ -35,3 +35,6 @@ ticketing app.md
 
 # Personal Claude Code settings
 .claude/settings.local.json
+
+# Editor settings, per person
+.vscode/
