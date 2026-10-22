@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T02:42:41.438Z",
   "spec": "20-releases.spec.ts",
+  "fingerprint": "335f5646868c3dfb",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S20.01": true,
     "S20.02": true,

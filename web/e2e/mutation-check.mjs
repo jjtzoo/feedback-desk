@@ -13,6 +13,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { fingerprint, gitState } from "./fingerprint.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const web = path.join(here, "..");
@@ -87,8 +88,10 @@ for (const [id, status] of Object.entries(results)) {
   record[id] = caught;
   console.log(`${id}  broken -> ${status}  ${caught ? "caught" : "NOT CAUGHT"}`);
 }
-// The record the evidence report reads: when it ran, and for each test whether breaking it made it fail.
+// The record the evidence report reads: when it ran, on which commit and spec file (so a spec edited
+// afterwards shows as stale), and for each test whether breaking it made it fail.
 fs.mkdirSync(path.join(here, "evidence"), { recursive: true });
-fs.writeFileSync(path.join(here, "evidence", `mutation-s${section}.json`), `${JSON.stringify({ ran: new Date().toISOString(), spec: specName, caught: record }, null, 2)}\n`);
+const bound = { ran: new Date().toISOString(), ...gitState(web), spec: specName, fingerprint: fingerprint(original), caught: record };
+fs.writeFileSync(path.join(here, "evidence", `mutation-s${section}.json`), `${JSON.stringify(bound, null, 2)}\n`);
 console.log(hollow ? `${hollow} not caught: those tests would pass with the feature broken` : `All ${Object.keys(results).length} broken tests failed, as they should`);
 process.exit(hollow ? 1 : 0);

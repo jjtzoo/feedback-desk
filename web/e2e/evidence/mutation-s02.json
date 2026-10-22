@@ -1,6 +1,9 @@
 {
-  "ran": "2026-10-22T04:29:36.296Z",
+  "ran": "2026-10-22T05:27:22.868Z",
+  "commit": "b54e713",
+  "uncommitted": true,
   "spec": "02-landing.spec.ts",
+  "fingerprint": "6523d45144dd3e4b",
   "caught": {
     "S02.01": true,
     "S02.09": true,
@@ -10,5 +13,6 @@
     "S02.13": true,
     "S02.14": true,
     "S02.15": true
-  }
+  },
+  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
 }

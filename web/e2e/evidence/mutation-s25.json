@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T03:49:53.747Z",
   "spec": "25-no-save-without-confirm.spec.ts",
+  "fingerprint": "c2503332feed9022",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S25.01": true,
     "S25.02": true,

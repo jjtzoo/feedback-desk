@@ -1,9 +1,13 @@
 {
-  "ran": "2026-10-22T04:00:21.718Z",
+  "ran": "2026-10-22T05:51:06.146Z",
+  "commit": "b54e713",
+  "uncommitted": true,
   "spec": "28-keyboard.spec.ts",
+  "fingerprint": "4cccd7dfc4281052",
   "caught": {
     "S28.02": true,
     "S28.04": true,
     "S28.05": true
-  }
+  },
+  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
 }

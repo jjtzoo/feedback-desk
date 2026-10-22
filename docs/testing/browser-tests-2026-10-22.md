@@ -22,7 +22,7 @@ Code and rules: `web/e2e/` and `web/e2e/CLAUDE.md`.
 | Item | Value |
 | --- | --- |
 | Date | 2026-10-22 |
-| Code under test | branch `ui/smoke-signal-brand` at `81bc2df` plus the uncommitted working changes of that day (nothing committed for the tests yet) |
+| Code under test | branch `feat/browser-tests` at `b54e713` (the tests are committed there) plus the uncommitted app changes of that day in `web/src` and `backend` |
 | Model | the scripted stub model, not Gemini |
 | Database | throwaway local Postgres 16 + pgvector (pgserver, database `fd_e2e`), seeded by `app.seed`: 5 Digital Staff, 15 projects, routing rules |
 | Servers | API on port 8002, web (production build) on 3100; email off |
@@ -103,6 +103,7 @@ Details and steps: `web/e2e/FINDINGS.md`. Two findings there are not checklist i
 - Every test uses the scripted stub model on a local database. None ran against Gemini, on staging or in production. The routing quality against Gemini is a separate record (`routing-eval-2026-10-21.md`).
 - "Passing" means the screen did what the checklist says in that run. "Shown able to fail" means the test goes red when its key check is wrong. Neither shows the feature is free of bugs, and the repeat runs, which test whether a result is stable, have not been done yet.
 - The tests check what the checklist describes, no more. Layout, colour, mobile width and dark mode (sections 27, 29 and 30) are not covered yet.
+- Every mutation record names the commit it ran on and carries a fingerprint of its spec file, and every run saves `web/e2e/evidence/last-run.json`, so a test edited after its check shows as stale instead of counting. On 2026-10-22 this caught 15 sections whose specs had been edited after their checks; all 15 were re-run and every broken test failed, as it should.
 - Passing browser tests do not replace the pre-deployment checklist and post-deployment verification in `docs/deployment.md`.
 
 ## What can be claimed today

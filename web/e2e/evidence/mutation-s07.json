@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T02:07:31.657Z",
   "spec": "07-my-feedback.spec.ts",
+  "fingerprint": "e62902970693027f",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S07.01": true,
     "S07.03": true,

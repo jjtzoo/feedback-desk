@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T01:54:20.688Z",
   "spec": "08-tracker.spec.ts",
+  "fingerprint": "3452c3b41d5fbbd9",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S08.01": true,
     "S08.02": true,

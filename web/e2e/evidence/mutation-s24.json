@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T03:53:18.439Z",
   "spec": "24-own-items-only.spec.ts",
+  "fingerprint": "419f8c0e3f7fcfd7",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S24.01": true,
     "S24.02": true,

@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T04:26:26.990Z",
   "spec": "22-ai-usage.spec.ts",
+  "fingerprint": "d2127dae1610a965",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S22.06": true,
     "S22.07": true

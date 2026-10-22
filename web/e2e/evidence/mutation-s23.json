@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T03:48:20.490Z",
   "spec": "23-roles-server.spec.ts",
+  "fingerprint": "72e102ec25e93889",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S23.01": true,
     "S23.02": true,

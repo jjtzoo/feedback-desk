@@ -1,6 +1,9 @@
 {
-  "ran": "2026-10-22T02:04:29.516Z",
+  "ran": "2026-10-22T05:31:02.122Z",
+  "commit": "b54e713",
+  "uncommitted": true,
   "spec": "03-chat.spec.ts",
+  "fingerprint": "f8906c8c9446a125",
   "caught": {
     "S03.01": true,
     "S03.02": true,
@@ -19,5 +22,6 @@
     "S03.15": true,
     "S03.16": true,
     "S03.17": true
-  }
+  },
+  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
 }

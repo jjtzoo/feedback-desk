@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T03:55:34.672Z",
   "spec": "26-masking.spec.ts",
+  "fingerprint": "8517ae35ccbd250d",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S26.01": true,
     "S26.02": true,

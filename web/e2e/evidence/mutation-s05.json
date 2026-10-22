@@ -1,6 +1,9 @@
 {
-  "ran": "2026-10-22T02:06:11.070Z",
+  "ran": "2026-10-22T05:35:29.641Z",
+  "commit": "b54e713",
+  "uncommitted": true,
   "spec": "05-duplicates.spec.ts",
+  "fingerprint": "6bc4f5c7bfed01a1",
   "caught": {
     "S05.01": true,
     "S05.02": true,
@@ -8,5 +11,6 @@
     "S05.04": true,
     "S05.05": true,
     "S05.06": true
-  }
+  },
+  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
 }

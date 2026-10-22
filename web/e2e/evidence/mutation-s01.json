@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T04:41:43.618Z",
   "spec": "01-sign-in-roles.spec.ts",
+  "fingerprint": "803140012162ea90",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S01.01": true,
     "S01.02": true,

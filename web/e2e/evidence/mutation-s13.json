@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T03:17:57.570Z",
   "spec": "13-item-panel.spec.ts",
+  "fingerprint": "c2cec2972d24424e",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S13.01": true,
     "S13.02": true,

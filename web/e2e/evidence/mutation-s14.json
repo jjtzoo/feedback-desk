@@ -1,6 +1,8 @@
 {
   "ran": "2026-10-22T03:03:09.510Z",
   "spec": "14-status-changes.spec.ts",
+  "fingerprint": "33ec21980508d6ec",
+  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
   "caught": {
     "S14.01": true,
     "S14.02": true,
