@@ -77,7 +77,7 @@ The whole suite: **199 passed, 24 skipped, none failed.** Six of the 199 are kno
 | S28.03 | after Esc closes a dialog, focus does not return to the button that opened it | focus returns |
 | S22.01 | under the chat box the allowance line and meter stay hidden until half the allowance is used (the code says this is deliberate, "quiet until half is used") | "Today's assistant allowance: N% used" with a meter at any level; this may be stale checklist wording rather than a bug |
 
-Details and steps: `web/e2e/FINDINGS.md`. Two findings there are not checklist items and matter more than the rest. First, a staff member's tracker reply with a password, card number and TFN is masked in the saved message but reaches the owner's bell notification unmasked (confirmed against the test app; no fix yet). Second, the live notification stream held a database transaction open for as long as a page was open; a fix is committed on its own branch (`fix/stream-idle-transaction`) and is not merged.
+Details and steps: `web/e2e/FINDINGS.md`. Two findings there are not checklist items and matter more than the rest. First, a staff member's tracker reply with a password, card number and TFN is masked in the saved message but reaches the owner's bell notification unmasked (confirmed against the test app; no fix yet). Second, the live notification stream held a database transaction open for as long as a page was open; that is fixed (74dd7f3, merged in 9874225).
 
 ### Skipped, and why
 

@@ -13,6 +13,14 @@ Format:
 - Found: YYYY-MM-DD
 ```
 
+## S10.02 The bell count does not rise until the page is reloaded
+- Test: e2e/10-notifications.spec.ts: S10.02 Mario's bell count rises within a few seconds without a refresh
+- Steps: as Liam, raise an item and have Marc approve it; open its tracker (the bell reads "1 unread"); as Darlene, post an update on it; wait 8 s without reloading.
+- Expected: the bell count rises within a few seconds without a refresh.
+- Actual: the bell stays at "1 unread"; after a reload it reads 2. The API's stream sends `event: unread` at once (seen directly on 8002, and through 3100 without gzip), but through the web server a browser's `Accept-Encoding: gzip` gets the stream back `Content-Encoding: gzip`: Next's default `compress: true` gzips the proxied `text/event-stream` (it has no `Cache-Control: no-transform`), and zlib holds the small events and the 15 s pings in its buffer. The connection stays open, so the bell's `onerror` never fires and its 30 s polling fallback never starts either. The same applies to `next dev` and the standalone server on Cloud Run, and the chat's own stream is gzipped the same way. Possible fixes (a separate change): send SSE responses with `Cache-Control: no-cache, no-transform`, or set `compress: false`.
+- Related, not tested: after any stream error (an API restart or deploy, Cloud Run's request timeout) the bell closes the stream for good and polls every 30 s; it never reconnects.
+- Found: 2026-10-23
+
 ## S26.02 (related) A tracker reply's password, card number and TFN reach the owner's bell unmasked
 - Test: none yet. `e2e/26-masking.spec.ts` S26.02 checks the Conversation tab and the tracker, which are masked; the notification is not in the checklist item. Found by reading the code and confirmed against the running test app.
 - Steps: as a staff member, reply on the tracker with "My password is Hunter2, card 4111 1111 1111 1111, TFN 123 456 782"; sign in as the item's owner and read `GET /api/notifications` (the bell).
@@ -94,3 +102,4 @@ These are not bugs in a test or the app that anyone has found. Each failed or mi
 - Expected: the stream checks Postgres every 3 seconds in short transactions (`app/api/notifications.py`) and holds nothing in between.
 - Actual: the request's sign-in lookup (the `CurrentUser` dependency's session) stays `idle in transaction` for as long as the page is open: seen at 96 s and growing. It holds share locks on `app.digital_staff` and `app.user_sessions` and keeps one pooled connection per open tab. Consequences: a `TRUNCATE`, and any migration that alters those tables (`ALTER TABLE` during a deploy), waits until every tab closes; and with many staff online the connection pool and Cloud SQL's connection limit fill up.
 - Found: 2026-10-22
+- Fixed: 74dd7f3 (merged in 9874225), with `backend/tests/test_streams.py`. What is left: the stream holds a transaction for the few milliseconds it takes to write each event.

@@ -29,9 +29,9 @@ async def reset() -> None:
     from app.seed import seed_all
 
     async with session_scope() as db:
-        # An open page's notification stream holds a transaction for as long as the page is open
-        # (e2e/FINDINGS.md), which would block TRUNCATE forever. End those, in this database only;
-        # the page reconnects by itself.
+        # An open page's notification stream holds a transaction for the moment it writes an event
+        # (it once held one for as long as the page was open; e2e/FINDINGS.md). End any such one, in
+        # this database only, so TRUNCATE never waits; that page's bell then polls every 30 s.
         await db.execute(text("SET LOCAL lock_timeout = '15s'"))
         await db.execute(
             text(
