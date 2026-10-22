@@ -107,9 +107,17 @@ const boardCard = (page: Page, ref: string) => page.locator(CARD).filter({ hasTe
 const viewButton = (page: Page, view: View) => page.getByRole("group", { name: "View" }).getByRole("button", { name: view, exact: true });
 const inboxTab = (page: Page, label: string) => page.getByRole("tab", { name: label, exact: true });
 
-/** The page's first loads: the board, and the projects that fill the Project filter. */
+/**
+ * The page's first loads: the board, and the projects that fill the Project filter. A failed load
+ * fails here with its status (the page loads each once and never retries), rather than hanging.
+ */
 const workLoaded = (page: Page) =>
-  Promise.all(["/api/console/board", "/api/projects"].map((path) => page.waitForResponse((r) => r.url().includes(path) && r.ok())));
+  Promise.all(
+    ["/api/console/board", "/api/projects"].map(async (path) => {
+      const r = await page.waitForResponse((r) => new URL(r.url()).pathname === path);
+      expect(r.status(), `GET ${path} through the web server's /api proxy`).toBe(200);
+    }),
+  );
 
 /** Open /console and wait for the page's first loads, so the page is ready to be clicked. */
 async function gotoWork(page: Page, query = "") {

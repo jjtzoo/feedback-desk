@@ -1,15 +1,14 @@
 {
-  "ran": "2026-10-22T05:50:00.129Z",
-  "commit": "b54e713",
+  "ran": "2026-10-22T23:09:39.343Z",
+  "commit": "9288b7f",
   "uncommitted": true,
   "spec": "21-dashboard.spec.ts",
-  "fingerprint": "02f2a32c92c7d9ac",
+  "fingerprint": "4c8cd7fcbd9396fb",
   "caught": {
     "S21.01": true,
     "S21.02": true,
     "S21.03": true,
     "S21.04": true,
     "S21.05": true
-  },
-  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
+  }
 }

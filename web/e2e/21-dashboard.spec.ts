@@ -27,40 +27,41 @@ const IMPACT = ["Slowing me down", "I expected it to open but got a blank screen
 // So: 5 open, 2 waiting for approval, 6 received this week, 1 resolved this week.
 type Refs = Record<"started" | "approved" | "feature" | "usability" | "resolved" | "closed", string>;
 
-let built: Promise<Refs> | null = null;
+/** Raise and move the six items; the tests only read what this leaves behind. */
+async function build(team: Team): Promise<Refs> {
+  const chris = await team.as("Chris");
+  const approve = (ref: string) => postJson(chris, `/console/items/${ref}/approve`);
+  const [liam, aisha, tom, grace, rafael, mei] = await Promise.all(["Liam", "Aisha", "Tom", "Grace", "Rafael", "Mei"].map((n) => team.as(n)));
 
-/** Raise and move the six items once per file; the tests only read what this leaves behind. */
-function build(team: Team) {
-  built ??= (async () => {
-    const chris = await team.as("Chris");
-    const approve = (ref: string) => postJson(chris, `/console/items/${ref}/approve`);
-    const [liam, aisha, tom, grace, rafael, mei] = await Promise.all(["Liam", "Aisha", "Tom", "Grace", "Rafael", "Mei"].map((n) => team.as(n)));
+  const started = await raiseBug(liam, "rake-agent", "The RAKE Agent export page shows an error when I open it");
+  await approve(started);
+  await postJson(chris, `/console/items/${started}/start`);
 
-    const started = await raiseBug(liam, "rake-agent", "The RAKE Agent export page shows an error when I open it");
-    await approve(started);
-    await postJson(chris, `/console/items/${started}/start`);
+  const approved = await raiseBug(aisha, "training-portal", "The Training Portal course list shows an error when I open it");
+  await approve(approved);
 
-    const approved = await raiseBug(aisha, "training-portal", "The Training Portal course list shows an error when I open it");
-    await approve(approved);
+  const feature = await raise(tom, "Please add a dark mode to RAKE Agent", IMPACT, "rake-agent");
+  const usability = await raise(grace, "The Training Portal course search is confusing to use", IMPACT, "training-portal");
 
-    const feature = await raise(tom, "Please add a dark mode to RAKE Agent", IMPACT, "rake-agent");
-    const usability = await raise(grace, "The Training Portal course search is confusing to use", IMPACT, "training-portal");
+  const resolved = await raiseBug(rafael, "rake-agent", "The RAKE Agent report page shows an error when I open it");
+  await approve(resolved);
+  await postJson(chris, `/console/items/${resolved}/resolve`, { body: "Fixed in this week's update" });
 
-    const resolved = await raiseBug(rafael, "rake-agent", "The RAKE Agent report page shows an error when I open it");
-    await approve(resolved);
-    await postJson(chris, `/console/items/${resolved}/resolve`, { body: "Fixed in this week's update" });
+  const closed = await raiseBug(mei, "training-portal", "The Training Portal profile page shows an error when I open it");
+  await approve(closed);
+  await postJson(chris, `/console/items/${closed}/close`, { reason: "Not needed any more", wont_fix: false });
 
-    const closed = await raiseBug(mei, "training-portal", "The Training Portal profile page shows an error when I open it");
-    await approve(closed);
-    await postJson(chris, `/console/items/${closed}/close`, { reason: "Not needed any more", wont_fix: false });
-
-    return { started, approved, feature, usability, resolved, closed };
-  })();
-  return built;
+  return { started, approved, feature, usability, resolved, closed };
 }
 
-// Raising six items through the stub takes a while on the first test.
-test.describe.configure({ timeout: 120_000 });
+let refs: Refs;
+
+// Built once per worker, in a hook with its own time, so a worker restarted after a failure rebuilds
+// outside a test's time.
+test.beforeAll(async ({ team }) => {
+  test.setTimeout(240_000);
+  refs = await build(team);
+});
 
 /** A headline figure: the box, and its big number. */
 function stat(page: Page, label: string) {
@@ -96,7 +97,6 @@ const weeklyTable = (page: Page) => page.getByRole("region", { name: "Weekly tre
 const rowCell = (row: Locator, i: number) => row.getByRole("cell").nth(i);
 
 test("S21.01 Dashboard shows Open items, Waiting for approval, Avg time to first response and Project reassignment rate with targets", async ({ page, signIn, team }) => {
-  await build(team);
   const api = await getJson<Dash>(await team.as("Chris"), "/console/dashboard");
   await signIn("Chris");
   await page.goto("/console/dashboard");
@@ -120,7 +120,6 @@ test("S21.01 Dashboard shows Open items, Waiting for approval, Avg time to first
 });
 
 test("S21.02 Weekly trend shows received and resolved for 8 weeks as a chart, and Show table gives the same as a table", async ({ page, signIn, team }) => {
-  await build(team);
   const api = await getJson<Dash>(await team.as("Chris"), "/console/dashboard");
   expect(api.weekly).toHaveLength(8);
   await signIn("Chris");
@@ -165,8 +164,7 @@ test("S21.02 Weekly trend shows received and resolved for 8 weeks as a chart, an
   await expect(weeklyTable(page)).toHaveCount(0);
 });
 
-test("S21.03 Open by project, assignee, category and work type each list their open items with numbers", async ({ page, signIn, team }) => {
-  await build(team);
+test("S21.03 Open by project, assignee, category and work type each list their open items with numbers", async ({ page, signIn }) => {
   await signIn("Chris");
   await page.goto("/console/dashboard");
 
@@ -177,8 +175,7 @@ test("S21.03 Open by project, assignee, category and work type each list their o
   expect(counts(await bars(page, "Open by work type"))).toEqual({ Fix: 3, "New feature": 1, Improvement: 1 });
 });
 
-test("S21.04 Open items equals the number of items in the console's All open inbox", async ({ page, signIn, team }) => {
-  const refs = await build(team);
+test("S21.04 Open items equals the number of items in the console's All open inbox", async ({ page, signIn }) => {
   await signIn("Chris");
   await page.goto("/console/dashboard");
   const open = stat(page, "Open items").value;
@@ -194,8 +191,7 @@ test("S21.04 Open items equals the number of items in the console's All open inb
   await expect(cards.filter({ hasText: refs.closed })).toHaveCount(0);
 });
 
-test("S21.05 Correcting a project on one item moves the project reassignment rate after a reload", async ({ page, signIn, team }) => {
-  const refs = await build(team);
+test("S21.05 Correcting a project on one item moves the project reassignment rate after a reload", async ({ page, signIn }) => {
   await signIn("Chris");
   await page.goto("/console/dashboard");
   await expect(stat(page, "Project reassignment rate").value).toHaveText("0%");
