@@ -135,10 +135,9 @@ function expandItems(tokens, sections) {
 }
 
 /** Evidence per requirement of the brief (docs/requirements.md): what backs each claim that it works, and what does not yet. */
-function writeEvidenceReport(sections, tests, outcome, at) {
+function writeEvidenceReport(sections, tests, outcome, at, { commit, uncommitted }) {
   const requirements = JSON.parse(readFileSync(REQUIREMENT_MAP, "utf8"));
   const { caught, stale, staleStress, mutationRan, stress } = readEvidence();
-  const { commit, uncommitted } = gitState(WEB_DIR);
   const repeated = (id) => stress.runs >= REPEATS && (stress.passes[id] ?? 0) >= stress.runs;
   const byId = new Map(sections.flatMap((s) => s.items.map((item) => [item.id, item])));
   // The wording comes from docs/requirements.md (the index of Marc's brief), so it is never retyped here.
@@ -226,13 +225,13 @@ function writeEvidenceReport(sections, tests, outcome, at) {
 }
 
 /** The dated record of the last run, kept in git so each run's commit and counts stay on file. */
-function saveRun(outcome, at) {
+function saveRun(outcome, at, state) {
   if (!at) return;
   const results = [...outcome.values()];
   const count = (f) => results.filter(f).length;
   const run = {
     started: at,
-    ...gitState(WEB_DIR),
+    ...state,
     tests: results.length,
     passed: count((r) => r === "Pass"),
     knownBugs: count((r) => r.startsWith("Known bug")),
@@ -296,9 +295,11 @@ function main() {
   if (stray.length) {
     out.push("## Tests naming an ID that is not in the checklist", "", ...stray.map((t) => `- ${t.file}: ${t.title}`), "");
   }
+  // Read before writing: this script's own output would otherwise always count as uncommitted.
+  const state = gitState(WEB_DIR);
   writeFileSync(OUT, out.join("\n"));
-  writeEvidenceReport(sections, tests, outcome, at);
-  saveRun(outcome, at);
+  writeEvidenceReport(sections, tests, outcome, at, state);
+  saveRun(outcome, at, state);
   console.log(`${covered}/${total} checklist items have a test. Wrote ${path.relative(WEB_DIR, OUT)} and ${path.relative(WEB_DIR, FEATURE_OUT)}.`);
 }
 
