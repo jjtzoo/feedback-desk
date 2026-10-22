@@ -1,6 +1,8 @@
 /** Where the browser tests run; shared by playwright.config.ts and the fixtures. */
 export const API = "http://localhost:8002";
 export const WEB = "http://localhost:3100";
+/** The test API's supervisor (backend/scripts/e2e_server.py), which restarts it with another model. */
+export const API_CONTROL = "http://127.0.0.1:8012";
 
 /** The first-visit tour is switched off for every test except the ones about the tour itself. */
 export const TOUR_SEEN = {

@@ -1,6 +1,6 @@
 import { expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 
-import { TOUR_SEEN, WEB } from "./env";
+import { API_CONTROL, TOUR_SEEN, WEB } from "./env";
 
 export type Person = { email: string; name: string; role: "admin" | "digital" | "staff" };
 
@@ -126,6 +126,33 @@ export async function chatSay(page: Page, text: string) {
   await box.fill(text);
   await box.press("Enter");
   await expect(page.getByText("Sig is writing…")).toHaveCount(0, { timeout: 20_000 });
+}
+
+type ApiModel = { provider: "stub" | "none"; pid: number };
+
+async function control(method: "GET" | "POST", body?: unknown): Promise<ApiModel> {
+  const r = await fetch(`${API_CONTROL}/model`, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(150_000),
+  }).catch((e) => {
+    throw new Error(`No test API supervisor on ${API_CONTROL}; restart the test servers. ${e}`);
+  });
+  if (!r.ok) throw new Error(`${method} /model -> ${r.status} ${await r.text()}`);
+  return (await r.json()) as ApiModel;
+}
+
+/** Which model the test API runs with, and its process. */
+export const apiModel = () => control("GET");
+
+/** Really restart the test API (a new process, same database) with this MODEL_PROVIDER; resolves once it is healthy. */
+export const restartApi = (provider: "stub" | "none") => control("POST", { provider });
+
+/** The model a page gets: the API's health as the web server's /api proxy reaches it. */
+export async function providerViaWeb(page: Page) {
+  const r = await page.request.get("/api/health").catch(() => null);
+  return r?.ok() ? ((await r.json()) as { model: { provider: string } }).model.provider : null;
 }
 
 /** Get to the backup form the way a person does: thirteen messages without confirming. */
