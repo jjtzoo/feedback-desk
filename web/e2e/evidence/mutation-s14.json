@@ -1,0 +1,12 @@
+{
+  "ran": "2026-10-22T03:03:09.510Z",
+  "spec": "14-status-changes.spec.ts",
+  "caught": {
+    "S14.01": true,
+    "S14.02": true,
+    "S14.03": true,
+    "S14.04": true,
+    "S14.06": true,
+    "S14.07": true
+  }
+}

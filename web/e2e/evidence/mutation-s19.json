@@ -1,0 +1,16 @@
+{
+  "ran": "2026-10-22T02:58:31.283Z",
+  "spec": "19-admin-page.spec.ts",
+  "caught": {
+    "S19.01": true,
+    "S19.02": true,
+    "S19.03": true,
+    "S19.04": true,
+    "S19.05": true,
+    "S19.06": true,
+    "S19.07": true,
+    "S19.08": true,
+    "S19.09": true,
+    "S19.10": true
+  }
+}

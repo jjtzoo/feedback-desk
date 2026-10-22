@@ -1,0 +1,23 @@
+{
+  "ran": "2026-10-22T02:04:29.516Z",
+  "spec": "03-chat.spec.ts",
+  "caught": {
+    "S03.01": true,
+    "S03.02": true,
+    "S03.03": true,
+    "S03.04": true,
+    "S03.05": true,
+    "S03.06": true,
+    "S03.07": true,
+    "S03.08": true,
+    "S03.09": true,
+    "S03.10": true,
+    "S03.11": true,
+    "S03.12": true,
+    "S03.13": true,
+    "S03.14": true,
+    "S03.15": true,
+    "S03.16": true,
+    "S03.17": true
+  }
+}

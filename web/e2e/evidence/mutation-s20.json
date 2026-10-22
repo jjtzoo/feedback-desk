@@ -1,0 +1,15 @@
+{
+  "ran": "2026-10-22T02:42:41.438Z",
+  "spec": "20-releases.spec.ts",
+  "caught": {
+    "S20.01": true,
+    "S20.02": true,
+    "S20.03": true,
+    "S20.04": true,
+    "S20.05": true,
+    "S20.06": true,
+    "S20.07": true,
+    "S20.08": true,
+    "S20.09": true
+  }
+}

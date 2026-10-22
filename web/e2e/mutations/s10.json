@@ -1,0 +1,9 @@
+{
+  "S10.01": ["unread$/", "unreadx$/"],
+  "S10.03": [".not.toHaveAccessibleName(/Unread/)", ".toHaveAccessibleName(/Unread/)"],
+  "S10.04": ["dialog\", { name: title })", "dialog\", { name: title + \"x\" })"],
+  "S10.05": ["2 unread", "3 unread"],
+  "S10.06": ["6 unread", "5 unread"],
+  "S10.07": ["2 unread", "1 unread"],
+  "S10.08": ["toHaveCount(0)", "toHaveCount(1)"]
+}

@@ -1,0 +1,5 @@
+{
+  "S26.01": ["expectMasked(problem)", "expect(problem).toContainText(\"[password removedx]\")"],
+  "S26.02": ["expectMasked(reply)", "expect(reply).toContainText(\"[TFN removedx]\")"],
+  "S26.03": ["not.toContainText(\"removed]\")", "toContainText(\"removed]\")"]
+}

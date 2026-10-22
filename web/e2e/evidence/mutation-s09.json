@@ -1,0 +1,11 @@
+{
+  "ran": "2026-10-22T02:08:55.618Z",
+  "spec": "09-reply-reopen.spec.ts",
+  "caught": {
+    "S09.01": true,
+    "S09.02": true,
+    "S09.03": true,
+    "S09.04": true,
+    "S09.05": true
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "S07.01": ["Open · 2", "Open · 3"],
+  "S07.03": ["\"aria-current\", \"page\"", "\"aria-current\", \"pagex\""],
+  "S07.04": ["No feedback yet", "No feedback yetx"],
+  "S07.05": ["toHaveCount(1)", "toHaveCount(2)"]
+}

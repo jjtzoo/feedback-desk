@@ -1,0 +1,14 @@
+{
+  "S08.01": ["RAKE Agent · Bug", "RAKE Agent · Bugx"],
+  "S08.02": ["\", done\"", "\", donex\""],
+  "S08.03": ["RAKE Agent owner", "RAKE Agent ownerx"],
+  "S08.04": ["who it belongs to.", "who it belongs tox."],
+  "S08.05": ["is in testing.", "is in testingx."],
+  "S08.06": ["toBeLessThan(2)", "toBeLessThan(0)"],
+  "S08.07": ["toHaveCount(4)", "toHaveCount(5)", 2],
+  "S08.08": ["(await fullHistory()).toEqual", "(await fullHistory()).not.toEqual"],
+  "S08.09": ["\"_blank\"", "\"_blankx\""],
+  "S08.10": ["this quarter", "this quarterx"],
+  "S08.11": ["find that feedback", "find that feedbackx"],
+  "S08.12": ["find that feedback", "find that feedbackx"]
+}

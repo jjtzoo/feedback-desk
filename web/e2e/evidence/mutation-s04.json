@@ -1,0 +1,19 @@
+{
+  "ran": "2026-10-22T02:12:27.742Z",
+  "spec": "04-confirm-card.spec.ts",
+  "caught": {
+    "S04.01": true,
+    "S04.02": true,
+    "S04.03": true,
+    "S04.04": true,
+    "S04.05": true,
+    "S04.06": true,
+    "S04.07": true,
+    "S04.08": true,
+    "S04.09": true,
+    "S04.10": true,
+    "S04.11": true,
+    "S04.12": true,
+    "S04.13": true
+  }
+}

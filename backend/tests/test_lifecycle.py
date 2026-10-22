@@ -1,5 +1,7 @@
 """Sprint 3: approvals, the console and the staff tracker, walked end to end (S3-1 to S3-5)."""
 
+import asyncio
+
 import httpx
 import pytest
 from sqlalchemy import select, update
@@ -83,6 +85,7 @@ async def test_full_lifecycle_end_to_end(
     assert (await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fix deployed"})).json()[
         "status"
     ] == "resolved"
+    await asyncio.sleep(0.05)  # the Windows clock ticks every ~16 ms; the reply must land after the assignee last read it
     t = (await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Still blank on my phone"})).json()
     assert t["status"] == "in_progress" and "Reopened after you added details" in [h["text"] for h in t["history"]]
     card = next(

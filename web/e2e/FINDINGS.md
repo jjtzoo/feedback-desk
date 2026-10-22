@@ -1,0 +1,82 @@
+# Findings from the browser tests
+
+Bugs the browser tests found in the app. Each one has a test marked `test.fail()` that names the same ID; when the app is fixed, that test passes unexpectedly and `test.fail()` comes out. App fixes are separate changes (e2e/CLAUDE.md, rule 1).
+
+Format:
+
+```
+## S00.00 Short title
+- Test: e2e/<file>: <test title>
+- Steps: what the test does
+- Expected: what the checklist says
+- Actual: what the app did
+- Found: YYYY-MM-DD
+```
+
+## S26.02 (related) A tracker reply's password, card number and TFN reach the owner's bell unmasked
+- Test: none yet. `e2e/26-masking.spec.ts` S26.02 checks the Conversation tab and the tracker, which are masked; the notification is not in the checklist item. Found by reading the code and confirmed against the running test app.
+- Steps: as a staff member, reply on the tracker with "My password is Hunter2, card 4111 1111 1111 1111, TFN 123 456 782"; sign in as the item's owner and read `GET /api/notifications` (the bell).
+- Expected: the checklist asks for masking before anything is stored (Brief §5.5), as the saved message is.
+- Actual: the bell's notification body is "The Flipbook login is broken. My password is Hunter2, card 4111 1111 1111 1111, TFN 123 456 782". In `backend/app/services/feedback.py`, `submitter_reply` saves `mask(body.strip())` as the message (line 435) but passes the original `body[:300]` to `notifications.notify_assignee` (line 457). The notification is stored with the secrets, and is probably emailed the same way. Probably also the staff-chat paths that notify with raw text: not checked.
+- Found: 2026-10-22
+
+## S28.01 The chat's hidden file input is a Tab stop with no visible focus ring
+- Test: e2e/28-keyboard.spec.ts: S28.01 (landing, tracker and console pass; the chat ring check is `test.fail()`)
+- Steps: sign in as a staff member, open `/chat`, press Tab from the top of the page.
+- Expected: every control reached by Tab shows a visible focus ring, with no invisible stops.
+- Actual: after "Back to home", Tab lands on a clipped 1 x 1 px file input (`input#chat-files`, `web/src/components/chat/chat-panel.tsx`) before the "Attach a file" button, and nothing shows focus.
+- Found: 2026-10-22
+
+## S28.03 After Esc closes a dialog, focus does not return to the button that opened it
+- Test: e2e/28-keyboard.spec.ts: S28.03 (`test.fail()`)
+- Steps: as Chris, open the approvals page with an item awaiting approval, press Enter on Decline, then Esc.
+- Expected: the dialog closes and focus returns to the Decline button; Tab stays inside while it is open.
+- Actual: the dialog closes and Tab stays inside, but focus is not on Decline afterwards (probably the page body). The dialogs open through a controlled `open` prop with no trigger, so Radix has nothing to return focus to.
+- Found: 2026-10-22
+
+## S13.08 Internal notes have no lock icon
+- Test: e2e/13-item-panel.spec.ts: S13.08 (the dashed border and the "Internal note" label are asserted first; only the lock icon is `test.fail()`)
+- Steps: as Darlene, raise a bug as a staff member, post an internal note (`POST /api/console/items/<ref>/note`), open the item panel and its Conversation tab.
+- Expected: the note is dashed, labelled "Internal note" and has a lock icon (checklist S13.08).
+- Actual: dashed border and label are there, no lock icon. `web/src/components/console/item-panel.tsx` has no lock icon.
+- Found: 2026-10-22
+
+## S14.05 After Resolve, the newest tracker entry is "Update", with "Resolved" second
+- Test: e2e/14-status-changes.spec.ts: S14.05 (the "Resolved: <note>" entry is asserted present; only "it is the first entry" is `test.fail()`)
+- Steps: raise a RAKE Agent bug, approve it, start work, Resolve with a note, open the tracker as the submitter and read the newest entry in Tracking history.
+- Expected: the checklist says the note becomes the tracker's last entry, "Resolved: <note>". Reading "last" as "newest" is an assumption: confirm the reading before treating this as a bug.
+- Actual: the newest entry is "Update: <note>" and "Resolved: <note>" is second. Resolving writes the note and the status change in one transaction; the status event is flushed before the message, so the message gets the later `created_at` and the history sorts it first. Both entries are shown; only the order is odd.
+- Found: 2026-10-22
+
+## Outside the checklist: small things the browser tests noticed
+- The dashboard's "Open by project" section has `aria-labelledby="bl-Open by project"`, an id with spaces, so the section has no accessible name (`web/src/app/console/dashboard/page.tsx`). Found 2026-10-22.
+- The item panel's age reads "now ago" during the first minute. Found 2026-10-22.
+- S13.06: the tracker says "Reassigned to Mario" where the checklist says "Assigned to Mario". Treated as wording, not a bug; the test asserts the app's wording. Found 2026-10-22.
+
+## S12.04 The board card shows the work type as plain text, not a badge
+- Test: e2e/12-board.spec.ts: S12.04 (asserts the work type as text in the card's meta line; not marked `test.fail()`)
+- Expected: the checklist lists "work type badge" and "priority badge" on a card.
+- Actual: the priority is a badge; the work type is plain text in the meta line. Confirm whether the checklist or the card is right.
+- Found: 2026-10-22
+
+## Open: results that went wrong once and then did not repeat
+These are not bugs in a test or the app that anyone has found. Each failed or misreported once and passed on every rerun. They stay open until the Stage 3 repeat runs (10 in a row) either reproduce them or show they are gone.
+- First full run, 2026-10-22 (about 09:11): 1 unexpected failure out of 83 tests; the test name was not captured. The next full run passed.
+- S11.01: the database reset timed out after 60 s once (`spawnSync … ETIMEDOUT` in `fixtures.ts`). Five resets right afterwards took 6 to 11 s.
+- S12.13: the Project filter listed only "All projects" in one full-file run, so the test timed out waiting for "RAKE Agent". Four later runs passed. `12-board.spec.ts` now also waits for the `/api/projects` response; that is a guess at the cause, not a confirmed fix.
+- S13.01: reported "broken test still passed" in one mutation run; two later runs caught it.
+- S21.03: timed out instead of failing in one mutation run; the next run failed correctly.
+
+## S07.02 My feedback rows have no stage badge
+- Test: e2e/07-my-feedback.spec.ts: S07.02 (the rest of the row is checked first; only the badge is `test.fail()`)
+- Steps: sign in as a staff member with an item, open `/my`, read the row.
+- Expected: "FB reference, title, tool (or "Tool to confirm"), a plain status, "updated … ago", and a stage badge on wider screens" (Brief §4.1.8).
+- Actual: the row shows everything except the stage badge. `StageBadge` exists in `src/components/badges.tsx` but nothing renders it, and `src/app/(staff)/my/page.tsx` never uses it. Either the page should show it or the checklist line should go (a product call, given the Quiet UI direction).
+- Found: 2026-10-22
+
+## Outside the checklist: the live notification stream holds a database transaction open
+- Test: none (found while building the database reset; `backend/scripts/e2e_reset.py` works around it in the test database only)
+- Steps: sign in, open any page with the bell (it opens `GET /api/notifications/stream`), then look at `pg_stat_activity`.
+- Expected: the stream checks Postgres every 3 seconds in short transactions (`app/api/notifications.py`) and holds nothing in between.
+- Actual: the request's sign-in lookup (the `CurrentUser` dependency's session) stays `idle in transaction` for as long as the page is open: seen at 96 s and growing. It holds share locks on `app.digital_staff` and `app.user_sessions` and keeps one pooled connection per open tab. Consequences: a `TRUNCATE`, and any migration that alters those tables (`ALTER TABLE` during a deploy), waits until every tab closes; and with many staff online the connection pool and Cloud SQL's connection limit fill up.
+- Found: 2026-10-22

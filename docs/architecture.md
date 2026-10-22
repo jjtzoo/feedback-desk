@@ -62,6 +62,8 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 
 Staging never points at production resources, and the scripts refuse to deploy a branch to the wrong environment.
 
+Browser tests (`web/e2e/`, Playwright) are a fourth, local-only setup: API on port 8002 (`backend/scripts/e2e_server.py`), a production web build in `web/.next-e2e/` on port 3100, the `fd_e2e` database in the same `pgserver`, the stub model, email off. `backend/scripts/e2e_reset.py` puts that database back to the seed before each spec file. Nothing in it reaches the local hand-testing servers (8001, 3000) or the cloud.
+
 ## Cloud resources (australia-southeast1)
 
 | Resource | Name (per environment `<env>`) | Settings |

@@ -1,0 +1,12 @@
+{
+  "S13.01": [".toBe(viewport.width);", ".toBe(viewport.width + 1);"],
+  "S13.02": ["header.getByText(\"P2 · Major\")", "header.getByText(\"P1 · Major\")"],
+  "S13.03": ["Raised by staff; see the brief.", "Raised by staffx; see the brief."],
+  "S13.04": ["Work type (${percent", "Work typex (${percent"],
+  "S13.05": ["priority P2 → priority P1", "priority P2 → priority P3"],
+  "S13.06": ["Reassigned to Mario", "Reassigned to Mariox", 2],
+  "S13.07": ["toHaveCount(1)", "toHaveCount(2)"],
+  "S13.09": [".toBe(file.buffer.length)", ".toBe(file.buffer.length + 1)"],
+  "S13.10": ["toHaveCount(events.length)", "toHaveCount(events.length + 1)"],
+  "S13.11": ["Waiting for an Admin to approve.", "Waiting for an Adminx to approve."]
+}

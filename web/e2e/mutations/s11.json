@@ -1,0 +1,8 @@
+{
+  "_each": true,
+  "S11.01": ["Nothing published yet.", "Nothing published yetx."],
+  "S11.02": ["\"New\", \"Improved\", \"Fixed\"", "\"New\", \"Improved\", \"Fixedx\""],
+  "S11.03": ["toHaveCount(0)", "toHaveCount(1)"],
+  "S11.04": ["not.toContainText(\"From your feedback\")", "toContainText(\"From your feedback\")"],
+  "S11.05": ["not.toContain(PROGRESS_UPDATE)", "toContain(PROGRESS_UPDATE)"]
+}

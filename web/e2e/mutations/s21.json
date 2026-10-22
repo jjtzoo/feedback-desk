@@ -1,0 +1,7 @@
+{
+  "S21.01": ["Target: 10% or less", "Target: 10% or lessx"],
+  "S21.02": ["[\"Week starting\", \"Received\", \"Resolved\"]", "[\"Week starting\", \"Received\", \"Resolvedx\"]"],
+  "S21.03": ["{ Darlene: 3, Marc: 2 }", "{ Darlene: 3, Marc: 3 }"],
+  "S21.04": ["toHaveCount(shown)", "toHaveCount(shown + 1)"],
+  "S21.05": ["toHaveText(\"17%\")", "toHaveText(\"18%\")"]
+}

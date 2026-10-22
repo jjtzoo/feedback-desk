@@ -1,0 +1,19 @@
+{
+  "ran": "2026-10-22T03:08:50.968Z",
+  "spec": "18-approvals.spec.ts",
+  "caught": {
+    "S18.01": true,
+    "S18.02": true,
+    "S18.03": true,
+    "S18.04": true,
+    "S18.05": true,
+    "S18.06": true,
+    "S18.07": true,
+    "S18.08": true,
+    "S18.09": true,
+    "S18.10": true,
+    "S18.11": true,
+    "S18.12": true,
+    "S18.13": true
+  }
+}

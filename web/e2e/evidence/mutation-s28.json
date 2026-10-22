@@ -1,0 +1,9 @@
+{
+  "ran": "2026-10-22T04:00:21.718Z",
+  "spec": "28-keyboard.spec.ts",
+  "caught": {
+    "S28.02": true,
+    "S28.04": true,
+    "S28.05": true
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "ran": "2026-10-22T03:17:57.570Z",
+  "spec": "13-item-panel.spec.ts",
+  "caught": {
+    "S13.01": true,
+    "S13.02": true,
+    "S13.03": true,
+    "S13.04": true,
+    "S13.05": true,
+    "S13.06": true,
+    "S13.07": true,
+    "S13.09": true,
+    "S13.10": true,
+    "S13.11": true
+  }
+}

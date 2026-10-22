@@ -1,0 +1,5 @@
+{
+  "S24.01": ["Open · 1$", "Open · 2$"],
+  "S24.02": ["toHaveText(unknownText)", "toHaveText(unknownText + \"x\")"],
+  "S24.03": ["expect(box).not.toContainText(\"Aisha\")", "expect(box).toContainText(\"Aisha\")"]
+}

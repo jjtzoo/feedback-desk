@@ -20,7 +20,8 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 
 - Docker: `cp .env.example .env`, `docker compose --profile dev up --build`, `docker compose exec api python -m app.seed`.
 - Without Docker: `cd backend && uv run python -m scripts.dev_server` (API on 8001, dev sign-in on, stub model), `cd web && npm run dev`. Port 8000 belongs to another local app; don't kill it.
-- Checks before any merge: `cd backend && uv run ruff check . && uv run mypy && uv run pytest`; `cd web && npm run build`. Agent changes also run `uv run python -m evals.run_routing` (gate 85 % project, 85 % work type, 80 % assignee on Gemini).
+- Checks before any merge: `cd backend && uv run ruff check . && uv run mypy && uv run pytest`; `cd web && npm run build`.
+- Browser tests: `cd web && npm run test:e2e` (Playwright, own ports 8002/3100, own database, stub model). Their rules are in `web/e2e/CLAUDE.md`; app bugs they find go in `web/e2e/FINDINGS.md`, never fixed inside a test change. Agent changes also run `uv run python -m evals.run_routing` (gate 85 % project, 85 % work type, 80 % assignee on Gemini).
 
 ## Rules for every change
 

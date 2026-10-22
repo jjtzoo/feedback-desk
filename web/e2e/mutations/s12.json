@@ -1,0 +1,11 @@
+{
+  "S12.01": ["inboxTab(page, \"Assigned to me\")", "inboxTab(page, \"Assigned to mex\")"],
+  "S12.02": ["/^Needs review \\d+$/,", "/^Needs reviewx \\d+$/,"],
+  "S12.03": ["\"Approved 4\"", "\"Approved 5\""],
+  "S12.04": ["toHaveClass(/border-primary/)", "toHaveClass(/border-primaryx/)"],
+  "S12.11": ["viewButton(page, \"List\")).toHaveAttribute(\"aria-pressed\", \"true\")", "viewButton(page, \"List\")).toHaveAttribute(\"aria-pressed\", \"false\")"],
+  "S12.12": ["OVERDUE.map((key) => world[key])", "OVERDUE.slice(1).map((key) => world[key])"],
+  "S12.13": ["${f.value}(&|$)", "${f.value}x(&|$)"],
+  "S12.14": ["\"Expected by\"]", "\"Expected byx\"]"],
+  "S12.15": ["toEqual(refsOf(urgent))", "toEqual(refsOf(urgent).reverse())"]
+}

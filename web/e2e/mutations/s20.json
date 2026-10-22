@@ -1,0 +1,12 @@
+{
+  "_each": true,
+  "S20.01": ["toHaveCount(3)", "toHaveCount(4)"],
+  "S20.02": ["DRAFT_READY(\"RAKE Agent\"))).toBeVisible()", "DRAFT_READY(\"RAKE Agentx\"))).toBeVisible()"],
+  "S20.03": ["expect(ticked(withSource(SOURCE.channel))).not.toBeChecked()", "expect(ticked(withSource(SOURCE.channel))).toBeChecked()"],
+  "S20.04": ["toContain(REWORDED)", "toContain(REWORDED + \"x\")"],
+  "S20.05": ["can publish\")).toBeVisible()", "can publishx\")).toBeVisible()"],
+  "S20.06": ["expect(publish).toBeDisabled()", "expect(publish).toBeEnabled()"],
+  "S20.07": ["toContainText(\"From your feedback\")", "toContainText(\"From your feedbackx\")"],
+  "S20.08": ["not.toContainText(\"Published\")", "toContainText(\"Published\")"],
+  "S20.09": ["toContainText(\"Published\")", "toContainText(\"Publishedx\")"]
+}

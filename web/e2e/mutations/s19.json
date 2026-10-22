@@ -1,0 +1,13 @@
+{
+  "_each": true,
+  "S19.01": ["Read only. Only Admins can change these.", "Read only. Only Admins can change these.x"],
+  "S19.02": ["\"Routing rules (1)\"", "\"Routing rules (2)\""],
+  "S19.03": ["toHaveText(\"No\")", "toHaveText(\"Yes\")"],
+  "S19.04": ["/It's with Mario/", "/It's with Mariox/"],
+  "S19.05": ["option(\"Test Tool\")).toHaveCount(0)", "option(\"Test Tool\")).toHaveCount(1)"],
+  "S19.06": ["toHaveCount(6)", "toHaveCount(7)"],
+  "S19.07": ["toContainText(\"Needs review\")", "toContainText(\"Needs reviewx\")"],
+  "S19.08": ["\"Sam Reid\", exact: true", "\"Sam Reidx\", exact: true"],
+  "S19.09": ["/It's with Darlene/", "/It's with Darlenex/"],
+  "S19.10": ["/It's with Mario/", "/It's with Mariox/"]
+}

@@ -5,10 +5,14 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // Playwright fixtures call `use()`, which is not React's hook.
+  { files: ["e2e/**"], rules: { "react-hooks/rules-of-hooks": "off" } },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    ".next-e2e/**",
+    "playwright-report/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

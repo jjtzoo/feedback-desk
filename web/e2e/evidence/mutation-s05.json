@@ -1,0 +1,12 @@
+{
+  "ran": "2026-10-22T02:06:11.070Z",
+  "spec": "05-duplicates.spec.ts",
+  "caught": {
+    "S05.01": true,
+    "S05.02": true,
+    "S05.03": true,
+    "S05.04": true,
+    "S05.05": true,
+    "S05.06": true
+  }
+}

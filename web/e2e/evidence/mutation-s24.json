@@ -1,0 +1,9 @@
+{
+  "ran": "2026-10-22T03:53:18.439Z",
+  "spec": "24-own-items-only.spec.ts",
+  "caught": {
+    "S24.01": true,
+    "S24.02": true,
+    "S24.03": true
+  }
+}

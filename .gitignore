@@ -18,6 +18,9 @@ node_modules/
 web/.next/
 web/out/
 web/test-results/
+web/playwright-report/
+web/.next-e2e/
+web/e2e-results.json
 
 # Deployment output rendered for review, never committed
 deploy/rendered/

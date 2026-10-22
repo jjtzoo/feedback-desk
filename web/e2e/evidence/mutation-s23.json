@@ -1,0 +1,10 @@
+{
+  "ran": "2026-10-22T03:48:20.490Z",
+  "spec": "23-roles-server.spec.ts",
+  "caught": {
+    "S23.01": true,
+    "S23.02": true,
+    "S23.03": true,
+    "S23.04": true
+  }
+}

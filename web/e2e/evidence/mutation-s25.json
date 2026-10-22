@@ -1,0 +1,9 @@
+{
+  "ran": "2026-10-22T03:49:53.747Z",
+  "spec": "25-no-save-without-confirm.spec.ts",
+  "caught": {
+    "S25.01": true,
+    "S25.02": true,
+    "S25.03": true
+  }
+}

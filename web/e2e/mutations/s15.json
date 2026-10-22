@@ -1,0 +1,6 @@
+{
+  "S15.01": ["not.toContainText(\"cache key is wrong\")", "toContainText(\"cache key is wrong\")"],
+  "S15.02": ["\"Reply from Darlene\"", "\"Reply from Darlenex\""],
+  "S15.03": ["`Update: ${update}`", "`Updatex: ${update}`"],
+  "S15.04": ["not.toContainText(\"same cache fault\")", "toContainText(\"same cache fault\")"]
+}

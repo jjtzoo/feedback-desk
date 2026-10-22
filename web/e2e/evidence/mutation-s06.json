@@ -1,0 +1,11 @@
+{
+  "ran": "2026-10-22T01:51:24.725Z",
+  "spec": "06-backup-form.spec.ts",
+  "caught": {
+    "S06.02": true,
+    "S06.03": true,
+    "S06.04": true,
+    "S06.05": true,
+    "S06.06": true
+  }
+}

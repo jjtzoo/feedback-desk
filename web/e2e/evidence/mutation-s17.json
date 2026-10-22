@@ -1,0 +1,12 @@
+{
+  "ran": "2026-10-22T02:39:14.627Z",
+  "spec": "17-project-channels.spec.ts",
+  "caught": {
+    "S17.01": true,
+    "S17.02": true,
+    "S17.03": true,
+    "S17.04": true,
+    "S17.05": true,
+    "S17.06": true
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "ran": "2026-10-22T01:54:20.688Z",
+  "spec": "08-tracker.spec.ts",
+  "caught": {
+    "S08.01": true,
+    "S08.02": true,
+    "S08.03": true,
+    "S08.04": true,
+    "S08.05": true,
+    "S08.06": true,
+    "S08.07": true,
+    "S08.08": true,
+    "S08.09": true,
+    "S08.10": true,
+    "S08.11": true,
+    "S08.12": true
+  }
+}

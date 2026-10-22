@@ -1,0 +1,8 @@
+{
+  "S05.01": ["there instead\"", "there insteadx\""],
+  "S05.02": ["box).not.toContainText(mario.name", "box).toContainText(mario.name"],
+  "S05.03": ["Added to ", "Added tox "],
+  "S05.04": ["\"Following\"", "\"Followingx\""],
+  "S05.05": ["Also following: Mike", "Also following: Mikex"],
+  "S05.06": ["% similar", "% similarx"]
+}

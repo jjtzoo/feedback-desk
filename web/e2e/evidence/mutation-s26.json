@@ -1,0 +1,9 @@
+{
+  "ran": "2026-10-22T03:55:34.672Z",
+  "spec": "26-masking.spec.ts",
+  "caught": {
+    "S26.01": true,
+    "S26.02": true,
+    "S26.03": true
+  }
+}

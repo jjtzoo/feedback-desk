@@ -1,0 +1,11 @@
+{
+  "ran": "2026-10-22T01:59:52.926Z",
+  "spec": "11-whats-new.spec.ts",
+  "caught": {
+    "S11.01": true,
+    "S11.02": true,
+    "S11.03": true,
+    "S11.04": true,
+    "S11.05": true
+  }
+}

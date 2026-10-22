@@ -1,0 +1,15 @@
+{
+  "ran": "2026-10-22T03:32:33.724Z",
+  "spec": "12-board.spec.ts",
+  "caught": {
+    "S12.01": true,
+    "S12.02": true,
+    "S12.03": true,
+    "S12.04": true,
+    "S12.11": true,
+    "S12.12": true,
+    "S12.13": true,
+    "S12.14": true,
+    "S12.15": true
+  }
+}

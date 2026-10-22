@@ -1,0 +1,10 @@
+{
+  "ran": "2026-10-22T02:37:07.333Z",
+  "spec": "15-notes-vs-updates.spec.ts",
+  "caught": {
+    "S15.01": true,
+    "S15.02": true,
+    "S15.03": true,
+    "S15.04": true
+  }
+}
