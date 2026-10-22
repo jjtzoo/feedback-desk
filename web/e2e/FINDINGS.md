@@ -13,6 +13,21 @@ Format:
 - Found: YYYY-MM-DD
 ```
 
+## S10.02 The bell count does not rise until the page is reloaded
+- Test: e2e/10-notifications.spec.ts: S10.02 Mario's bell count rises within a few seconds without a refresh
+- Steps: as Liam, raise an item and have Marc approve it; open its tracker (the bell reads "1 unread"); as Darlene, post an update on it; wait 8 s without reloading.
+- Expected: the bell count rises within a few seconds without a refresh.
+- Actual: the bell stays at "1 unread"; after a reload it reads 2. The API's stream sends `event: unread` at once (seen directly on 8002, and through 3100 without gzip), but through the web server a browser's `Accept-Encoding: gzip` gets the stream back `Content-Encoding: gzip`: Next's default `compress: true` gzips the proxied `text/event-stream` (it has no `Cache-Control: no-transform`), and zlib holds the small events and the 15 s pings in its buffer. The connection stays open, so the bell's `onerror` never fires and its 30 s polling fallback never starts either. The same applies to `next dev` and the standalone server on Cloud Run, and the chat's own stream is gzipped the same way. Possible fixes (a separate change): send SSE responses with `Cache-Control: no-cache, no-transform`, or set `compress: false`.
+- Related, not tested: after any stream error (an API restart or deploy, Cloud Run's request timeout) the bell closes the stream for good and polls every 30 s; it never reconnects.
+- Found: 2026-10-23
+
+## S22.05 A limit reached mid-chat does not switch to the backup form
+- Test: e2e/22-ai-usage.spec.ts: S22.05 Reaching a limit mid-chat: the backup form takes over with your text kept, and an existing confirm card can still be confirmed
+- Steps: as Tom, start two chats and bring one to its confirm card; record usage up to his daily limit; confirm the card (this half works: "Sent. Your reference is FB-…"); send another message in the other chat.
+- Expected: the backup form takes over with what was typed kept.
+- Actual: Sig keeps answering, the allowance line reads "100% used" and no form appears. Limits are checked only at `POST /api/chat/sessions`. This is deliberate in spec D36 ("a chat in progress always finishes") and in `backend/tests/test_usage.py`, so the checklist and the spec disagree: recorded as OPEN in D36 for Marc.
+- Found: 2026-10-23
+
 ## S26.02 (related) A tracker reply's password, card number and TFN reach the owner's bell unmasked
 - Test: none yet. `e2e/26-masking.spec.ts` S26.02 checks the Conversation tab and the tracker, which are masked; the notification is not in the checklist item. Found by reading the code and confirmed against the running test app.
 - Steps: as a staff member, reply on the tracker with "My password is Hunter2, card 4111 1111 1111 1111, TFN 123 456 782"; sign in as the item's owner and read `GET /api/notifications` (the bell).
@@ -52,6 +67,7 @@ Format:
 - The dashboard's "Open by project" section has `aria-labelledby="bl-Open by project"`, an id with spaces, so the section has no accessible name (`web/src/app/console/dashboard/page.tsx`). Found 2026-10-22.
 - The item panel's age reads "now ago" during the first minute. Found 2026-10-22.
 - S13.06: the tracker says "Reassigned to Mario" where the checklist says "Assigned to Mario". Treated as wording, not a bug; the test asserts the app's wording. Found 2026-10-22.
+- Guide tour (S02.03, S02.04, S02.05), from reading `web/src/components/guide.tsx`: the spotlight's solid `ring-4 ring-primary` never renders (Tailwind v4 rings are box-shadows and the inline dimming `boxShadow` overrides them), so the only red is the pulsing outline at 60 % opacity; the small card is shorter but not narrower. While the small card asks for a click, mouse clicks elsewhere are blocked but the keyboard is not: Tab reaches page controls, and Radix triggers that open on keydown (the account menu, "Already know which tool?") still open. The "Try it out" card covers about 352 x 130 px at the bottom right, and controls under it can't be clicked until Next. Pressing Guide during "Try it out" gives a "Try it out … Have a look at Welcome to Smoke Signal" card; moving between the staff area and the console mid-tour ends the tour without marking it seen. Found 2026-10-23.
 
 ## S12.04 The board card shows the work type as plain text, not a badge
 - Test: e2e/12-board.spec.ts: S12.04 (asserts the work type as text in the card's meta line; not marked `test.fail()`)
@@ -59,14 +75,14 @@ Format:
 - Actual: the priority is a badge; the work type is plain text in the meta line. Confirm whether the checklist or the card is right.
 - Found: 2026-10-22
 
-## Open: results that went wrong once and then did not repeat
-These are not bugs in a test or the app that anyone has found. Each failed or misreported once and passed on every rerun. They stay open until the Stage 3 repeat runs (10 in a row) either reproduce them or show they are gone.
-- First full run, 2026-10-22 (about 09:11): 1 unexpected failure out of 83 tests; the test name was not captured. The next full run passed.
-- S11.01: the database reset timed out after 60 s once (`spawnSync … ETIMEDOUT` in `fixtures.ts`). Five resets right afterwards took 6 to 11 s.
-- S12.13: the Project filter listed only "All projects" in one full-file run, so the test timed out waiting for "RAKE Agent". Four later runs passed. `12-board.spec.ts` now also waits for the `/api/projects` response; that is a guess at the cause, not a confirmed fix.
-- S13.01: reported "broken test still passed" in one mutation run; two later runs caught it.
-- S21.03: timed out instead of failing in one mutation run; the next run failed correctly.
-- S01.05: the "G'day, I'm Sig." greeting did not appear within 10 s after picking Liam Carter, twice in a row, then the test passed in 6 single runs and 9 full-file runs. The wait is now 20 s; the cause is not found (a cold first load of /chat is a guess).
+## Closed: results that went wrong once (Stage 3 repeat runs, 2026-10-23)
+Each failed or misreported once on 2026-10-22. The causes below come from the server logs and the code; after the test fixes, every test in each file passed 10 separate runs in a row (`e2e/evidence/stress.json`).
+- First full run, 2026-10-22 (about 09:11), 1 of 83 failed: it was S09.03. The web server's `/api` proxy dropped the tracker request (`read ECONNRESET`, see "the web server's /api proxy now and then drops a request" below). No test change; spec 09 10/10.
+- S11.01, the reset timed out at 60 s once: the cause is not in the records (the machine-wide pgserver lock or a slow `uv` start are suspects). The reset now runs without `cmd.exe`, so the limit ends `uv` itself and a failure reports its time and output. Spec 11 10/10.
+- S12.13, the Project filter listed only "All projects": the same proxy drop, on `GET /api/projects`, which the page never retries. The test now fails fast with the status instead of hanging. Spec 12 10/10.
+- S13.01, "broken test still passed" once: a test weakness. The check sampled the panel during its 200 ms slide-in, where the broken value is a real frame; it now measures after the animation ends. Mutation 13 and spec 13 10/10.
+- S21.03, timed out instead of failing in one mutation run: a test weakness. After each failure Playwright restarts the worker, and the test rebuilt its six items inside its own time; a hung chat request had no timeout. The items are now built in `beforeAll` and the API helpers time out at 30 s. Mutation 21 and spec 21 10/10.
+- S01.05, the greeting missing twice: a race in the test. It signed out while `/console` was still loading, the page's next board load got a 401, and the app's own redirect to `/sign-in?next=/console` raced the test's next `goto`, so Liam landed on the console. The test now leaves the page before signing out. Mutation 01 and spec 01 10/10. Outside the checklist and harmless: someone who signs out from the menu while the console loads can land on `/sign-in?next=/console`.
 
 ## S22.01 The allowance line and meter are hidden until half the allowance is used
 - Test: e2e/22-ai-usage.spec.ts: S22.01 (`test.fail()`)
@@ -79,6 +95,8 @@ These are not bugs in a test or the app that anyone has found. Each failed or mi
 - S02.11, S02.12: "RAKE Agent chip pressed", but `/chat` shows a static "About RAKE Agent" pill with no pressed state.
 - S02.13: the landing page shows the status wording "Received, waiting for approval", not a stage badge.
 - S02.15: the footer says "tax file numbers", not "TFNs".
+- S02.02: OK shows only on steps that ask for a click. "Your console" (the Console button) and the console's "Smoke Signal home" (a link) spotlight something clickable but show Next, and the last step, "That's it", shows Done. The test asserts the app's rule ("steps that ask you to click"); whether the checklist means that is the user's call.
+- S02.08: both tours end with a "That's it" step the checklist does not list (6 steps for Mario, 8 for Chris).
 - S01.03: the picker shows a job title for staff, not an email (by design); the test reads "each with an email" as applying to the five Admin and Digital people.
 
 ## S07.02 My feedback rows have no stage badge
@@ -88,9 +106,18 @@ These are not bugs in a test or the app that anyone has found. Each failed or mi
 - Actual: the row shows everything except the stage badge. `StageBadge` exists in `src/components/badges.tsx` but nothing renders it, and `src/app/(staff)/my/page.tsx` never uses it. Either the page should show it or the checklist line should go (a product call, given the Quiet UI direction).
 - Found: 2026-10-22
 
+## Outside the checklist: the web server's /api proxy now and then drops a request with a 500
+- Test: none of its own; it surfaces as a one-off failure in any test (see "went wrong once" above).
+- Steps: run the browser tests for a few hours; watch the web server's output for `Failed to proxy`.
+- Expected: every `/api/*` request reaches the API.
+- Actual: about 1 in 12,000 proxied requests fails with `read ECONNRESET` or `socket hang up`, and the browser gets `500 Internal Server Error`. Seen 3 times on 2026-10-22: `GET /api/feedback/FB-0003/tracker` (S09.03, first full run), `GET /api/projects` (S12.13) and `POST /api/console/items/FB-0001/approve` (an S21 mutation run). Likely cause: `web/src/proxy.ts` rewrites `/api/*` through Next's keep-alive agent, which has no idle timeout, while uvicorn closes idle keep-alive connections after 5 s (`timeout_keep_alive` default, set neither in `e2e_server.py` nor in the Dockerfile); a request sent on a socket uvicorn is closing fails. Possible fixes (a separate change): a uvicorn `--timeout-keep-alive` longer than the proxy's idle time, or no keep-alive on the proxy leg.
+- Related: when `GET /api/projects` (or `/api/admin/digital-staff`) fails, the console's Work filters stay empty for the life of the page with no message (`web/src/app/console/page.tsx`, `.catch(() => undefined)`); and the notification stream checks the sign-in only when it opens, so after signing out an open page keeps getting unread counts until it navigates.
+- Found: 2026-10-22 (from the web server log; written up 2026-10-23)
+
 ## Outside the checklist: the live notification stream holds a database transaction open
 - Test: none (found while building the database reset; `backend/scripts/e2e_reset.py` works around it in the test database only)
 - Steps: sign in, open any page with the bell (it opens `GET /api/notifications/stream`), then look at `pg_stat_activity`.
 - Expected: the stream checks Postgres every 3 seconds in short transactions (`app/api/notifications.py`) and holds nothing in between.
 - Actual: the request's sign-in lookup (the `CurrentUser` dependency's session) stays `idle in transaction` for as long as the page is open: seen at 96 s and growing. It holds share locks on `app.digital_staff` and `app.user_sessions` and keeps one pooled connection per open tab. Consequences: a `TRUNCATE`, and any migration that alters those tables (`ALTER TABLE` during a deploy), waits until every tab closes; and with many staff online the connection pool and Cloud SQL's connection limit fill up.
 - Found: 2026-10-22
+- Fixed: 74dd7f3 (merged in 9874225), with `backend/tests/test_streams.py`. What is left: the stream holds a transaction for the few milliseconds it takes to write each event.

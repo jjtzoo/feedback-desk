@@ -1,10 +1,11 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { chatSay, getJson, raise } from "./helpers";
+import { chatSay, getJson, postJson, raise, raiseBug } from "./helpers";
 
-// Manual checklist section 16 (Digital Staff: merge and duplicates). Merging through the panel is
-// left for Stage 3; the one item that can be shown today is that nothing merges on its own.
+// Manual checklist section 16 (Digital Staff: merge and duplicates): merging through the item panel,
+// what the merged item's submitter and the original then show, and that nothing merges on its own.
+// Each test uses its own tool, so the duplicates one test makes are never candidates in another.
 
 test.beforeAll(resetDatabase);
 
@@ -30,16 +31,101 @@ async function raiseSeparately(mike: Page, text: string) {
   return (await heading.innerText()).match(/FB-\d{4}/)![0];
 }
 
-test("S16.01 'Merge into it' closes the item, its tracker says 'Merged into FB-…' with a link, and its submitter follows the original", async () => {
-  test.skip(true, "Stage 3: duplicate merging");
+/** Near-identical pairs on tools nobody else in this file uses (the same pairs as e2e/05-duplicates.spec.ts). */
+const PAIRS = {
+  flipbook: { project: "flipbook", first: "The Flipbook is slow to open big brochures", second: "Flipbook is really slow to open big brochures" },
+  training: { project: "training-portal", first: "The Training Portal is slow to load big courses", second: "Training Portal is really slow to load big courses" },
+  afss: { project: "afss-portal", first: "The AFSS Portal is slow to save big statements", second: "AFSS Portal is really slow to save big statements" },
+};
+
+/** Liam raises the original and Aisha the same problem again, so merging gives Aisha something to follow. */
+async function pair(team: { as: (first: string) => Promise<Page> }, { project, first, second }: (typeof PAIRS)[keyof typeof PAIRS]) {
+  const original = await raise(await team.as("Liam"), first, ["Slowing me down"], project);
+  const separate = await raise(await team.as("Aisha"), second, ["Slowing me down"], project);
+  return { original, separate };
+}
+
+/** The console item panel for an item, opened by address (Darlene's board has no Awaiting approval column). */
+async function openPanel(page: Page, ref: string) {
+  await page.goto(`/console?inbox=open&item=${ref}`);
+  const panel = page.getByRole("dialog").filter({ hasText: ref });
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+/** The merge is saved once the original lists it; wait for that before another window reads it. */
+async function merged(page: Page, separate: string, into: string) {
+  await expect.poll(async () => (await getJson<Item>(page, `/console/items/${into}`)).linked).toContain(separate);
+}
+
+/** What Aisha, who raised the merged item, sees: its tracker points at the original by a link, and she follows the original. */
+async function expectFollowsOriginal(aisha: Page, separate: string, original: string) {
+  await aisha.goto(`/track/${separate}`);
+  await expect(aisha.getByRole("heading", { level: 1 })).toHaveText(`Merged into ${original}`);
+  const progress = aisha.getByRole("region", { name: "Progress" });
+  await expect(progress.getByRole("listitem").filter({ hasText: "Closed" })).not.toContainText("not yet");
+  const link = progress.getByRole("link", { name: original, exact: true });
+  await expect(link).toHaveAttribute("href", `/track/${original}`);
+  await link.click();
+  await expect(aisha).toHaveURL(new RegExp(`/track/${original}$`));
+  await expect(aisha.getByRole("heading", { level: 1 })).toBeVisible();
+
+  await aisha.goto("/my");
+  await expect(aisha.getByRole("link", { name: new RegExp(`${original}(?!\\d)`) })).toContainText("Following");
+}
+
+test("S16.01 'Merge into it' closes the item, its tracker says 'Merged into FB-…' with a link, and its submitter follows the original", async ({ team }) => {
+  const { original, separate } = await pair(team, PAIRS.flipbook);
+  const darlene = await team.as("Darlene");
+
+  const panel = await openPanel(darlene, separate);
+  const duplicates = panel.getByRole("region", { name: "Duplicates" });
+  await expect(duplicates).toContainText(original);
+  await duplicates.getByRole("button", { name: "Merge into it" }).click();
+  await expect(duplicates).toContainText(`Merged into ${original}.`);
+  // Closed: nothing can be merged or closed from it any more.
+  await expect(duplicates.getByRole("button", { name: "Merge into it" })).toHaveCount(0);
+  await expect(panel.locator("header").getByRole("button", { name: "Close", exact: true })).toHaveCount(0);
+
+  await merged(darlene, separate, original);
+  await expectFollowsOriginal(await team.as("Aisha"), separate, original);
 });
 
-test("S16.02 'Merge into another reference…' with a typed FB number gives the same result", async () => {
-  test.skip(true, "Stage 3: duplicate merging");
+test("S16.02 'Merge into another reference…' with a typed FB number gives the same result", async ({ team }) => {
+  const { project, first, second } = PAIRS.training;
+  const candidate = await raise(await team.as("Liam"), first, ["Slowing me down"], project);
+  // The one typed in is not the listed candidate, so the result can only come from what was typed.
+  const typed = await raiseBug(await team.as("Tom"), project, "Training Portal certificate download shows an error");
+  const separate = await raise(await team.as("Aisha"), second, ["Slowing me down"], project);
+  const darlene = await team.as("Darlene");
+
+  const panel = await openPanel(darlene, separate);
+  const duplicates = panel.getByRole("region", { name: "Duplicates" });
+  await expect(duplicates).toContainText(candidate);
+  await expect(duplicates).not.toContainText(typed);
+  await duplicates.getByRole("button", { name: /^Merge into another reference/ }).click();
+
+  const dialog = darlene.getByRole("dialog", { name: "Merge into another item", exact: true });
+  await dialog.getByLabel("Original reference").fill(typed.toLowerCase());
+  await expect(dialog.getByLabel("Original reference")).toHaveValue(typed);
+  await dialog.locator('button[type="submit"]').click();
+  await expect(dialog).toHaveCount(0);
+  await expect(duplicates).toContainText(`Merged into ${typed}.`);
+
+  await merged(darlene, separate, typed);
+  await expectFollowsOriginal(await team.as("Aisha"), separate, typed);
 });
 
-test("S16.03 The original shows 'Merged here: FB-…'", async () => {
-  test.skip(true, "Stage 3: duplicate merging");
+test("S16.03 The original shows 'Merged here: FB-…'", async ({ team }) => {
+  const { original, separate } = await pair(team, PAIRS.afss);
+  const darlene = await team.as("Darlene");
+  await postJson(darlene, `/console/items/${separate}/merge`, { into: original });
+  await merged(darlene, separate, original);
+
+  const duplicates = (await openPanel(darlene, original)).getByRole("region", { name: "Duplicates" });
+  await expect(duplicates).toContainText(`Merged here: ${separate}`);
+  // Merged, it is no longer offered as a duplicate.
+  await expect(duplicates.getByRole("button", { name: "Merge into it" })).toHaveCount(0);
 });
 
 test("S16.04 Two near-identical items sit side by side offering 'Merge into it', and none of the items is merged until someone clicks", async ({
@@ -64,9 +150,9 @@ test("S16.04 Two near-identical items sit side by side offering 'Merge into it',
   await expect(duplicates).toContainText(separate);
   await expect(panel).not.toContainText("Merged here");
 
-  // Every item in the system: none is linked, none closed as a merge.
+  // Every RAKE Agent item (the tests above merge on other tools on purpose): none is linked, none closed as a merge.
   const chris = await team.as("Chris");
-  const cards = (await getJson<{ items: Card[] }>(chris, "/console/items?inbox=all")).items;
+  const cards = (await getJson<{ items: Card[] }>(chris, `/console/items?inbox=all&project=${PROJECT}`)).items;
   expect(cards.map((c) => c.reference)).toEqual(expect.arrayContaining([original, separate]));
   for (const card of cards) {
     const item = await getJson<Item>(chris, `/console/items/${card.reference}`);

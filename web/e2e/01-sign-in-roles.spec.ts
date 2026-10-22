@@ -91,14 +91,17 @@ test("S01.05 From a bare /sign-in, Mario and Chris land on the console (Work) an
     await pick(page, first);
     await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
     await expect(page, `${first} lands on`).toHaveURL(/\/console$/);
+    // Leave the console first: its second board load would get a 401 after sign-out, and the app's own
+    // redirect (/sign-in?next=/console) would race the next page.goto.
+    await page.goto("about:blank");
     await signOut(page);
   }
 
   await openSignIn(page);
+  await expect(page).toHaveURL(/\/sign-in$/); // nothing left over in ?next=
   await pick(page, "Liam Carter");
-  // The greeting comes from the chat session the page starts, so allow for a slow first load.
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible({ timeout: 20_000 });
   await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
 });
 
 test("S01.06 /sign-in?error=domain shows a red alert that Smoke Signal is only for REDADAIR Google accounts", async ({ page }) => {

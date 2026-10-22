@@ -1,15 +1,16 @@
 {
-  "ran": "2026-10-22T05:36:40.130Z",
-  "commit": "b54e713",
+  "ran": "2026-10-22T22:32:17.942Z",
+  "commit": "6320f20",
   "uncommitted": true,
   "spec": "06-backup-form.spec.ts",
-  "fingerprint": "64b4c6e0fdad18cb",
+  "fingerprint": "b17049aa650e05ca",
   "caught": {
+    "S06.01": true,
     "S06.02": true,
     "S06.03": true,
     "S06.04": true,
     "S06.05": true,
-    "S06.06": true
-  },
-  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
+    "S06.06": true,
+    "S06.07": true
+  }
 }

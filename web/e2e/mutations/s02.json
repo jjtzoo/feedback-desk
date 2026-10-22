@@ -1,5 +1,12 @@
 {
   "S02.01": ["\"href\", \"/chat\"", "\"href\", \"/chatx\""],
+  "S02.02": ["[\"Your console\", \"Next\"]", "[\"Your console\", \"OK\"]"],
+  "S02.03": ["toHaveCSS(\"animation-name\", \"pulse\")", "toHaveCSS(\"animation-name\", \"spin\")"],
+  "S02.04": ["toBe(before + 1)", "toBe(before + 2)"],
+  "S02.05": ["toBe(16)", "toBe(17)"],
+  "S02.06": ["\"Step 4 of 9\"", "\"Step 5 of 9\""],
+  "S02.07": ["\"Step 6 of 9\"", "\"Step 7 of 9\""],
+  "S02.08": ["[\"Smoke Signal home\", \"Next\"]", "[\"Smoke Signal home\", \"OK\"]"],
   "S02.09": ["toHaveValue(\"I need access to \")", "toHaveValue(\"I need access to x\")"],
   "S02.10": ["toHaveCount(15)", "toHaveCount(16)"],
   "S02.11": ["\"About RAKE Agent\"", "\"About RAKE Agentx\""],

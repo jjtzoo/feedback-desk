@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, postJson, reachBackupForm } from "./helpers";
+import { apiModel, BUG, chatSay, getJson, postJson, providerViaWeb, reachBackupForm, restartApi } from "./helpers";
 
 // Manual checklist section 6: the backup form.
 
@@ -13,7 +13,7 @@ const GAP = "Sent through the backup form, so the agent didn't classify it.";
 /**
  * The form the way the checklist reaches it with MODEL_PROVIDER=none: the chat start answers
  * "fallback". The real answer is fetched and only its mode changed, so the project list is real.
- * The API cannot be restarted without a model here, so S06.01 and S06.07 stay Stage 3.
+ * Much quicker than restarting the API, which only S06.01 and S06.07 do.
  */
 async function openOfflineForm(page: Page) {
   await page.route("**/api/chat/sessions", async (route) => {
@@ -28,10 +28,6 @@ async function openOfflineForm(page: Page) {
   await page.goto("/chat");
   await expect(page.getByLabel(DETAILS)).toBeVisible();
 }
-
-test("S06.01 With no model the chat is replaced by a form, 'Sig isn't available right now.' and 'Not available right now'", async () => {
-  test.skip(true, "Stage 3: needs the API restarted without a model");
-});
 
 test("S06.02 Send feedback with empty details shows the error and focuses the field", async ({ page, signIn }) => {
   await signIn("Tom");
@@ -110,6 +106,57 @@ test("S06.06 After 13 messages the form shows with what you typed already in the
   await expect(page.getByText("Not available right now")).toBeVisible();
 });
 
-test("S06.07 With the model back, the chat is back", async () => {
-  test.skip(true, "Stage 3: needs the API restarted without a model");
+// Last in the file: S06.06 needs the stub, and the afterAll puts it back for the files after this one.
+test.describe("the API restarted with no model", () => {
+  test.afterAll(async () => {
+    test.setTimeout(180_000); // a real API restart
+    if ((await apiModel()).provider !== "stub") await restartApi("stub");
+  });
+
+  test("S06.01 With no model the chat is replaced by a form, 'Sig isn't available right now.' and 'Not available right now'", async ({ page, signIn }) => {
+    test.setTimeout(180_000); // a real API restart
+    const before = await apiModel();
+    const after = await restartApi("none");
+    expect(after.pid).not.toBe(before.pid);
+    await expect.poll(() => providerViaWeb(page), { timeout: 30_000 }).toBe("none");
+
+    await signIn("Tom");
+    const started = page.waitForResponse((r) => r.url().endsWith("/api/chat/sessions") && r.request().method() === "POST");
+    await page.goto("/chat");
+    // The API's own answer, not a failed request: the page shows the same form for any error.
+    const response = await started;
+    expect(response.status()).toBe(200);
+    expect(await response.json()).toMatchObject({ mode: "fallback", limit: null, session_id: null });
+
+    const chat = page.getByRole("region", { name: "Chat with Sig, the feedback assistant" });
+    const notice = chat.getByRole("alert").filter({ hasText: "Sig isn't available right now." });
+    await expect(notice.locator("strong")).toHaveText("Sig isn't available right now.");
+    await expect(notice.locator("strong")).toHaveCSS("font-weight", "700");
+    await expect(chat.locator('form > [data-slot="alert"]:first-child')).toContainText("Sig isn't available right now.");
+    await expect(chat.getByText("Not available right now", { exact: true })).toBeVisible();
+    await expect(chat.getByLabel(DETAILS)).toBeVisible();
+    await expect(chat.getByRole("button", { name: "Send feedback" })).toBeVisible();
+    await expect(chat.getByLabel("Your message")).toHaveCount(0);
+  });
+
+  test("S06.07 With the model back, the chat is back", async ({ page, signIn }) => {
+    test.setTimeout(240_000); // up to two real API restarts
+    if ((await apiModel()).provider !== "none") await restartApi("none");
+    await signIn("Tom");
+    await page.goto("/chat");
+    await expect(page.getByLabel(DETAILS)).toBeVisible();
+
+    const before = await apiModel();
+    const after = await restartApi("stub");
+    expect(after.pid).not.toBe(before.pid);
+    await expect.poll(() => providerViaWeb(page), { timeout: 30_000 }).toBe("stub");
+    // A form already open stays a form; the chat is back on the next visit.
+    await page.goto("/chat");
+    // The first chat after a restart builds the agent; a cold start once took over 10 s (S01.05).
+    await expect(page.getByText("G'day, I'm Sig. Spotted something?")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Smoke Signal's feedback assistant")).toBeVisible();
+    await expect(page.getByLabel(DETAILS)).toHaveCount(0);
+    await chatSay(page, BUG);
+    await expect(page.getByText("How much is this affecting your work")).toBeVisible();
+  });
 });

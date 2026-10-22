@@ -1,19 +1,38 @@
 import type { Page } from "@playwright/test";
 
-import { expect, resetDatabase, test } from "./fixtures";
-import { getJson } from "./helpers";
+import { addUsage, clearUsage, expect, resetDatabase, test } from "./fixtures";
+import { answerUntilCard, BUG, chatSay, getJson } from "./helpers";
 
 // Manual checklist section 22: AI usage and spend limits (D36).
 //
 // The browser tests run the scripted stub model, which reports no token counts, and the stub embeddings are
-// never recorded, so nothing in this database ever writes a usage row. Every person is at 0 % of the
-// allowance and the AI usage panel shows zeros. The spend limits come from the API's settings (300,000
-// tokens a person a day, A$5 a day, A$60 a month unless the environment says otherwise) and a test must not
-// change them. Items that need usage or a limit to be reached are therefore skipped with the setting they need.
+// never recorded, so the stub never writes a usage row. The spend limits come from the API's settings and a
+// test must not change them; the tests read them from the API and reach them by adding usage rows directly
+// (`addUsage`), each test as its own person, and remove those rows afterwards so no limit leaks into the next.
 
 test.beforeAll(resetDatabase);
 
 type Usage = { people: unknown[] };
+type Allowance = { limit_tokens: number; blocked: "user" | "budget" | null };
+type Budgets = { daily_budget_aud: number; monthly_budget_aud: number };
+
+const DETAILS = /What happened, or what would you like/;
+const chat = (page: Page) => page.getByRole("region", { name: "Chat with Sig, the feedback assistant" });
+const allowanceLine = (page: Page) => chat(page).locator("form p").filter({ hasText: "Today's assistant allowance" });
+
+/** The person's daily token allowance, checked to be on (above 0) so a limit can be reached. */
+async function dailyLimit(page: Page) {
+  const { limit_tokens } = await getJson<Allowance>(page, "/usage/me");
+  expect(limit_tokens).toBeGreaterThan(0);
+  return limit_tokens;
+}
+
+/** Open /chat and return what the API answered to the chat start. */
+async function startChat(page: Page) {
+  const started = page.waitForResponse((r) => r.url().endsWith("/api/chat/sessions") && r.request().method() === "POST");
+  await page.goto("/chat");
+  return (await started).json();
+}
 
 const panel = (page: Page) => page.getByRole("region", { name: "AI usage" });
 /** The value under a label in the panel's totals (Model calls today, Tokens today, Cost per item (30 days)). */
@@ -39,20 +58,98 @@ test("S22.01 Open /chat: under the box, 'Today's assistant allowance: N% used' w
   await expect(page.getByRole("meter", { name: "Today's assistant allowance used" })).toBeVisible();
 });
 
-test("S22.02 At 80 % or more the line turns amber with a warning icon and 'The form still works if it runs out.'", async () => {
-  test.skip(true, "Not automated: needs 80 % of the per-person daily limit used, and the stub model records no tokens (it needs Gemini token counts or a low DAILY_TOKENS_PER_USER)");
+test("S22.02 At 80 % or more the line turns amber with a warning icon and 'The form still works if it runs out.'", async ({ page, signIn }) => {
+  const grace = await signIn("Grace");
+  const limit = await dailyLimit(page);
+  try {
+    // Below 80 %: grey, no icon. (Percent rounds half to even, so seed whole percents from above.)
+    addUsage({ email: grace.email, tokens: Math.ceil(limit * 0.6) });
+    await page.goto("/chat");
+    const line = allowanceLine(page);
+    await expect(line).toHaveText("Today's assistant allowance: 60% used");
+    await expect(line).toHaveCSS("color", "rgb(91, 97, 107)");
+    await expect(line.locator("svg")).toHaveCount(0);
+
+    addUsage({ email: grace.email, tokens: Math.ceil(limit * 0.85) - Math.ceil(limit * 0.6) });
+    await page.goto("/chat");
+    await expect(line).toHaveText("Today's assistant allowance: 85% used. The form still works if it runs out.");
+    await expect(line).toHaveCSS("color", "rgb(180, 83, 9)");
+    await expect(line.locator("svg.lucide-triangle-alert")).toBeVisible();
+    const meter = chat(page).getByRole("meter", { name: "Today's assistant allowance used" });
+    await expect(meter).toHaveAttribute("aria-valuenow", "85");
+    await expect(meter.locator("div")).toHaveCSS("background-color", "rgb(180, 83, 9)");
+    await expect(chat(page).getByLabel("Your message")).toBeEditable();
+  } finally {
+    clearUsage();
+  }
 });
 
-test("S22.03 At the personal limit a new chat opens the backup form with \"You've used today's allowance with Sig. It resets tomorrow.\"", async () => {
-  test.skip(true, "Not automated: needs the per-person limit reached (DAILY_TOKENS_PER_USER set low, and chat tokens recorded, which the stub does not do)");
+test("S22.03 At the personal limit a new chat opens the backup form with \"You've used today's allowance with Sig. It resets tomorrow.\"", async ({ page, signIn }) => {
+  const rafael = await signIn("Rafael");
+  const limit = await dailyLimit(page);
+  try {
+    addUsage({ email: rafael.email, tokens: limit });
+    expect((await getJson<Allowance>(page, "/usage/me")).blocked).toBe("user");
+
+    expect(await startChat(page)).toMatchObject({ mode: "fallback", limit: "user" });
+    await expect(chat(page).getByText("You've used today's allowance with Sig. It resets tomorrow.", { exact: true })).toBeVisible();
+    await expect(chat(page).getByText("Not available right now", { exact: true })).toBeVisible();
+    await expect(chat(page).getByLabel(DETAILS)).toBeVisible();
+    await expect(page.getByText("G'day, I'm Sig.")).toHaveCount(0);
+  } finally {
+    clearUsage();
+  }
 });
 
-test("S22.04 At the daily or monthly budget a new chat opens the backup form with 'Sig is paused for today to keep costs in check.'", async () => {
-  test.skip(true, "Not automated: needs DAILY_BUDGET_AUD or MONTHLY_BUDGET_AUD reached (a low budget, and cost recorded, which the stub does not do)");
+test("S22.04 At the daily or monthly budget a new chat opens the backup form with 'Sig is paused for today to keep costs in check.'", async ({ page, signIn, team }) => {
+  test.slow(); // each usage change runs a script
+  await signIn("Mei");
+  const budgets = await getJson<Budgets>(await team.as("Marc"), "/console/usage");
+  expect(budgets.daily_budget_aud).toBeGreaterThan(0);
+  expect(budgets.monthly_budget_aud).toBeGreaterThan(0);
+  try {
+    // Today's spend, by everyone, reaches the daily budget.
+    addUsage({ cost: budgets.daily_budget_aud });
+    expect(await startChat(page)).toMatchObject({ mode: "fallback", limit: "budget" });
+    await expect(chat(page).getByText("Sig is paused for today to keep costs in check.", { exact: true })).toBeVisible();
+    await expect(chat(page).getByText("Not available right now", { exact: true })).toBeVisible();
+
+    // This month's spend, from earlier in the month, reaches the monthly budget.
+    clearUsage();
+    addUsage({ cost: budgets.monthly_budget_aud, monthStart: true });
+    expect(await startChat(page)).toMatchObject({ mode: "fallback", limit: "budget" });
+    await expect(chat(page).getByText("Sig is paused for today to keep costs in check.", { exact: true })).toBeVisible();
+  } finally {
+    clearUsage();
+  }
 });
 
-test("S22.05 Reaching a limit mid-chat: the backup form takes over with your text kept, and an existing confirm card can still be confirmed", async () => {
-  test.skip(true, "Not automated: needs a limit reached while a chat is open (a low DAILY_TOKENS_PER_USER or budget, and usage recorded, which the stub does not do)");
+test("S22.05 Reaching a limit mid-chat: the backup form takes over with your text kept, and an existing confirm card can still be confirmed", async ({ page, signIn }) => {
+  test.slow(); // two chats and a usage change
+  const tom = await signIn("Tom");
+  const limit = await dailyLimit(page);
+  // A second chat, open before the limit: after it no new chat can start, and sending in the first clears its card.
+  const other = await page.context().newPage();
+  try {
+    await other.goto("/chat");
+    await chatSay(other, BUG);
+    await page.goto("/chat");
+    await chatSay(page, BUG);
+    await answerUntilCard(page);
+
+    addUsage({ email: tom.email, tokens: limit });
+    expect((await getJson<Allowance>(page, "/usage/me")).blocked).toBe("user");
+    await page.getByRole("region", { name: "Your feedback" }).getByRole("button", { name: "Confirm" }).click();
+    await expect(page.getByRole("heading", { name: /Sent\. Your reference is FB-\d{4}/ })).toBeVisible();
+
+    test.fail(true, "Known bug or open decision: a limit reached mid-chat does not hand over to the backup form; limits are checked only when a chat starts (spec D36)");
+    await chatSay(other, "It happens every morning");
+    await expect(chat(other).getByText(/What you typed is kept below\./)).toBeVisible();
+    await expect(chat(other).getByLabel(DETAILS)).toHaveValue(/Training Portal shows an error[\s\S]*every morning/);
+  } finally {
+    await other.close();
+    clearUsage();
+  }
 });
 
 test("S22.06 An Admin's AI usage panel: today and this month against the budgets, 14 days of history, cost per item against A$0.05", async ({ page, signIn }) => {

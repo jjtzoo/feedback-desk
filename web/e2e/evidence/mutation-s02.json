@@ -1,11 +1,18 @@
 {
-  "ran": "2026-10-22T05:27:22.868Z",
-  "commit": "b54e713",
+  "ran": "2026-10-22T22:35:47.453Z",
+  "commit": "6320f20",
   "uncommitted": true,
   "spec": "02-landing.spec.ts",
-  "fingerprint": "6523d45144dd3e4b",
+  "fingerprint": "bb7d719890096dbd",
   "caught": {
     "S02.01": true,
+    "S02.02": true,
+    "S02.03": true,
+    "S02.04": true,
+    "S02.05": true,
+    "S02.06": true,
+    "S02.07": true,
+    "S02.08": true,
     "S02.09": true,
     "S02.10": true,
     "S02.11": true,
@@ -13,6 +20,5 @@
     "S02.13": true,
     "S02.14": true,
     "S02.15": true
-  },
-  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
+  }
 }

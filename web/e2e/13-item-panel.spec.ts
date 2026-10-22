@@ -114,12 +114,12 @@ test("S13.01 Clicking a card opens a panel on the right without leaving the boar
   await expect(approved).toBeAttached();
   await expect(page.locator("button", { hasText: ref })).toBeAttached();
   // On the right: once it has slid in, its right edge is the window's edge and its left edge is past the middle of a 1280 px window.
+  // Wait for the panel's own 200 ms slide-in to finish (not its subtree's, which has endless skeleton pulses).
+  await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const viewport = page.viewportSize()!;
-  await expect.poll(async () => (await panel.boundingBox())?.x ?? 0).toBeGreaterThan(viewport.width / 3);
-  await expect.poll(async () => {
-    const box = await panel.boundingBox();
-    return box ? Math.round(box.x + box.width) : 0;
-  }).toBe(viewport.width);
+  const box = (await panel.boundingBox())!;
+  expect(box.x).toBeGreaterThan(viewport.width / 2);
+  expect(Math.round(box.x + box.width)).toBe(viewport.width);
 
   await page.keyboard.press("Escape");
   await expect(panel).toBeHidden();

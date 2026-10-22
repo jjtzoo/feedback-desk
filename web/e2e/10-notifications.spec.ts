@@ -32,8 +32,43 @@ test("S10.01 A bell in the staff header and the console header, with an unread c
   await expect(darlene.getByRole("banner").getByRole("button", { name: /^Notifications, \d+ unread$/ })).toBeVisible();
 });
 
-test("S10.02 Mario's bell count rises within a few seconds without a refresh", async () => {
-  test.skip(true, "Stage 3: live notification stream");
+test("S10.02 Mario's bell count rises within a few seconds without a refresh", async ({ page, signIn, team }) => {
+  test.fail(true, "Known bug: the web app gzips the proxied event stream, so no event reaches the bell until a reload");
+  await signIn("Liam");
+  await clearBell(page);
+  const ref = await raiseBug(page, "rake-agent", "RAKE Agent freezes when I search the policy library");
+  await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
+  const darlene = await team.as("Darlene");
+
+  // Recorded, not waited for: waiting on the stream would turn the bug into a setup timeout.
+  let encoding = "not seen";
+  page.on("response", (r) => {
+    if (new URL(r.url()).pathname === "/api/notifications/stream") encoding = r.headers()["content-encoding"] ?? "identity";
+  });
+  // Post only after the bell's first load, so that load cannot pick up the update instead of the stream.
+  const firstList = page.waitForResponse((r) => new URL(r.url()).pathname === "/api/notifications" && r.request().method() === "GET");
+  await page.goto(`/track/${ref}`);
+  await (await firstList).finished();
+  await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread");
+
+  // A reload or navigation would wipe this mark.
+  let navigations = 0;
+  page.on("framenavigated", (frame) => {
+    if (frame === page.mainFrame()) navigations++;
+  });
+  await page.evaluate(() => {
+    (window as Window & { s1002?: string }).s1002 = "same page";
+  });
+
+  await postJson(darlene, `/console/items/${ref}/update`, { body: "We reproduced it and are working on a fix" });
+
+  // The API checks every 3 s (STREAM_CHECK_SECONDS). 8 s is "a few seconds" with margin and well
+  // under the 30 s polling fallback, so only the live stream can pass this.
+  test.info().annotations.push({ type: "stream content-encoding", description: encoding });
+  await expect(bell(page)).toHaveAccessibleName("Notifications, 2 unread", { timeout: 8_000 });
+  expect(await page.evaluate(() => (window as Window & { s1002?: string }).s1002)).toBe("same page");
+  expect(navigations).toBe(0);
+  await expect(page).toHaveURL(new RegExp(`/track/${ref}$`));
 });
 
 test("S10.03 Clicking a notification opens the tracker and the item turns read", async ({ page, signIn, team }) => {
@@ -156,5 +191,5 @@ test("S10.08 Mute stops notifications for the item and Unmute brings them back",
 });
 
 test("S10.09 Under Docker, Mailpit holds one email per notification", async () => {
-  test.skip(true, "Not automated: needs Docker and Mailpit");
+  test.skip(true, "Not automated: needs Docker and Mailpit, and this machine has no Docker (no Docker Desktop, no WSL distro); the browser tests run with email off");
 });
