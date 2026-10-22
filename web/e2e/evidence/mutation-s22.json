@@ -1,9 +1,13 @@
 {
-  "ran": "2026-10-22T04:26:26.990Z",
+  "ran": "2026-10-22T22:50:29.602Z",
+  "commit": "b0e7b03",
+  "uncommitted": true,
   "spec": "22-ai-usage.spec.ts",
-  "fingerprint": "d2127dae1610a965",
-  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
+  "fingerprint": "9b37d76e2a156001",
   "caught": {
+    "S22.02": true,
+    "S22.03": true,
+    "S22.04": true,
     "S22.06": true,
     "S22.07": true
   }

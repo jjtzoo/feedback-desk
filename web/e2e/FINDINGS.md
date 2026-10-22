@@ -21,6 +21,13 @@ Format:
 - Related, not tested: after any stream error (an API restart or deploy, Cloud Run's request timeout) the bell closes the stream for good and polls every 30 s; it never reconnects.
 - Found: 2026-10-23
 
+## S22.05 A limit reached mid-chat does not switch to the backup form
+- Test: e2e/22-ai-usage.spec.ts: S22.05 Reaching a limit mid-chat: the backup form takes over with your text kept, and an existing confirm card can still be confirmed
+- Steps: as Tom, start two chats and bring one to its confirm card; record usage up to his daily limit; confirm the card (this half works: "Sent. Your reference is FB-…"); send another message in the other chat.
+- Expected: the backup form takes over with what was typed kept.
+- Actual: Sig keeps answering, the allowance line reads "100% used" and no form appears. Limits are checked only at `POST /api/chat/sessions`. This is deliberate in spec D36 ("a chat in progress always finishes") and in `backend/tests/test_usage.py`, so the checklist and the spec disagree: recorded as OPEN in D36 for Marc.
+- Found: 2026-10-23
+
 ## S26.02 (related) A tracker reply's password, card number and TFN reach the owner's bell unmasked
 - Test: none yet. `e2e/26-masking.spec.ts` S26.02 checks the Conversation tab and the tracker, which are masked; the notification is not in the checklist item. Found by reading the code and confirmed against the running test app.
 - Steps: as a staff member, reply on the tracker with "My password is Hunter2, card 4111 1111 1111 1111, TFN 123 456 782"; sign in as the item's owner and read `GET /api/notifications` (the bell).
@@ -60,6 +67,7 @@ Format:
 - The dashboard's "Open by project" section has `aria-labelledby="bl-Open by project"`, an id with spaces, so the section has no accessible name (`web/src/app/console/dashboard/page.tsx`). Found 2026-10-22.
 - The item panel's age reads "now ago" during the first minute. Found 2026-10-22.
 - S13.06: the tracker says "Reassigned to Mario" where the checklist says "Assigned to Mario". Treated as wording, not a bug; the test asserts the app's wording. Found 2026-10-22.
+- Guide tour (S02.03, S02.04, S02.05), from reading `web/src/components/guide.tsx`: the spotlight's solid `ring-4 ring-primary` never renders (Tailwind v4 rings are box-shadows and the inline dimming `boxShadow` overrides them), so the only red is the pulsing outline at 60 % opacity; the small card is shorter but not narrower. While the small card asks for a click, mouse clicks elsewhere are blocked but the keyboard is not: Tab reaches page controls, and Radix triggers that open on keydown (the account menu, "Already know which tool?") still open. The "Try it out" card covers about 352 x 130 px at the bottom right, and controls under it can't be clicked until Next. Pressing Guide during "Try it out" gives a "Try it out … Have a look at Welcome to Smoke Signal" card; moving between the staff area and the console mid-tour ends the tour without marking it seen. Found 2026-10-23.
 
 ## S12.04 The board card shows the work type as plain text, not a badge
 - Test: e2e/12-board.spec.ts: S12.04 (asserts the work type as text in the card's meta line; not marked `test.fail()`)
@@ -87,6 +95,8 @@ These are not bugs in a test or the app that anyone has found. Each failed or mi
 - S02.11, S02.12: "RAKE Agent chip pressed", but `/chat` shows a static "About RAKE Agent" pill with no pressed state.
 - S02.13: the landing page shows the status wording "Received, waiting for approval", not a stage badge.
 - S02.15: the footer says "tax file numbers", not "TFNs".
+- S02.02: OK shows only on steps that ask for a click. "Your console" (the Console button) and the console's "Smoke Signal home" (a link) spotlight something clickable but show Next, and the last step, "That's it", shows Done. The test asserts the app's rule ("steps that ask you to click"); whether the checklist means that is the user's call.
+- S02.08: both tours end with a "That's it" step the checklist does not list (6 steps for Mario, 8 for Chris).
 - S01.03: the picker shows a job title for staff, not an email (by design); the test reads "each with an email" as applying to the five Admin and Digital people.
 
 ## S07.02 My feedback rows have no stage badge
@@ -95,6 +105,14 @@ These are not bugs in a test or the app that anyone has found. Each failed or mi
 - Expected: "FB reference, title, tool (or "Tool to confirm"), a plain status, "updated … ago", and a stage badge on wider screens" (Brief §4.1.8).
 - Actual: the row shows everything except the stage badge. `StageBadge` exists in `src/components/badges.tsx` but nothing renders it, and `src/app/(staff)/my/page.tsx` never uses it. Either the page should show it or the checklist line should go (a product call, given the Quiet UI direction).
 - Found: 2026-10-22
+
+## Outside the checklist: the web server's /api proxy now and then drops a request with a 500
+- Test: none of its own; it surfaces as a one-off failure in any test (see "went wrong once" above).
+- Steps: run the browser tests for a few hours; watch the web server's output for `Failed to proxy`.
+- Expected: every `/api/*` request reaches the API.
+- Actual: about 1 in 12,000 proxied requests fails with `read ECONNRESET` or `socket hang up`, and the browser gets `500 Internal Server Error`. Seen 3 times on 2026-10-22: `GET /api/feedback/FB-0003/tracker` (S09.03, first full run), `GET /api/projects` (S12.13) and `POST /api/console/items/FB-0001/approve` (an S21 mutation run). Likely cause: `web/src/proxy.ts` rewrites `/api/*` through Next's keep-alive agent, which has no idle timeout, while uvicorn closes idle keep-alive connections after 5 s (`timeout_keep_alive` default, set neither in `e2e_server.py` nor in the Dockerfile); a request sent on a socket uvicorn is closing fails. Possible fixes (a separate change): a uvicorn `--timeout-keep-alive` longer than the proxy's idle time, or no keep-alive on the proxy leg.
+- Related: when `GET /api/projects` (or `/api/admin/digital-staff`) fails, the console's Work filters stay empty for the life of the page with no message (`web/src/app/console/page.tsx`, `.catch(() => undefined)`); and the notification stream checks the sign-in only when it opens, so after signing out an open page keeps getting unread counts until it navigates.
+- Found: 2026-10-22 (from the web server log; written up 2026-10-23)
 
 ## Outside the checklist: the live notification stream holds a database transaction open
 - Test: none (found while building the database reset; `backend/scripts/e2e_reset.py` works around it in the test database only)

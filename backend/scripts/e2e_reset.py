@@ -1,14 +1,18 @@
 """Put the browser-test database back to the seed: no feedback, references from FB-0001 again.
 
     uv run python -m scripts.e2e_reset
+    uv run python -m scripts.e2e_reset usage [--email E] [--tokens N] [--cost AUD] [--month-start] | --clear
 
 Each Playwright spec file runs this first (web/e2e/fixtures.ts), so files never depend on each
 other. Only the `fd_e2e` database is touched. Sign-in sessions are kept, so windows a spec has
-already opened stay signed in.
+already opened stay signed in. `usage` adds the model usage the stub model never records, so the
+spend-limit tests (checklist S22) can reach a limit; `--clear` removes only the rows it added.
 """
 
+import argparse
 import asyncio
 import os
+import uuid
 
 from scripts.e2e_server import E2E_DATABASE
 from scripts.local_db import start
@@ -20,6 +24,8 @@ TABLES = (
     "notification_mutes, notifications, release_items, releases, project_messages, feedback, "
     "routing_rules, projects, digital_staff, user_preferences, job_runs, model_usage"
 )
+# Model and session of the usage rows the browser tests add.
+SEEDED = "e2e-seeded"
 
 
 async def reset() -> None:
@@ -46,9 +52,65 @@ async def reset() -> None:
     await dispose_engine()
 
 
+async def add_usage(email: str | None, tokens: int, cost: float, month_start: bool) -> None:
+    """One chat usage row: a person's tokens today, or (no email) spend toward the budgets."""
+    from datetime import UTC, datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    from app.config import get_settings
+    from app.db import dispose_engine, session_scope
+    from app.models.entities import ModelUsage
+
+    row = ModelUsage(
+        id=uuid.uuid4(),
+        user_email=email,
+        session_id=SEEDED,
+        kind="chat",
+        model=SEEDED,
+        calls=1,
+        input_tokens=tokens,
+        output_tokens=0,
+        cost_aud=cost,
+    )
+    if month_start:  # a minute into this month, as the usage service counts months (usage.period_starts)
+        local = datetime.now(UTC).astimezone(ZoneInfo(get_settings().timezone))
+        month = local.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        row.created_at = (month + timedelta(minutes=1)).astimezone(UTC)
+    async with session_scope() as db:
+        db.add(row)
+    await dispose_engine()
+
+
+async def clear_usage() -> None:
+    # DELETE, not TRUNCATE, so it never waits on an open notification stream.
+    from sqlalchemy import delete
+
+    from app.db import dispose_engine, session_scope
+    from app.models.entities import ModelUsage
+
+    async with session_scope() as db:
+        await db.execute(delete(ModelUsage).where(ModelUsage.session_id == SEEDED))
+    await dispose_engine()
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    commands = parser.add_subparsers(dest="command")
+    usage = commands.add_parser("usage", help="add a chat usage row, or --clear the ones added")
+    usage.add_argument("--email")
+    usage.add_argument("--tokens", type=int, default=0)
+    usage.add_argument("--cost", type=float, default=0)
+    usage.add_argument("--month-start", action="store_true", help="dated at the start of this month, not now")
+    usage.add_argument("--clear", action="store_true")
+    args = parser.parse_args()
+
     os.environ["DATABASE_URL"] = start(database=E2E_DATABASE)
-    asyncio.run(reset())
+    if args.command != "usage":
+        asyncio.run(reset())
+    elif args.clear:
+        asyncio.run(clear_usage())
+    else:
+        asyncio.run(add_usage(args.email, args.tokens, args.cost, args.month_start))
 
 
 if __name__ == "__main__":
