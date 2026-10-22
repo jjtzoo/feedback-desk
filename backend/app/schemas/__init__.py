@@ -6,6 +6,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.config import get_settings
+
 Status = Literal[
     "new",
     "needs_review",
@@ -153,6 +155,9 @@ class ChatStartOut(Out):
     greeting: str | None = None
     project: ProjectOut | None = None
     projects: list[ProjectOut] = []
+    # Upload limits, so the page can refuse a file before sending it (the API checks again).
+    max_file_mb: int = Field(default_factory=lambda: get_settings().max_file_mb)
+    max_files: int = Field(default_factory=lambda: get_settings().max_files_per_item)
 
 
 class MessageIn(BaseModel):

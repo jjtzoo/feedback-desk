@@ -51,9 +51,11 @@ log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 session_limiter = RateLimiter(get_settings().chat_sessions_per_user_per_hour, 3600)
 
+SHOW_SUMMARY_LEAD = "Here's what I'll send"
+SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
 IMPACT_CHIPS = [
     {"label": "Blocking my work", "value": "It's blocking my work"},
-    {"label": "Annoying", "value": "It's annoying"},
+    {"label": "Slowing me down", "value": "It's slowing me down"},
     {"label": "Nice-to-have", "value": "It's a nice-to-have"},
 ]
 
@@ -212,6 +214,13 @@ async def _message_parts(user: User, session_id: str, text: str, ids: list[uuid.
     return parts
 
 
+def _without_card_fields(text: str) -> str:
+    """The confirm card shows the draft, so a model message that also lists it ("**Title:** …")
+    is cut back to the lead-in line."""
+    at = text.find(SHOW_SUMMARY_LEAD)
+    return text if at < 0 else text[:at] + SHOW_SUMMARY
+
+
 def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False, default=str)}
 
@@ -222,7 +231,8 @@ async def _stream(
     said: list[str] = []
     try:
         async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
-            async for text in runtime.run_turn(user, session_id, parts, delta):
+            async for raw in runtime.run_turn(user, session_id, parts, delta):
+                text = _without_card_fields(raw)
                 said.append(text)
                 yield _sse("message", {"text": text})
     except TimeoutError:

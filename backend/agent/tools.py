@@ -86,7 +86,8 @@ async def update_draft(
         work_type_confidence: 0 to 1.
         category: bug, performance, data_issue, usability, feature_request, access_request, question or praise.
         category_confidence: 0 to 1.
-        priority: P1 (blocking work), P2 (major annoyance), P3 (minor) or P4 (nice-to-have).
+        priority: P1 (blocking work), P2 (major: a real problem, but work can continue), P3 (minor) or
+            P4 (nice-to-have). Leave it out until the person has said how much it affects them.
         priority_confidence: 0 to 1.
         impact: one_person, team or company.
         effort: S, M or L.

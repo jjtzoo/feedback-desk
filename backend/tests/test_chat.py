@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from agent.stub import ASK_EXPECTED, ASK_IMPACT, ASK_PROJECT, NOISE, SHOW_SUMMARY
 from app import agent_runtime
+from app.api.chat import _without_card_fields
 from app.config import get_settings
 from app.db import session_scope
 from app.models import Attachment, Feedback, FeedbackEvent, FeedbackMessage, Notification
@@ -273,3 +274,9 @@ async def test_sessions_survive_an_api_restart(staff: httpx.AsyncClient) -> None
     agent_runtime.reset(sessions=True)
     events = await say(staff, sid, "It's annoying")
     assert texts(events)[-1] == ASK_EXPECTED
+
+
+def test_a_message_that_lists_the_card_fields_is_cut_back_to_the_lead_in() -> None:
+    listed = f"Looks like someone raised this.\n\n{SHOW_SUMMARY}\n\n**Title:** Blank answer\n**Priority:** P2"
+    assert _without_card_fields(listed) == f"Looks like someone raised this.\n\n{SHOW_SUMMARY}"
+    assert _without_card_fields(ASK_IMPACT) == ASK_IMPACT

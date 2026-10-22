@@ -66,6 +66,8 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const [context, setContext] = useState<Record<string, string>>({});
   const [limit, setLimit] = useState<UsageLimit | null>(null);
   const [allowance, setAllowance] = useState<Allowance | null>(null);
+  const [fallbackReason, setFallbackReason] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLOListElement>(null);
@@ -144,7 +146,10 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
             setCard({ card: e.card, hash: e.hash });
           }
           else if (e.type === "done") done = { reference: e.reference, assigned_to: e.assigned_to, status: e.status };
-          else if (e.type === "fallback") fallback = true;
+          else if (e.type === "fallback") {
+            fallback = true;
+            setFallbackReason(e.reason);
+          }
         });
       } catch (e) {
         setError(errorText(e));
@@ -204,14 +209,29 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     }
   }
 
+  const maxFiles = start?.max_files ?? 5;
+  const maxMb = start?.max_file_mb ?? 10;
+
+  /** From the paperclip or a drop. Size and count are checked here first so a refusal is instant;
+   *  the API checks type, contents, size and count again. */
   async function attach(list: FileList | null) {
     if (!list || !sid) return;
     setUploading(true);
     setError(null);
+    let count = files.length;
     for (const file of Array.from(list)) {
+      if (count >= maxFiles) {
+        setError(`Up to ${maxFiles} files per feedback.`);
+        break;
+      }
+      if (file.size > maxMb * 1024 * 1024) {
+        setError(`${file.name}: Files can be up to ${maxMb} MB.`);
+        continue;
+      }
       try {
         const att = await api.upload<Attachment>(`/chat/sessions/${sid}/attachments`, file);
         setFiles((f) => [...f, att]);
+        count += 1;
       } catch (e) {
         setError(`${file.name}: ${errorText(e)}`);
       }
@@ -222,6 +242,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
 
   function again() {
     setSaved(null);
+    setFallbackReason(null);
     setProject(null);
     setRound((r) => r + 1);
   }
@@ -258,6 +279,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
             initialProject={project}
             initialDetails={userTyped}
             limit={limit}
+            reason={fallbackReason}
             sessionId={sid}
             context={context}
             onSaved={(s) => {
@@ -271,7 +293,28 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
       {mode === "done" && saved && <DoneView saved={saved.saved} plusOne={saved.plusOne} onAgain={again} />}
 
       {mode === "chat" && (
-        <>
+        <div
+          className="relative"
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+          }}
+          onDrop={(e) => {
+            if (!e.dataTransfer.files.length) return;
+            e.preventDefault();
+            setDragging(false);
+            if (!busy && !uploading) void attach(e.dataTransfer.files);
+          }}
+        >
+          {dragging && (
+            <div className="pointer-events-none absolute inset-2 z-10 grid place-items-center rounded-2xl border-2 border-dashed border-primary bg-card/90 text-sm font-semibold">
+              Drop files to attach (up to {maxFiles}, {maxMb} MB each)
+            </div>
+          )}
           <ol ref={list} className="grid max-h-[60dvh] min-h-56 content-start gap-3 overflow-y-auto p-5" aria-live="polite">
             {turns.map((t, i) => (
               <li key={i} className={cn("flex animate-fade-up", t.role === "user" ? "justify-end" : "justify-start")}>
@@ -367,8 +410,8 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                 size="icon-lg"
                 className="size-12 shrink-0 rounded-xl"
                 onClick={() => fileInput.current?.click()}
-                disabled={busy || uploading || files.length >= 5}
-                aria-label="Attach a file (PDF, Word, Excel or image, up to 10 MB)"
+                disabled={busy || uploading || files.length >= maxFiles}
+                aria-label={`Attach a file (PDF, Word, Excel or image, up to ${maxMb} MB), or drop files on the chat`}
               >
                 {uploading ? <Loader2 className="animate-spin" /> : <Paperclip className="size-5" />}
               </Button>
@@ -402,10 +445,12 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                 <Send /> <span className="sr-only sm:not-sr-only">Send</span>
               </Button>
             </div>
-            {firstMessage && <p className="mt-2 px-1 text-xs text-muted-foreground">Enter to send, Shift+Enter for a new line</p>}
+            {firstMessage && (
+              <p className="mt-2 px-1 text-xs text-muted-foreground">Enter to send, Shift+Enter for a new line. Drop files here to attach them.</p>
+            )}
             {allowance && <UsageMeter allowance={allowance} />}
           </form>
-        </>
+        </div>
       )}
     </section>
   );

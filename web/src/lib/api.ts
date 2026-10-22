@@ -112,6 +112,8 @@ export interface ChatStart {
   greeting: string | null;
   project: Project | null;
   projects: Project[];
+  max_file_mb: number;
+  max_files: number;
 }
 
 export interface Saved {

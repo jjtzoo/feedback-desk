@@ -18,7 +18,7 @@ from google.genai import types
 from app.services.drafts import first_sentence
 
 ASK_PROJECT = "Which tool is this about?"
-ASK_IMPACT = "How much is this affecting your work: blocking, annoying, or nice-to-have?"
+ASK_IMPACT = "How much is this affecting your work: blocking it, slowing you down, or nice-to-have?"
 ASK_EXPECTED = "What did you expect to happen, and what happened instead?"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
 PRESS_CONFIRM = "Press Confirm on the summary to send it, or tell me what to change."
@@ -130,7 +130,7 @@ BLOCKING = (
     "nobody can",
     "no one can",
 )
-ANNOYING = ("annoying", "frustrating", "painful", "major")
+ANNOYING = ("slowing me down", "annoying", "frustrating", "painful", "major")
 MINOR = ("minor", "typo", "cosmetic", "small thing", "a bit")
 NICE = ("nice to have", "nice-to-have", "idea", "would be nice", "someday")
 CONFIRM_WORDS = ("yes", "yep", "yeah", "correct", "looks good", "that's right", "send it", "submit", "ok", "okay")

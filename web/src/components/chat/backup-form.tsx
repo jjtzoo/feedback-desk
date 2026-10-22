@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 const HOW_MUCH = [
   { value: "blocking", label: "Blocking my work" },
-  { value: "annoying", label: "Annoying" },
+  { value: "annoying", label: "Slowing me down" },
   { value: "nice_to_have", label: "Nice-to-have" },
 ] as const;
 
@@ -23,12 +23,21 @@ const NOTICE: Record<UsageLimit | "offline", string> = {
   budget: "Sig is paused for today to keep costs in check.",
 };
 
+/** Why a chat in progress switched to the form. */
+const REASON: Record<string, string> = {
+  too_long: "Sorry, this is taking longer than it should.",
+  timeout: "Sorry, Sig took too long to answer.",
+  error: "Sorry, Sig ran into a problem.",
+  network: "Sorry, we lost the connection to Sig.",
+};
+
 /** When Sig is down: a simple form so feedback is never lost (brief §8). */
 export function BackupForm({
   projects,
   initialProject,
   initialDetails,
   limit,
+  reason,
   sessionId,
   context,
   onSaved,
@@ -37,6 +46,7 @@ export function BackupForm({
   initialProject: string | null;
   initialDetails: string;
   limit: UsageLimit | null;
+  reason: string | null;
   sessionId: string | null;
   context: Record<string, string>;
   onSaved: (s: Saved) => void;
@@ -80,7 +90,7 @@ export function BackupForm({
       <Alert>
         <TriangleAlert className="text-warning" />
         <AlertDescription>
-          <strong className="text-foreground">{NOTICE[limit ?? "offline"]}</strong> Answer these and the Digital team still gets your feedback.
+          <strong className="text-foreground">{(reason && REASON[reason]) ?? NOTICE[limit ?? "offline"]}</strong> {initialDetails && "What you typed is kept below. "}Answer these and the Digital team still gets your feedback.
         </AlertDescription>
       </Alert>
       <div className="grid gap-2">
