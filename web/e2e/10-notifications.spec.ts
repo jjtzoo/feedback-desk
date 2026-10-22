@@ -191,5 +191,5 @@ test("S10.08 Mute stops notifications for the item and Unmute brings them back",
 });
 
 test("S10.09 Under Docker, Mailpit holds one email per notification", async () => {
-  test.skip(true, "Not automated: needs Docker and Mailpit");
+  test.skip(true, "Not automated: needs Docker and Mailpit, and this machine has no Docker (no Docker Desktop, no WSL distro); the browser tests run with email off");
 });

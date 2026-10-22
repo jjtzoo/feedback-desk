@@ -75,14 +75,14 @@ Format:
 - Actual: the priority is a badge; the work type is plain text in the meta line. Confirm whether the checklist or the card is right.
 - Found: 2026-10-22
 
-## Open: results that went wrong once and then did not repeat
-These are not bugs in a test or the app that anyone has found. Each failed or misreported once and passed on every rerun. They stay open until the Stage 3 repeat runs (10 in a row) either reproduce them or show they are gone.
-- First full run, 2026-10-22 (about 09:11): 1 unexpected failure out of 83 tests; the test name was not captured. The next full run passed.
-- S11.01: the database reset timed out after 60 s once (`spawnSync … ETIMEDOUT` in `fixtures.ts`). Five resets right afterwards took 6 to 11 s.
-- S12.13: the Project filter listed only "All projects" in one full-file run, so the test timed out waiting for "RAKE Agent". Four later runs passed. `12-board.spec.ts` now also waits for the `/api/projects` response; that is a guess at the cause, not a confirmed fix.
-- S13.01: reported "broken test still passed" in one mutation run; two later runs caught it.
-- S21.03: timed out instead of failing in one mutation run; the next run failed correctly.
-- S01.05: the "G'day, I'm Sig." greeting did not appear within 10 s after picking Liam Carter, twice in a row, then the test passed in 6 single runs and 9 full-file runs. The wait is now 20 s; the cause is not found (a cold first load of /chat is a guess).
+## Closed: results that went wrong once (Stage 3 repeat runs, 2026-10-23)
+Each failed or misreported once on 2026-10-22. The causes below come from the server logs and the code; after the test fixes, every test in each file passed 10 separate runs in a row (`e2e/evidence/stress.json`).
+- First full run, 2026-10-22 (about 09:11), 1 of 83 failed: it was S09.03. The web server's `/api` proxy dropped the tracker request (`read ECONNRESET`, see "the web server's /api proxy now and then drops a request" below). No test change; spec 09 10/10.
+- S11.01, the reset timed out at 60 s once: the cause is not in the records (the machine-wide pgserver lock or a slow `uv` start are suspects). The reset now runs without `cmd.exe`, so the limit ends `uv` itself and a failure reports its time and output. Spec 11 10/10.
+- S12.13, the Project filter listed only "All projects": the same proxy drop, on `GET /api/projects`, which the page never retries. The test now fails fast with the status instead of hanging. Spec 12 10/10.
+- S13.01, "broken test still passed" once: a test weakness. The check sampled the panel during its 200 ms slide-in, where the broken value is a real frame; it now measures after the animation ends. Mutation 13 and spec 13 10/10.
+- S21.03, timed out instead of failing in one mutation run: a test weakness. After each failure Playwright restarts the worker, and the test rebuilt its six items inside its own time; a hung chat request had no timeout. The items are now built in `beforeAll` and the API helpers time out at 30 s. Mutation 21 and spec 21 10/10.
+- S01.05, the greeting missing twice: a race in the test. It signed out while `/console` was still loading, the page's next board load got a 401, and the app's own redirect to `/sign-in?next=/console` raced the test's next `goto`, so Liam landed on the console. The test now leaves the page before signing out. Mutation 01 and spec 01 10/10. Outside the checklist and harmless: someone who signs out from the menu while the console loads can land on `/sign-in?next=/console`.
 
 ## S22.01 The allowance line and meter are hidden until half the allowance is used
 - Test: e2e/22-ai-usage.spec.ts: S22.01 (`test.fail()`)
