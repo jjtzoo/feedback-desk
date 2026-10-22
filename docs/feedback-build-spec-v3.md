@@ -509,7 +509,7 @@ Four one-week sprints, one per brief phase. Points are relative size, not hours;
 
 ### Build status (2026-10-20)
 
-Built locally against this spec, ahead of the sprint gates; nothing deployed, nothing committed yet.
+Built against this spec, ahead of the sprint gates; committed on a working branch, nothing deployed.
 
 | Area | Status |
 | --- | --- |
