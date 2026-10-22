@@ -179,7 +179,7 @@ The company standards are followed in full. The only deviations are for stacks t
 | 3 | Sign-in uses the local dev picker (D23); Google OAuth is built but untested against Google | No OAuth client yet | Ask 2 |
 | 4 | Email is switched off or goes to Mailpit locally | No Gmail API account or ZeptoMail access; provider open (D32) | Asks 4 and 10 |
 | 5 | The Gemini key is held in a git-ignored local `.env` | Secret Manager not available yet; the key never goes in code, `.env.example` or YAML | Asks 1 and 3 |
-| 6 | Work is on feature branches cut from `feat/v3-build` | The company GitHub repo, `staging` and branch protection do not exist yet | Ask 5 |
+| 6 | Work is on feature branches cut from `main` (previously `feat/v3-build`, renamed 2026-10-23); `main` is not yet protected or tied to production | The company GitHub repo, `staging` and branch protection do not exist yet | Ask 5 |
 | 7 | Deployment scripts, CI workflow and Cloud Run YAML are written but not run | No Google Cloud access or company repo | Asks 1, 5 and 9 |
 
 ## Stack and architecture
