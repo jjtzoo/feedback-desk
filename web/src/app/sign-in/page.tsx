@@ -38,7 +38,8 @@ const ROLE: Record<DevUser["role"], string> = { staff: "Staff", digital: "Digita
 function SignIn() {
   const params = useSearchParams();
   const router = useRouter();
-  const next = params.get("next") ?? "/";
+  const requested = params.get("next");
+  const next = requested ?? "/";
   const [options, setOptions] = useState<{ google: boolean; dev_login: boolean } | null>(null);
   const [people, setPeople] = useState<DevUser[]>([]);
   const [error, setError] = useState<string | null>(params.get("error") ? (ERRORS[params.get("error") ?? ""] ?? ERRORS.google) : null);
@@ -51,12 +52,18 @@ function SignIn() {
     }).catch((e: unknown) => setError(errorText(e)));
   }, []);
 
-  async function devSignIn(email: string) {
-    setBusy(email);
+  /** The page they asked for; otherwise the Digital team lands on the queue and staff on the chat. */
+  function destination(role: DevUser["role"]): string {
+    if (requested?.startsWith("/") && !requested.startsWith("//")) return requested;
+    return role === "staff" ? "/chat" : "/console";
+  }
+
+  async function devSignIn(person: DevUser) {
+    setBusy(person.email);
     setError(null);
     try {
-      await api.post("/auth/dev/sign-in", { email });
-      router.replace(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+      await api.post("/auth/dev/sign-in", { email: person.email });
+      router.replace(destination(person.role));
     } catch (e) {
       setError(errorText(e));
       setBusy(null);
@@ -108,7 +115,7 @@ function SignIn() {
                       <li key={p.email}>
                         <button
                           type="button"
-                          onClick={() => devSignIn(p.email)}
+                          onClick={() => devSignIn(p)}
                           disabled={busy !== null}
                           className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-left hover:bg-muted disabled:opacity-60"
                         >

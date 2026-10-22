@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { useMe } from "@/components/me";
@@ -42,6 +42,7 @@ export function UserMenu({ tone = "light" }: { tone?: "light" | "dark" }) {
             <AvatarFallback className="bg-muted text-xs font-bold">{initials(me.name)}</AvatarFallback>
           </Avatar>
           <span className="hidden max-w-32 truncate text-sm font-semibold sm:inline">{me.name}</span>
+          <ChevronDown className="size-4 opacity-70" aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
@@ -51,19 +52,6 @@ export function UserMenu({ tone = "light" }: { tone?: "light" | "dark" }) {
             {me.email} · {ROLE[me.role]}
           </span>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild className="min-h-11">
-          <Link href="/chat">
-            Give feedback
-          </Link>
-        </DropdownMenuItem>
-        {me.role !== "staff" && (
-          <DropdownMenuItem asChild className="min-h-11">
-            <Link href="/console">
-              Open the console
-            </Link>
-          </DropdownMenuItem>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={signOut} className="min-h-11">
           Sign out

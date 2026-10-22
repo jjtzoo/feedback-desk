@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu } from "lucide-react";
+import { House, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -85,6 +85,12 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           <Brand href="/console" tone="dark" />
           <span className="hidden text-sm text-band-muted sm:inline">Console</span>
           <div className="ml-auto flex items-center gap-1">
+            <Button asChild variant="ghost" className="h-11 gap-1.5 rounded-full px-3 text-band-foreground hover:bg-white/10 hover:text-band-foreground">
+              <Link href="/" data-tour="nav-home">
+                <House className="size-5" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">Smoke Signal home</span>
+              </Link>
+            </Button>
             <GuideButton area="console" tone="dark" />
             <NotificationBell tone="dark" />
             <UserMenu tone="dark" />

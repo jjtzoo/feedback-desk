@@ -1,10 +1,13 @@
 "use client";
 
+import { LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Brand, Stripe } from "@/components/brand";
 import { GuideButton } from "@/components/guide";
+import { useMe } from "@/components/me";
+import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notification-bell";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
@@ -22,6 +25,7 @@ function isActive(href: string, path: string): boolean {
 }
 
 export function StaffHeader() {
+  const me = useMe();
   const path = usePathname();
   return (
     <header className="sticky top-0 z-30 bg-card">
@@ -49,6 +53,14 @@ export function StaffHeader() {
             })}
           </nav>
           <div className="ml-auto flex items-center gap-1">
+            {me.role !== "staff" && (
+              <Button asChild variant="ghost" className="h-11 gap-1.5 rounded-full px-3">
+                <Link href="/console" data-tour="nav-console">
+                  <LayoutDashboard className="size-5" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">Console</span>
+                </Link>
+              </Button>
+            )}
             <GuideButton area="staff" />
             <div data-tour="bell">
               <NotificationBell />

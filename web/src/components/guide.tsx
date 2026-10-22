@@ -13,8 +13,10 @@ import { cn } from "@/lib/utils";
 type Area = "staff" | "console";
 
 /** One stop on the tour. `target` is a `data-tour` value on the real control; `path` is the page
- *  the step lives on (the tour goes there first). No target, or a hidden one, centres the card. */
-type Step = { title: string; body: string; target?: string; path?: string; roles?: Me["role"][] };
+ *  the step lives on (the tour goes there first). No target, or a hidden one, centres the card.
+ *  With an `action`, the person presses OK, the control is highlighted, and clicking it unlocks the
+ *  next step; without one the step is only read and moved past with Next. */
+type Step = { title: string; body: string; action?: string; target?: string; path?: string; roles?: Me["role"][] };
 
 const STEPS: Record<Area, Step[]> = {
   staff: [
@@ -29,18 +31,30 @@ const STEPS: Record<Area, Step[]> = {
       target: "start-cards",
       path: "/",
     },
-    { title: "Give feedback", body: "Opens the assistant from any page.", target: "nav-chat" },
+    { title: "Give feedback", body: "Opens the assistant from any page.", action: "Click Give feedback", target: "nav-chat" },
     {
       title: "My feedback",
       body: "Everything you've sent, where each one is up to and who has it. Open one to follow it like a parcel, or reply to add details.",
+      action: "Click My feedback",
       target: "nav-my",
     },
-    { title: "Updates", body: "The bell shows news on your feedback: approved, started, resolved, or a reply.", target: "bell" },
-    { title: "What's new", body: "The changes the team releases each Friday.", target: "nav-whats-new" },
+    {
+      title: "Updates",
+      body: "The bell shows news on your feedback: approved, started, resolved, or a reply.",
+      action: "Click the bell",
+      target: "bell",
+    },
+    { title: "What's new", body: "The changes the team releases each Friday.", action: "Click What's new", target: "nav-whats-new" },
+    {
+      title: "Your account",
+      body: "Your initials, top right, open your account menu: who you're signed in as, and Sign out.",
+      action: "Click your initials, top right",
+      target: "user-menu",
+    },
     {
       title: "Your console",
-      body: "As part of the Digital team, open the console from this menu to work items, approve requests and see the dashboard.",
-      target: "user-menu",
+      body: "As part of the Digital team, this button takes you to the console to work items, approve requests and see the dashboard.",
+      target: "nav-console",
       roles: ["digital", "admin"],
     },
     { title: "That's it", body: "Open this tour again any time from Guide.", target: "guide" },
@@ -49,27 +63,46 @@ const STEPS: Record<Area, Step[]> = {
     {
       title: "Work",
       body: "Every item routed to the team, as a board, list or cards. Drag a card to change its status, or open it for the full brief, history and replies.",
+      action: "Click Work",
       target: "console-work",
       path: "/console",
     },
     {
       title: "Approvals",
       body: "New items wait here for an Admin. Approve, decline with a reason, or ask the sender for more information.",
+      action: "Click Approvals",
       target: "console-approvals",
       roles: ["admin"],
     },
-    { title: "Channels", body: "One shared thread per project, for the team to discuss its items.", target: "console-channels" },
+    {
+      title: "Channels",
+      body: "One shared thread per project, for the team to discuss its items.",
+      action: "Click Channels",
+      target: "console-channels",
+    },
     {
       title: "Releases",
       body: "Each Friday a release is drafted per project. The owner ticks, edits and publishes it to What's new. Nothing publishes on its own.",
+      action: "Click Releases",
       target: "console-releases",
     },
-    { title: "Dashboard", body: "Open items, the weekly trend, response times, and AI usage against the budgets.", target: "console-dashboard" },
+    {
+      title: "Dashboard",
+      body: "Open items, the weekly trend, response times, and AI usage against the budgets.",
+      action: "Click Dashboard",
+      target: "console-dashboard",
+    },
     {
       title: "Admin",
       body: "Projects, Digital Staff and the routing rules that decide who receives each item.",
+      action: "Click Admin",
       target: "console-admin",
       roles: ["admin"],
+    },
+    {
+      title: "Smoke Signal home",
+      body: "Back to the staff pages, where anyone gives feedback and follows it.",
+      target: "nav-home",
     },
     { title: "That's it", body: "Open this tour again any time from Guide.", target: "guide" },
   ],
@@ -146,14 +179,28 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
   const path = usePathname();
   const step = steps[Math.min(index, steps.length - 1)];
   const last = index >= steps.length - 1;
+  // "intro": the card explains the step. "act": the control is highlighted and waits for a click.
+  // "try": the click worked; the page is free to use until the person presses Next.
+  const [phase, setPhase] = useState<"intro" | "act" | "try">("intro");
+  const acting = phase === "act" && Boolean(step.action);
+  const trying = phase === "try";
   const [rect, setRect] = useState<DOMRect | null>(null);
   const card = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
-  // Go to the step's page first, so the highlighted control is really there.
+  const go = useCallback(
+    (i: number) => {
+      setPhase("intro");
+      onIndex(i);
+    },
+    [onIndex],
+  );
+
+  // Go to the step's page first, so the highlighted control is really there. While trying a
+  // feature the person may go anywhere.
   useEffect(() => {
-    if (step.path && step.path !== path) router.push(step.path);
-  }, [step.path, path, router]);
+    if (phase === "intro" && step.path && step.path !== path) router.push(step.path);
+  }, [phase, step.path, path, router]);
 
   // Find the control, bring it into view, and follow it on scroll and resize.
   const measure = useCallback(() => {
@@ -177,14 +224,53 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
   }, [measure, step.target, path]);
 
   useEffect(() => {
-    heading.current?.focus();
-  }, [index]);
+    if (phase === "intro") heading.current?.focus();
+  }, [index, phase]);
+
+  // Esc ends the tour, except while trying a feature, where Esc belongs to the page (menus, dialogs).
+  useEffect(() => {
+    if (trying) return;
+    const onEscape = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onEnd();
+    };
+    document.addEventListener("keydown", onEscape);
+    return () => document.removeEventListener("keydown", onEscape);
+  }, [onEnd, trying]);
+
+  // While waiting for the click, only the highlighted control works. Pressing it lets the control
+  // do its job (open the page or menu) and frees the page to try it; Next moves on.
+  useEffect(() => {
+    if (!acting) return;
+    const where = (e: Event): "card" | "target" | "outside" => {
+      const node = e.target instanceof Node ? e.target : null;
+      if (node && card.current?.contains(node)) return "card";
+      if (node && findTarget(step.target)?.contains(node)) return "target";
+      return "outside";
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const at = where(e);
+      if (at === "outside") {
+        e.preventDefault();
+        e.stopPropagation();
+      } else if (at === "target") setPhase("try");
+    };
+    const onClick = (e: MouseEvent) => {
+      const at = where(e);
+      if (at === "outside") {
+        e.preventDefault();
+        e.stopPropagation();
+      } else if (at === "target" && e.detail === 0) setPhase("try"); // pressed with the keyboard
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [acting, step.target]);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      onEnd();
-    } else if (e.key === "Tab" && card.current) {
+    if (e.key === "Tab" && card.current && !acting) {
       // Keep focus inside the tour card.
       const items = card.current.querySelectorAll<HTMLElement>("button");
       const first = items[0];
@@ -199,14 +285,43 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
     }
   }
 
+  if (trying) {
+    return (
+      <div className="pointer-events-none fixed inset-0 z-50">
+        <div
+          role="status"
+          className="pointer-events-auto absolute right-4 bottom-4 w-[min(22rem,calc(100vw-2rem))] rounded-2xl bg-popover p-4 text-popover-foreground shadow-card ring-1 ring-foreground/10"
+        >
+          <p className="text-base font-bold">Try it out</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Step {index + 1} of {steps.length}. Have a look at {step.title}, then press {last ? "Done" : "Next"} to carry on.
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            {!last && (
+              <Button variant="ghost" className="-ml-2 h-11 rounded-xl text-muted-foreground" onClick={onEnd}>
+                Skip tour
+              </Button>
+            )}
+            <Button className="ml-auto h-11 rounded-xl px-5" onClick={() => (last ? onEnd() : go(index + 1))}>
+              {last ? "Done" : "Next"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50" onKeyDown={onKeyDown}>
-      {/* Blocks the page while the tour is open; the hole in the dim layer shows the control. */}
-      <div className="absolute inset-0" aria-hidden="true" />
+    <div className="pointer-events-none fixed inset-0 z-50" onKeyDown={onKeyDown}>
+      {/* Blocks the page while a card is open; while waiting for a click only the control is live. */}
+      {!acting && <div className="pointer-events-auto absolute inset-0" aria-hidden="true" />}
       {rect ? (
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute rounded-xl ring-2 ring-white/80 transition-all duration-200 ease-out"
+          className={cn(
+            "absolute rounded-xl transition-all duration-200 ease-out",
+            acting ? "ring-4 ring-primary" : "ring-2 ring-white/80",
+          )}
           style={{
             left: rect.left - PAD,
             top: rect.top - PAD,
@@ -214,46 +329,77 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
             height: rect.height + PAD * 2,
             boxShadow: "0 0 0 9999px rgb(0 0 0 / 0.55)",
           }}
-        />
+        >
+          {acting && <span className="absolute -inset-2 rounded-2xl ring-4 ring-primary/60 motion-safe:animate-pulse" />}
+        </div>
       ) : (
         <div className="absolute inset-0 bg-black/55" aria-hidden="true" />
       )}
-      <div
-        ref={card}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="tour-title"
-        aria-describedby="tour-body"
-        className="absolute w-[min(22rem,calc(100vw-2rem))] rounded-2xl bg-popover p-5 text-popover-foreground shadow-card ring-1 ring-foreground/10"
-        style={cardPosition(rect)}
-      >
-        <p className="text-xs font-semibold text-muted-foreground">
-          Step {index + 1} of {steps.length}
-        </p>
-        <h2 id="tour-title" ref={heading} tabIndex={-1} className="mt-1 text-lg font-bold outline-none">
-          {step.title}
-        </h2>
-        <p id="tour-body" className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-          {step.body}
-        </p>
-        <div className="mt-5 flex items-center gap-2">
-          {!last && (
+      {acting ? (
+        <div
+          ref={card}
+          role="status"
+          className="pointer-events-auto absolute w-[min(22rem,calc(100vw-2rem))] rounded-2xl bg-popover p-4 text-popover-foreground shadow-card ring-1 ring-foreground/10"
+          style={cardPosition(rect)}
+        >
+          <p className="text-base font-bold">{step.action}</p>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            Step {index + 1} of {steps.length}. {rect ? "Click the highlighted control to try it." : "That control isn't showing on this screen."}
+          </p>
+          <div className="mt-3 flex items-center gap-2">
             <Button variant="ghost" className="-ml-2 h-11 rounded-xl text-muted-foreground" onClick={onEnd}>
               Skip tour
             </Button>
-          )}
-          <div className="ml-auto flex gap-2">
-            {index > 0 && (
-              <Button variant="outline" className="h-11 rounded-xl" onClick={() => onIndex(index - 1)}>
-                Back
-              </Button>
-            )}
-            <Button className="h-11 rounded-xl px-5" onClick={() => (last ? onEnd() : onIndex(index + 1))}>
-              {last ? "Done" : "Next"}
+            <Button variant="outline" className="ml-auto h-11 rounded-xl" onClick={() => go(index + 1)}>
+              Skip this step
             </Button>
           </div>
         </div>
-      </div>
+      ) : (
+        <div
+          ref={card}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="tour-title"
+          aria-describedby="tour-body"
+          className="pointer-events-auto absolute w-[min(22rem,calc(100vw-2rem))] rounded-2xl bg-popover p-5 text-popover-foreground shadow-card ring-1 ring-foreground/10"
+          style={cardPosition(rect)}
+        >
+          <p className="text-xs font-semibold text-muted-foreground">
+            Step {index + 1} of {steps.length}
+          </p>
+          <h2 id="tour-title" ref={heading} tabIndex={-1} className="mt-1 text-lg font-bold outline-none">
+            {step.title}
+          </h2>
+          <p id="tour-body" className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            {step.body}
+          </p>
+          <div className="mt-5 flex items-center gap-2">
+            {!last && (
+              <Button variant="ghost" className="-ml-2 h-11 rounded-xl text-muted-foreground" onClick={onEnd}>
+                Skip tour
+              </Button>
+            )}
+            <div className="ml-auto flex gap-2">
+              {index > 0 && (
+                <Button variant="outline" className="h-11 rounded-xl" onClick={() => go(index - 1)}>
+                  Back
+                </Button>
+              )}
+              <Button
+                className="h-11 rounded-xl px-5"
+                onClick={() => {
+                  if (last) onEnd();
+                  else if (step.action) setPhase("act");
+                  else go(index + 1);
+                }}
+              >
+                {last ? "Done" : step.action ? "OK" : "Next"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
