@@ -66,6 +66,20 @@ These are not bugs in a test or the app that anyone has found. Each failed or mi
 - S12.13: the Project filter listed only "All projects" in one full-file run, so the test timed out waiting for "RAKE Agent". Four later runs passed. `12-board.spec.ts` now also waits for the `/api/projects` response; that is a guess at the cause, not a confirmed fix.
 - S13.01: reported "broken test still passed" in one mutation run; two later runs caught it.
 - S21.03: timed out instead of failing in one mutation run; the next run failed correctly.
+- S01.05: the "G'day, I'm Sig." greeting did not appear within 10 s after picking Liam Carter, twice in a row, then the test passed in 6 single runs and 9 full-file runs. The wait is now 20 s; the cause is not found (a cold first load of /chat is a guess).
+
+## S22.01 The allowance line and meter are hidden until half the allowance is used
+- Test: e2e/22-ai-usage.spec.ts: S22.01 (`test.fail()`)
+- Steps: sign in as Aisha (staff, no usage), open `/chat`, wait for the Sig greeting, look under the message box.
+- Expected: "Today's assistant allowance: N% used" with a meter (checklist section 22, item 1).
+- Actual: nothing is shown. `src/components/chat/usage-meter.tsx` returns null below 50 %, and its comment says "Quiet until half is used". Either the checklist line is stale (a product call, given the Quiet UI direction) or the meter should always show. The "hidden when the limit is 0" half cannot be reached because the test API fixes the limit.
+- Found: 2026-10-22
+
+## Wording differences in sections 2 and 22 (not bugs, checklist to update)
+- S02.11, S02.12: "RAKE Agent chip pressed", but `/chat` shows a static "About RAKE Agent" pill with no pressed state.
+- S02.13: the landing page shows the status wording "Received, waiting for approval", not a stage badge.
+- S02.15: the footer says "tax file numbers", not "TFNs".
+- S01.03: the picker shows a job title for staff, not an email (by design); the test reads "each with an email" as applying to the five Admin and Digital people.
 
 ## S07.02 My feedback rows have no stage badge
 - Test: e2e/07-my-feedback.spec.ts: S07.02 (the rest of the row is checked first; only the badge is `test.fail()`)

@@ -1,0 +1,8 @@
+{
+  "ran": "2026-10-22T04:26:26.990Z",
+  "spec": "22-ai-usage.spec.ts",
+  "caught": {
+    "S22.06": true,
+    "S22.07": true
+  }
+}

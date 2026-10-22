@@ -1,0 +1,22 @@
+{
+  "ran": "2026-10-22T04:41:43.618Z",
+  "spec": "01-sign-in-roles.spec.ts",
+  "caught": {
+    "S01.01": true,
+    "S01.02": true,
+    "S01.03": true,
+    "S01.04": true,
+    "S01.05": true,
+    "S01.06": true,
+    "S01.07": true,
+    "S01.08": true,
+    "S01.09": true,
+    "S01.10": true,
+    "S01.11": true,
+    "S01.12": true,
+    "S01.13": true,
+    "S01.14": true,
+    "S01.15": true,
+    "S01.16": true
+  }
+}

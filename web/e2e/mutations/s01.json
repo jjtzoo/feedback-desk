@@ -1,0 +1,18 @@
+{
+  "S01.01": ["toBe(\"/my\")", "toBe(\"/myx\")"],
+  "S01.02": ["toBeDisabled()", "toBeEnabled()"],
+  "S01.03": ["\"Digital team\", \"REDMEN\"", "\"Digital team\", \"REDMENx\""],
+  "S01.04": ["toHaveURL(/\\/my$/)", "toHaveURL(/\\/myx$/)"],
+  "S01.05": ["toHaveURL(/\\/chat$/)", "toHaveURL(/\\/chatx$/)"],
+  "S01.06": ["toHaveClass(/text-destructive/)", "toHaveClass(/text-destructivex/)"],
+  "S01.07": ["toHaveText([\"Sign out\"])", "toHaveText([\"Sign outx\"])"],
+  "S01.08": ["{ name: \"Console\" });", "{ name: \"Consolex\" });"],
+  "S01.09": ["Tell us what's", "Tell us what'sx"],
+  "S01.10": ["toBe(\"/console\")", "toBe(\"/consolex\")"],
+  "S01.11": ["\"Work\", \"Channels\"", "\"Work\", \"Channelsx\""],
+  "S01.12": ["\"Work\", \"Approvals\"", "\"Work\", \"Approvalsx\""],
+  "S01.13": ["not.toContainText(title)", "toContainText(title)"],
+  "S01.14": ["not.toContainText(/[{}]/)", "toContainText(/[{}]/)"],
+  "S01.15": ["The console is for the Digital team", "The console is for the Digital teamx"],
+  "S01.16": ["{ name: \"Console\" })).toHaveCount(0)", "{ name: \"Console\" })).toHaveCount(1)"]
+}

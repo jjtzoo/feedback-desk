@@ -4,7 +4,7 @@ Record of the automated browser tests of the manual test checklist (`Feedback te
 
 ## What they test
 
-The checklist's sections 3 to 21 and 23 to 26 and 28: the staff chat, confirm card, duplicates, backup form, My feedback, tracker, reply and reopen, notifications and What's new, then the Digital team console (board, item panel, status changes, notes, merge, project channels) and the Admin screens (approvals, admin page, Friday releases, dashboard), then the cross-cutting checks on roles enforced by the server, staff seeing only their own items, nothing saved without Confirm, masking and the keyboard. Sections 1, 2 and 22 (sign-in and roles, landing page, AI usage) and 27, 29 and 30 (mobile, dark mode, reduced motion) have no browser test yet.
+The checklist's sections 1 to 26 and 28: the staff chat, confirm card, duplicates, backup form, My feedback, tracker, reply and reopen, notifications and What's new, then the Digital team console (board, item panel, status changes, notes, merge, project channels) and the Admin screens (approvals, admin page, Friday releases, dashboard), then the cross-cutting checks on roles enforced by the server, staff seeing only their own items, nothing saved without Confirm, masking and the keyboard. Sections 27, 29 and 30 (mobile, dark mode, reduced motion) have no browser test yet.
 
 Each test proves one checklist item against the real app (database, API, Next.js) through a real browser. A test is named after its item (`S08.06 …`: section 8, item 6), so every result traces to a line of the checklist.
 
@@ -27,14 +27,16 @@ Code and rules: `web/e2e/` and `web/e2e/CLAUDE.md`.
 | Database | throwaway local Postgres 16 + pgvector (pgserver, database `fd_e2e`), seeded by `app.seed`: 5 Digital Staff, 15 projects, routing rules |
 | Servers | API on port 8002, web (production build) on 3100; email off |
 | Environment | local only; one worker; Chromium desktop |
-| Run | whole suite, 185 tests in 6.0 minutes |
+| Run | whole suite, 223 tests in 6.9 minutes |
 
 ## Results
 
-The whole suite: **172 passed, 13 skipped, none failed.** Five of the 172 are known bugs that fail as expected (listed below), so 167 are plain passes: 163 checklist tests and 4 setup checks.
+The whole suite: **199 passed, 24 skipped, none failed.** Six of the 199 are known bugs that fail as expected (listed below), so 193 are plain passes: 189 checklist tests and 4 setup checks.
 
 | Section | Items | With a test | Passing | Known bug | Skipped | Shown able to fail |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1. Sign-in and roles | 16 | 16 | 16 | 0 | 0 | 16 |
+| 2. Landing page | 15 | 15 | 8 | 0 | 7 | 8 |
 | 3. Staff: chat | 17 | 17 | 17 | 0 | 0 | 17 |
 | 4. Confirm card | 13 | 13 | 13 | 0 | 0 | 13 |
 | 5. Duplicates | 6 | 6 | 6 | 0 | 0 | 6 |
@@ -54,14 +56,15 @@ The whole suite: **172 passed, 13 skipped, none failed.** Five of the 172 are kn
 | 19. Admin page | 10 | 10 | 10 | 0 | 0 | 10 |
 | 20. Friday releases | 9 | 9 | 9 | 0 | 0 | 9 |
 | 21. Dashboard | 5 | 5 | 5 | 0 | 0 | 5 |
+| 22. AI usage and spend limits | 7 | 7 | 2 | 1 | 4 | 2 |
 | 23. Roles enforced on the server | 4 | 4 | 4 | 0 | 0 | 4 |
 | 24. Staff see only their own items | 3 | 3 | 3 | 0 | 0 | 3 |
 | 25. Nothing saved without Confirm | 3 | 3 | 3 | 0 | 0 | 3 |
 | 26. Masking of passwords, card numbers and TFNs | 3 | 3 | 3 | 0 | 0 | 3 |
 | 28. Keyboard | 5 | 5 | 3 | 2 | 0 | 3 |
-| **Total** | **181** | **181** | **163** | **5** | **13** | **163** |
+| **Total** | **219** | **219** | **189** | **6** | **24** | **189** |
 
-181 of the checklist's 227 items have a browser test.
+219 of the checklist's 227 items have a browser test; the other 8 are sections 27, 29 and 30.
 
 ### Known bugs the tests found
 
@@ -72,6 +75,7 @@ The whole suite: **172 passed, 13 skipped, none failed.** Five of the 172 are kn
 | S14.05 | after Resolve the newest tracker entry is "Update: …" and "Resolved: …" is second | "Resolved: …" as the last entry (this reading of "last" still to be confirmed) |
 | S28.01 | on the chat page, Tab stops on a hidden 1 px file input with no visible focus ring | a visible focus ring on every control |
 | S28.03 | after Esc closes a dialog, focus does not return to the button that opened it | focus returns |
+| S22.01 | under the chat box the allowance line and meter stay hidden until half the allowance is used (the code says this is deliberate, "quiet until half is used") | "Today's assistant allowance: N% used" with a meter at any level; this may be stale checklist wording rather than a bug |
 
 Details and steps: `web/e2e/FINDINGS.md`. Two findings there are not checklist items and matter more than the rest. First, a staff member's tracker reply with a password, card number and TFN is masked in the saved message but reaches the owner's bell notification unmasked (confirmed against the test app; no fix yet). Second, the live notification stream held a database transaction open for as long as a page was open; a fix is committed on its own branch (`fix/stream-idle-transaction`) and is not merged.
 
@@ -84,26 +88,28 @@ Details and steps: `web/e2e/FINDINGS.md`. Two findings there are not checklist i
 | S10.09 | needs Docker and Mailpit |
 | S12.05 to S12.10 | board drag-and-drop and the keyboard move (later stage) |
 | S16.01 to S16.03 | merging through the item panel (later stage) |
+| S02.02 to S02.08 | the Guide tour (later stage) |
+| S22.02 to S22.05 | need the spend limits or usage changed (later stage) |
 
 ## Open points
 
-- **Five one-off results.** Across about 200 tests, five results went wrong once and passed on every rerun: one failure in the first full run (the test name was not captured), one database reset that timed out, one project filter that listed only "All projects", one test that reported as not able to fail, and one that timed out instead of failing. None has been reproduced. Each is listed in `FINDINGS.md` and stays open until the planned repeat runs (10 in a row, per test) either reproduce it or show it is gone.
+- **Six one-off results.** Across about 220 tests, six results went wrong once and passed on every rerun: one failure in the first full run (the test name was not captured), one database reset that timed out, one project filter that listed only "All projects", one test that reported as not able to fail, one that timed out instead of failing, and S01.05 (the Sig greeting did not appear within 10 s, twice in a row, then passed on every later run). None has been reproduced. Each is listed in `FINDINGS.md` and stays open until the planned repeat runs (10 in a row, per test) either reproduce it or show it is gone.
 - **Two weaker tests.** S16.04's break covers only the "Merge into it" button, not the check that nothing merged by itself. S21's date test is tied to the current week's numbers and would fail if a run crossed Monday midnight UTC.
 - **A rule bent.** S14.07 resets the database in the middle of its file.
-- **The checklist's own wording.** S12.04 asks for a work type badge and the card shows plain text. S13.06 says "Assigned to Mario" where the tracker says "Reassigned to Mario". Both are logged to confirm.
+- **The checklist's own wording.** S12.04 asks for a work type badge and the card shows plain text. S13.06 says "Assigned to Mario" where the tracker says "Reassigned to Mario". Both are logged to confirm. Section 2 and 22 wording also differs from the app: the checklist says the RAKE Agent chip is "pressed" (the page has a static pill), the landing page shows status wording where the checklist says a stage badge, and the footer says "tax file numbers" where it says "TFNs". S22.07 proves only that the panel and totals show for Darlene; the per-person rows are covered by the backend test.
 
 ## How far this can be trusted
 
 - Every test uses the scripted stub model on a local database. None ran against Gemini, on staging or in production. The routing quality against Gemini is a separate record (`routing-eval-2026-10-21.md`).
 - "Passing" means the screen did what the checklist says in that run. "Shown able to fail" means the test goes red when its key check is wrong. Neither shows the feature is free of bugs, and the repeat runs, which test whether a result is stable, have not been done yet.
-- The tests check what the checklist describes, no more. Layout, colour, mobile width, keyboard and dark mode (sections 27 to 30) are not covered yet.
+- The tests check what the checklist describes, no more. Layout, colour, mobile width and dark mode (sections 27, 29 and 30) are not covered yet.
 - Passing browser tests do not replace the pre-deployment checklist and post-deployment verification in `docs/deployment.md`.
 
 ## What can be claimed today
 
-The staff chat, confirm card, duplicates, backup form, My feedback, tracker, reply, notification and What's new flows, the Digital team console, the Admin screens, and the checks on roles, own-items-only, confirm-before-save, masking and the keyboard each pass automated browser tests on the stub model against a local database, with 5 known bugs logged and one privacy leak found outside the checklist. 181 of the 227 manual checklist items are automated, and 163 pass and are shown able to fail.
+The staff chat, confirm card, duplicates, backup form, My feedback, tracker, reply, notification and What's new flows, the Digital team console, the Admin screens, and the checks on roles, own-items-only, confirm-before-save, masking and the keyboard each pass automated browser tests on the stub model against a local database, with 6 known bugs logged and one privacy leak found outside the checklist. 219 of the 227 manual checklist items have a browser test, and 189 pass and are shown able to fail.
 
-Not yet: any feature as "pressure-tested" (that needs the 10-in-a-row runs), the sign-in, landing page and AI usage checks (sections 1, 2 and 22), the mobile, dark mode and reduced motion checks, the board drag-and-drop, merging and live-notification cases, or anything on staging or against Gemini. Beta or production readiness also depends on the sprint gates in the build spec (Marc and Chris sign them off there, not here), the deployment checklist, and the pilot.
+Not yet: any feature as "pressure-tested" (that needs the 10-in-a-row runs), the Guide tour and the spend-limit cases, the mobile, dark mode and reduced motion checks, the board drag-and-drop, merging and live-notification cases, or anything on staging or against Gemini. Beta or production readiness also depends on the sprint gates in the build spec (Marc and Chris sign them off there, not here), the deployment checklist, and the pilot.
 
 ## Where this leaves the build
 
