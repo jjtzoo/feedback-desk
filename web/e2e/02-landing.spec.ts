@@ -1,9 +1,9 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
 import { raiseBug } from "./helpers";
 
-// Manual checklist section 2: the staff landing page (/). The Guide tour items are a Stage 3 hard case.
+// Manual checklist section 2: the staff landing page (/) and the Guide tour.
 
 test.beforeAll(resetDatabase);
 
@@ -29,6 +29,59 @@ const sortedNames = (names: string[]) => [...names].sort((a, b) => a.localeCompa
 async function openLanding(page: Page) {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+}
+
+const banner = (page: Page) => page.getByRole("banner");
+const guide = (page: Page) => banner(page).getByRole("button", { name: "Guide", exact: true });
+/** A tour card that explains a step (a dialog), by its title. */
+const tourCard = (page: Page, title: string) => page.getByRole("dialog", { name: title, exact: true });
+/** The small card that asks for a click, by its words. */
+const smallCard = (page: Page, text: string) => page.getByRole("status").filter({ hasText: text });
+const tryCard = (page: Page) => page.getByRole("status").filter({ hasText: "Try it out" });
+const spotlight = (page: Page) => page.locator('div[aria-hidden="true"][style*="9999px"]');
+const pulse = (page: Page) => page.locator('[class~="motion-safe:animate-pulse"]');
+const fullDim = (page: Page) => page.locator('[class~="bg-black/55"]');
+const navChat = (page: Page) => banner(page).getByRole("link", { name: "Give feedback", exact: true });
+const press = (card: Locator, name: string) => card.getByRole("button", { name, exact: true }).click();
+
+/** The landing page's Guide, up to the card that explains step 3 (Give feedback). */
+async function toGiveFeedback(page: Page) {
+  await openLanding(page);
+  await guide(page).click();
+  await press(tourCard(page, "Welcome to Smoke Signal"), "Next");
+  await press(tourCard(page, "Start here"), "Next");
+  await expect(tourCard(page, "Give feedback")).toBeVisible();
+}
+
+/** On to step 3's "Try it out" card, by clicking Give feedback as asked. */
+async function toTryGiveFeedback(page: Page) {
+  await toGiveFeedback(page);
+  await press(tourCard(page, "Give feedback"), "OK");
+  await expect(smallCard(page, "Click Give feedback")).toBeVisible();
+  await navChat(page).click();
+  await expect(tryCard(page)).toBeVisible();
+}
+
+async function expectNoTour(page: Page) {
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: /Step \d+ of \d+/ })).toHaveCount(0);
+  await expect(spotlight(page)).toHaveCount(0);
+  await expect(fullDim(page)).toHaveCount(0);
+}
+
+/** The console's Guide, every step in order: its title and main button; each click step is skipped. */
+async function runConsoleGuide(page: Page, steps: [string, "OK" | "Next" | "Done"][]) {
+  await page.goto("/console");
+  await expect(page.getByRole("navigation", { name: "Console" })).toBeVisible();
+  await guide(page).click();
+  for (const [i, [title, main]] of steps.entries()) {
+    const card = tourCard(page, title);
+    await expect(card).toContainText(`Step ${i + 1} of ${steps.length}`);
+    await expect(card.getByRole("button", { name: main, exact: true })).toBeVisible();
+    await press(card, main);
+    if (main === "OK") await press(smallCard(page, `Click ${title}`), "Skip this step");
+  }
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 /** The "Already know which tool?" menu, opened. The tools come from the API after the page shows. */
@@ -59,32 +112,196 @@ test("S02.01 As Mario, / shows the red hero band 'Tell us what's not working, or
   await expect(start).toHaveAttribute("href", "/chat");
 });
 
-test("S02.02 The Guide's first card explains step 1, and steps with something to click show OK instead of Next", async () => {
-  test.skip(true, "Stage 3: Guide tour");
+test("S02.02 The Guide's first card explains step 1, and steps with something to click show OK instead of Next", async ({ page, signIn }) => {
+  await signIn("Mario");
+  await openLanding(page);
+  const button = guide(page);
+  await expect(button.locator("svg.lucide-circle-question-mark")).toHaveCount(1);
+  expect((await button.boundingBox())!.x).toBeGreaterThan(page.viewportSize()!.width / 2);
+
+  await button.click();
+  const welcome = tourCard(page, "Welcome to Smoke Signal");
+  await expect(welcome).toContainText("Step 1 of 9");
+  await expect(welcome).toContainText("Report a problem, ask for access or suggest an idea for any intranet platform or agent.");
+  await expect(fullDim(page)).toHaveCount(1); // nothing to point at, so the card sits in the middle
+
+  const steps: [string, "Next" | "OK" | "Done"][] = [
+    ["Welcome to Smoke Signal", "Next"],
+    ["Start here", "Next"],
+    ["Give feedback", "OK"],
+    ["My feedback", "OK"],
+    ["Updates", "OK"],
+    ["What's new", "OK"],
+    ["Your account", "OK"],
+    ["Your console", "Next"],
+    ["That's it", "Done"],
+  ];
+  for (const [i, [title, main]] of steps.entries()) {
+    const card = tourCard(page, title);
+    await expect(card).toContainText(`Step ${i + 1} of 9`);
+    for (const other of ["Next", "OK", "Done"].filter((name) => name !== main)) {
+      await expect(card.getByRole("button", { name: other, exact: true })).toHaveCount(0);
+    }
+    await press(card, main);
+    if (main === "OK") await press(smallCard(page, "Skip this step"), "Skip this step");
+  }
+  await expectNoTour(page);
 });
 
-test("S02.03 OK on 'Give feedback' shrinks the card to 'Click Give feedback', pulses that control and dims the rest", async () => {
-  test.skip(true, "Stage 3: Guide tour");
+test("S02.03 OK on 'Give feedback' shrinks the card to 'Click Give feedback', pulses that control and dims the rest", async ({ page, signIn }) => {
+  await signIn("Mario");
+  await toGiveFeedback(page);
+  const introBox = (await tourCard(page, "Give feedback").boundingBox())!;
+  await press(tourCard(page, "Give feedback"), "OK");
+
+  const card = smallCard(page, "Click Give feedback");
+  await expect(card).toContainText("Step 3 of 9. Click the highlighted control to try it.");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect((await card.boundingBox())!.height).toBeLessThan(introBox.height);
+
+  await expect(pulse(page)).toHaveCount(1);
+  await expect(pulse(page)).toHaveCSS("animation-name", "pulse");
+  const primary = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
+  expect(await pulse(page).evaluate((el) => getComputedStyle(el).getPropertyValue("--tw-ring-color"))).toContain(primary);
+  await expect(spotlight(page)).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.55) 0px 0px 0px 9999px");
+
+  // The spotlight is the control with 6 px around it; it animates into place.
+  await expect(async () => {
+    const hole = (await spotlight(page).boundingBox())!;
+    const target = (await navChat(page).boundingBox())!;
+    expect(Math.abs(hole.x - (target.x - 6))).toBeLessThanOrEqual(1);
+    expect(Math.abs(hole.y - (target.y - 6))).toBeLessThanOrEqual(1);
+    expect(Math.abs(hole.width - (target.width + 12))).toBeLessThanOrEqual(1);
+    expect(Math.abs(hole.height - (target.height + 12))).toBeLessThanOrEqual(1);
+  }).toPass();
 });
 
-test("S02.04 While the small card says 'Click Give feedback', clicking anywhere not highlighted does nothing", async () => {
-  test.skip(true, "Stage 3: Guide tour");
+test("S02.04 While the small card says 'Click Give feedback', clicking anywhere not highlighted does nothing", async ({ page, signIn }) => {
+  await signIn("Mario");
+  await toGiveFeedback(page);
+  await press(tourCard(page, "Give feedback"), "OK");
+  const card = smallCard(page, "Click Give feedback");
+  await expect(card).toBeVisible();
+  const before = await page.evaluate(() => history.length);
+
+  const header = banner(page);
+  for (const name of ["My feedback", "What's new", "Console"]) await header.getByRole("link", { name, exact: true }).click();
+  await header.getByRole("button", { name: /^Notifications/ }).click();
+  await header.getByRole("button", { name: "Account: Mario" }).click();
+
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/:3100\/$/);
+  await expect(card).toBeVisible();
+
+  // The highlighted control still works, and it is the only navigation there was.
+  await navChat(page).click();
+  await expect(page).toHaveURL(/\/chat$/);
+  expect(await page.evaluate(() => history.length)).toBe(before + 1);
 });
 
-test("S02.05 Clicking the highlighted control does its normal job, the dimming goes and a 'Try it out' card appears", async () => {
-  test.skip(true, "Stage 3: Guide tour");
+test("S02.05 Clicking the highlighted control does its normal job, the dimming goes and a 'Try it out' card appears", async ({ page, signIn }) => {
+  await signIn("Mario");
+  await toGiveFeedback(page);
+  await press(tourCard(page, "Give feedback"), "OK");
+  await expect(smallCard(page, "Click Give feedback")).toBeVisible();
+  await navChat(page).click();
+
+  await expect(page).toHaveURL(/\/chat$/);
+  await expect(page.getByText(/I'm Sig/)).toBeVisible();
+  const card = tryCard(page);
+  await expect(card).toContainText("Step 3 of 9. Have a look at Give feedback, then press Next to carry on.");
+  await expect(spotlight(page)).toHaveCount(0);
+  await expect(fullDim(page)).toHaveCount(0);
+  await expect(pulse(page)).toHaveCount(0);
+
+  // Bottom right, 16 px from the edges.
+  const box = (await card.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(Math.round(viewport.width - (box.x + box.width))).toBe(16);
+  expect(Math.round(viewport.height - (box.y + box.height))).toBe(16);
+
+  // The page is free to use, and the tour waits.
+  await banner(page).getByRole("link", { name: "What's new", exact: true }).click();
+  await expect(page).toHaveURL(/\/whats-new$/);
+  await expect(card).toBeVisible();
 });
 
-test("S02.06 On the 'Try it out' card, Next shows the next step's card", async () => {
-  test.skip(true, "Stage 3: Guide tour");
+test("S02.06 On the 'Try it out' card, Next shows the next step's card", async ({ page, signIn }) => {
+  await signIn("Mario");
+  await toTryGiveFeedback(page);
+  await press(tryCard(page), "Next");
+
+  const card = tourCard(page, "My feedback");
+  await expect(card).toContainText("Step 4 of 9");
+  await expect(card.getByRole("button", { name: "OK", exact: true })).toBeVisible();
+  await expect(tryCard(page)).toHaveCount(0);
 });
 
-test("S02.07 Skip this step moves on, Skip tour ends the tour, Esc ends it except during 'Try it out'", async () => {
-  test.skip(true, "Stage 3: Guide tour");
+test("S02.07 Skip this step moves on, Skip tour ends the tour, Esc ends it except during 'Try it out'", async ({ page, signIn }) => {
+  await signIn("Mario");
+
+  // Skip this step, then Skip tour.
+  await toGiveFeedback(page);
+  await press(tourCard(page, "Give feedback"), "OK");
+  await press(smallCard(page, "Skip this step"), "Skip this step");
+  const next = tourCard(page, "My feedback");
+  await expect(next).toContainText("Step 4 of 9");
+  expect(new URL(page.url()).pathname).toBe("/");
+  await press(next, "Skip tour");
+  await expectNoTour(page);
+
+  // Esc on an explaining card, and on the small card.
+  await guide(page).click();
+  await expect(tourCard(page, "Welcome to Smoke Signal")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expectNoTour(page);
+  await toGiveFeedback(page);
+  await press(tourCard(page, "Give feedback"), "OK");
+  await expect(smallCard(page, "Click Give feedback")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expectNoTour(page);
+
+  // Esc during "Try it out" closes the open popover only.
+  await guide(page).click();
+  await press(tourCard(page, "Welcome to Smoke Signal"), "Next");
+  await press(tourCard(page, "Start here"), "Next");
+  for (const title of ["Give feedback", "My feedback"]) {
+    await press(tourCard(page, title), "OK");
+    await press(smallCard(page, "Skip this step"), "Skip this step");
+  }
+  await press(tourCard(page, "Updates"), "OK");
+  await expect(smallCard(page, "Click the bell")).toBeVisible();
+  await banner(page).getByRole("button", { name: /^Notifications/ }).click();
+  await expect(page.getByRole("dialog")).toContainText("Notifications");
+  await expect(tryCard(page)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(tryCard(page)).toBeVisible();
+  await press(tryCard(page), "Next");
+  await expect(tourCard(page, "What's new")).toContainText("Step 6 of 9");
 });
 
-test("S02.08 As Mario the console's Guide runs Work, Channels, Releases, Dashboard, then Smoke Signal home; Chris also gets Approvals and Admin", async () => {
-  test.skip(true, "Stage 3: Guide tour");
+test("S02.08 As Mario the console's Guide runs Work, Channels, Releases, Dashboard, then Smoke Signal home; Chris also gets Approvals and Admin", async ({ page, signIn, team }) => {
+  await signIn("Mario");
+  await runConsoleGuide(page, [
+    ["Work", "OK"],
+    ["Channels", "OK"],
+    ["Releases", "OK"],
+    ["Dashboard", "OK"],
+    ["Smoke Signal home", "Next"],
+    ["That's it", "Done"],
+  ]);
+  await runConsoleGuide(await team.as("Chris"), [
+    ["Work", "OK"],
+    ["Approvals", "OK"],
+    ["Channels", "OK"],
+    ["Releases", "OK"],
+    ["Dashboard", "OK"],
+    ["Admin", "OK"],
+    ["Smoke Signal home", "Next"],
+    ["That's it", "Done"],
+  ]);
 });
 
 test("S02.09 The 'I need access' card opens /chat?start=access with 'I need access to ' in the box and the cursor in it", async ({ page, signIn }) => {
