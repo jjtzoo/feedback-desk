@@ -3,9 +3,9 @@ import type { Page } from "@playwright/test";
 import { expect, resetDatabase, test } from "./fixtures";
 import { getJson, pdf, postJson, raise, signOut } from "./helpers";
 
-// Manual checklist section 12 (Digital Staff: the board). Dragging cards and the keyboard move are
-// left for Stage 3; the rest (landing, columns, counts, cards, saved view, inbox tabs, filters, List
-// and Cards) is checked here. The people and items are made through the API, then looked at on /console.
+// Manual checklist section 12 (Digital Staff: the board): landing, columns, counts, cards, moving cards
+// with the mouse and the keyboard, saved view, inbox tabs, filters, List and Cards. The people and items
+// are made through the API, then looked at and moved on /console.
 
 test.beforeAll(resetDatabase);
 
@@ -255,28 +255,149 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
   await expect(boardCard(marc, world.p1).getByText("Flagged")).toHaveCount(0);
 });
 
-test("S12.05 Dragging an Approved card to In progress toasts '… moved to In progress' and ticks In progress on the submitter's tracker", async () => {
-  test.skip(true, "Stage 3: board drag-and-drop");
-});
+// Moving cards. Each test raises its own items, so the world above (and the counts S12.03 checks) is left alone.
+// Marc's six columns, and Darlene's Closed column, run past the right edge of a 1280 px window, so these
+// tests use a 1920 px screen and every drag stays inside the window.
+test.describe("moving cards", () => {
+  test.use({ viewport: { width: 1920, height: 1080 } });
 
-test("S12.06 Dragging an In progress card to Resolved opens a dialog that requires 'What was done'", async () => {
-  test.skip(true, "Stage 3: board drag-and-drop");
-});
+  /** A card in a given column. */
+  const cardIn = (page: Page, title: string, ref: string) => column(page, title).locator(CARD).filter({ hasText: new RegExp(`${ref}(?!\\d)`) });
 
-test("S12.07 Dragging a card to Closed opens the Close dialog", async () => {
-  test.skip(true, "Stage 3: board drag-and-drop");
-});
+  /** Raise an item as a staff member and, unless it should wait for approval, have Chris approve it. */
+  async function item(team: Team, who: string, text: string, project: string, approve = true) {
+    const ref = await raise(await team.as(who), text, IMPACT, project);
+    if (approve) await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+    return ref;
+  }
 
-test("S12.08 As Marc, dragging an Awaiting approval card to In progress is refused and the card stays", async () => {
-  test.skip(true, "Stage 3: board drag-and-drop");
-});
+  /** Drag a card onto a column with the mouse: press on it, move past the 6 px it takes to pick it up, glide over, let go. */
+  async function drag(page: Page, ref: string, to: string) {
+    const card = await boardCard(page, ref).boundingBox();
+    const target = column(page, to);
+    const box = await target.boundingBox();
+    if (!card || !box) throw new Error(`${ref} or the ${to} column is not on the screen`);
+    const [x, y] = [card.x + card.width / 2, card.y + card.height / 2];
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 12, y, { steps: 3 });
+    await page.mouse.move(box.x + box.width / 2, box.y + Math.min(80, box.height / 2), { steps: 20 });
+    // The column lights up under the card: where it will land, as the person sees it.
+    await expect(target).toHaveClass(/ring-2/);
+    await page.mouse.up();
+  }
 
-test("S12.09 As Marc, dragging an Awaiting approval card to Approved approves it", async () => {
-  test.skip(true, "Stage 3: board drag-and-drop");
-});
+  test("S12.05 Dragging an Approved card to In progress toasts '… moved to In progress' and ticks In progress on the submitter's tracker", async ({ page, signIn, team }) => {
+    const ref = await item(team, "Liam", "The RAKE Agent calendar widget freezes my browser tab", "rake-agent");
+    await signIn("Darlene");
+    await gotoWork(page);
+    await expect(cardIn(page, "Approved", ref)).toBeVisible();
 
-test("S12.10 Moving a card with the keyboard (Tab, Space, arrows, Space) gives the same result as dragging", async () => {
-  test.skip(true, "Stage 3: board drag-and-drop");
+    await drag(page, ref, "In progress");
+    await expect(page.getByText(`${ref} moved to In progress`, { exact: true })).toBeVisible();
+    await expect(cardIn(page, "In progress", ref)).toBeVisible();
+    await expect(cardIn(page, "Approved", ref)).toHaveCount(0);
+
+    // The person who raised it sees the stepper move on: Approved done, In progress current.
+    const liam = await team.as("Liam");
+    await liam.goto(`/track/${ref}`);
+    const stages = liam.getByRole("region", { name: "Progress" }).getByRole("listitem");
+    await expect(stages.nth(1)).toContainText("Approved, done");
+    await expect(stages.nth(2)).toContainText("In progress, current stage");
+  });
+
+  test("S12.06 Dragging an In progress card to Resolved opens a dialog that requires 'What was done'", async ({ page, signIn, team }) => {
+    const ref = await item(team, "Aisha", "RAKE Agent citations point to the wrong policy clause", "rake-agent");
+    await postJson(await team.as("Darlene"), `/console/items/${ref}/start`);
+    await signIn("Darlene");
+    await gotoWork(page);
+
+    await drag(page, ref, "Resolved");
+    const dialog = page.getByRole("dialog", { name: "Resolve" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("What was done")).toBeVisible();
+
+    // Empty, it is refused and nothing moves.
+    await dialog.getByRole("button", { name: "Resolve" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText("What was done is needed.");
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByLabel("What was done").fill("Pointed the citations at the current policy library");
+    await dialog.getByRole("button", { name: "Resolve" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText(`${ref} resolved`, { exact: true })).toBeVisible();
+    await expect(cardIn(page, "Resolved", ref)).toBeVisible();
+    await expect(cardIn(page, "In progress", ref)).toHaveCount(0);
+  });
+
+  test("S12.07 Dragging a card to Closed opens the Close dialog", async ({ page, signIn, team }) => {
+    const ref = await item(team, "Tom", "RAKE Agent spell checker underlines Australian spelling", "rake-agent");
+    await postJson(await team.as("Darlene"), `/console/items/${ref}/start`);
+    await signIn("Darlene");
+    await gotoWork(page);
+
+    await drag(page, ref, "Closed");
+    const dialog = page.getByRole("dialog", { name: "Close" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Closing ends the item for everyone following it.")).toBeVisible();
+
+    await dialog.getByLabel("Reason (shown to staff)").fill("Already fixed by the dictionary update");
+    // The form's own Close button, not the dialog's corner X (also called Close).
+    await dialog.locator("form").getByRole("button", { name: "Close", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText(`${ref} closed`, { exact: true })).toBeVisible();
+    await expect(cardIn(page, "Closed", ref)).toBeVisible();
+  });
+
+  test("S12.08 As Marc, dragging an Awaiting approval card to In progress is refused and the card stays", async ({ page, signIn, team }) => {
+    const ref = await item(team, "Grace", "Training Portal quiz timer resets when I switch tabs", "training-portal", false);
+    await signIn("Marc");
+    await gotoWork(page);
+    await expect(cardIn(page, "Awaiting approval", ref)).toBeVisible();
+
+    await drag(page, ref, "In progress");
+    await expect(page.getByText("Only approved items can be started. Ask an Admin to approve it first.", { exact: true })).toBeVisible();
+    await expect(cardIn(page, "Awaiting approval", ref)).toBeVisible();
+    await expect(cardIn(page, "In progress", ref)).toHaveCount(0);
+  });
+
+  test("S12.09 As Marc, dragging an Awaiting approval card to Approved approves it", async ({ page, signIn, team }) => {
+    const ref = await item(team, "Rafael", "Training Portal course videos buffer forever on the VPN", "training-portal", false);
+    await signIn("Marc");
+    await gotoWork(page);
+    await expect(cardIn(page, "Awaiting approval", ref)).toBeVisible();
+
+    await drag(page, ref, "Approved");
+    await expect(page.getByText(`${ref} approved`, { exact: true })).toBeVisible();
+    await expect(cardIn(page, "Approved", ref)).toBeVisible();
+    await expect(cardIn(page, "Awaiting approval", ref)).toHaveCount(0);
+  });
+
+  test("S12.10 Moving a card with the keyboard (Tab, Space, arrows, Space) gives the same result as dragging", async ({ page, signIn, team }) => {
+    const ref = await item(team, "Mei", "RAKE Agent keyboard shortcuts stopped working in Firefox", "rake-agent");
+    await signIn("Darlene");
+    await gotoWork(page);
+    const card = boardCard(page, ref);
+    await expect(cardIn(page, "Approved", ref)).toBeVisible();
+
+    // Tab from the search box until the card itself has focus.
+    await page.getByRole("textbox", { name: "Search", exact: true }).focus();
+    for (let i = 0; i < 60 && !(await card.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+    await expect(card).toBeFocused();
+
+    // Space picks it up; each arrow press moves it 25 px, so press until In progress lights up; Space drops it.
+    // The screen-reader announcement says it is held: "Picked up …", at once replaced by "… moved over … approved".
+    await page.keyboard.press("Space");
+    await expect(page.getByRole("status").filter({ hasText: new RegExp(`^(Picked up draggable item|Draggable item) ${ref}\\b`) })).toBeAttached();
+    const target = column(page, "In progress");
+    for (let i = 0; i < 40 && !/ring-2/.test((await target.getAttribute("class")) ?? ""); i++) await page.keyboard.press("ArrowRight");
+    await expect(target).toHaveClass(/ring-2/);
+    await page.keyboard.press("Space");
+
+    await expect(page.getByText(`${ref} moved to In progress`, { exact: true })).toBeVisible();
+    await expect(cardIn(page, "In progress", ref)).toBeVisible();
+    await expect(cardIn(page, "Approved", ref)).toHaveCount(0);
+  });
 });
 
 test("S12.11 The chosen view (List) survives a reload and signing out and in; Mario, who never chose, gets Board", async ({ page, signIn }) => {

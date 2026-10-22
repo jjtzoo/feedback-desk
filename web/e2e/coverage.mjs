@@ -84,12 +84,14 @@ function readResults() {
 
 /**
  * Recorded runs behind the evidence report: e2e/evidence/mutation-sNN.json (mutation-check.mjs: breaking
- * the test's key assertion made it fail) and e2e/evidence/stress.json ({ ran, runs, passes: { ID: n } }:
- * how many identical runs in a row each test passed).
+ * the test's key assertion made it fail) and e2e/evidence/stress.json (stress-check.mjs: { ran, runs, passes: { ID: n } }:
+ * how many identical runs in a row each test passed, with per spec file the fingerprint it ran on). Passes from a
+ * spec file that has changed since are stale and count for nothing.
  */
 function readEvidence() {
   const caught = new Map();
   const stale = [];
+  const staleStress = [];
   const dates = [];
   let stress = { ran: null, runs: 0, passes: {} };
   if (existsSync(EVIDENCE)) {
@@ -101,10 +103,17 @@ function readEvidence() {
         const current = existsSync(spec) && json.fingerprint === fingerprint(readFileSync(spec, "utf8"));
         if (!current) stale.push(json.spec);
         for (const [id, ok] of Object.entries(json.caught)) caught.set(id, current ? ok : "stale");
-      } else if (file === "stress.json") stress = json;
+      } else if (file === "stress.json") {
+        stress = { ...json, passes: {} };
+        for (const [name, record] of Object.entries(json.specs ?? {})) {
+          const spec = path.join(HERE, name);
+          if (existsSync(spec) && record.fingerprint === fingerprint(readFileSync(spec, "utf8"))) Object.assign(stress.passes, record.passes);
+          else staleStress.push(name);
+        }
+      }
     }
   }
-  return { caught, stale, mutationRan: dates.sort().at(-1) ?? null, stress };
+  return { caught, stale, staleStress, mutationRan: dates.sort().at(-1) ?? null, stress };
 }
 
 /** The checklist IDs a requirement lists: "S03.15", "S03.09-S03.14" or "S12.*" (the whole section). */
@@ -128,7 +137,7 @@ function expandItems(tokens, sections) {
 /** Evidence per requirement of the brief (docs/requirements.md): what backs each claim that it works, and what does not yet. */
 function writeEvidenceReport(sections, tests, outcome, at) {
   const requirements = JSON.parse(readFileSync(REQUIREMENT_MAP, "utf8"));
-  const { caught, stale, mutationRan, stress } = readEvidence();
+  const { caught, stale, staleStress, mutationRan, stress } = readEvidence();
   const { commit, uncommitted } = gitState(WEB_DIR);
   const repeated = (id) => stress.runs >= REPEATS && (stress.passes[id] ?? 0) >= stress.runs;
   const byId = new Map(sections.flatMap((s) => s.items.map((item) => [item.id, item])));
@@ -197,6 +206,7 @@ function writeEvidenceReport(sections, tests, outcome, at) {
     `3. **Repeats:** it passed ${REPEATS} identical runs in a row (\`evidence/stress.json\`${stress.ran ? `, last recorded ${stress.ran}` : ", none recorded yet"}).`,
     "",
     ...(stale.length ? [`**Stale records:** ${stale.join(", ")} changed after their mutation check, so their "Can fail" is not counted until \`npm run test:e2e:mutation\` is run again for them.`, ""] : []),
+    ...(staleStress.length ? [`**Stale repeat runs:** ${staleStress.join(", ")} changed after their repeat runs, so their "Repeated" is not counted until \`node e2e/stress-check.mjs\` is run again for them.`, ""] : []),
     "A requirement is **Pressure-tested** when every one of its items is, **Partly evidenced** when some have tests, and **Not covered** when none do. Known bugs, items that cannot be automated here and items without a test keep a requirement from being pressure-tested. An item that backs two requirements counts in both.",
     "",
     "What this does not show: every test uses the scripted stub model against a local test database. None ran on staging or against Gemini, and passing browser tests do not replace the sprint gates (signed by Marc and Chris) or the pre-deployment checklist in `docs/deployment.md`. F18 (launch) is checked here only through the Guide tour; the pilot, the intranet tile and production are not browser-testable.",
