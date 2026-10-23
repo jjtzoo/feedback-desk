@@ -33,7 +33,6 @@ test("S10.01 A bell in the staff header and the console header, with an unread c
 });
 
 test("S10.02 Mario's bell count rises within a few seconds without a refresh", async ({ page, signIn, team }) => {
-  test.fail(true, "Known bug: the web app gzips the proxied event stream, so no event reaches the bell until a reload");
   await signIn("Liam");
   await clearBell(page);
   const ref = await raiseBug(page, "rake-agent", "RAKE Agent freezes when I search the policy library");

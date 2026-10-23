@@ -1,5 +1,6 @@
 {
   "S10.01": ["unread$/", "unreadx$/"],
+  "S10.02": ["\"Notifications, 2 unread\", { timeout: 8_000 }", "\"Notifications, 3 unread\", { timeout: 8_000 }"],
   "S10.03": [".not.toHaveAccessibleName(/Unread/)", ".toHaveAccessibleName(/Unread/)"],
   "S10.04": ["dialog\", { name: title })", "dialog\", { name: title + \"x\" })"],
   "S10.05": ["2 unread", "3 unread"],
