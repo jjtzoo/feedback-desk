@@ -251,7 +251,8 @@ test("S18.08 As Marc, approving works from the item panel and from the board's A
   ];
 
   await signIn("Marc");
-  await openBoard(page);
+  // His own inbox keeps the board short enough to drag across; an Admin's default is All open, which is taller than the window.
+  await openBoard(page, "?inbox=mine");
   const awaiting = column(page, "Awaiting approval");
   await expect(boardCard(awaiting, panelRef)).toBeVisible();
   await expect(boardCard(awaiting, boardRef)).toBeVisible();
@@ -289,7 +290,7 @@ test("S18.09 The History tab of an approved and a declined item shows who, when 
   ]) {
     await page.goto(`/console?inbox=open&item=${ref}`);
     const panel = page.getByRole("dialog");
-    await openActivity(panel, "Changes");
+    await openActivity(panel, "History");
     const entry = panel.getByRole("listitem").filter({ hasText: text });
     await expect(entry, ref).toBeVisible();
     await expect(entry).toContainText(`Chris · ${text}`);

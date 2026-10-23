@@ -181,8 +181,8 @@ export async function answerUntilCard(page: Page) {
   await expect(page.getByRole("button", { name: "Confirm" })).toBeVisible();
 }
 
-/** Open the console panel's Activity tab, showing everything, only messages or only changes. */
-export async function openActivity(panel: Locator, show: "All" | "Messages" | "Changes" = "All") {
+/** Open the console panel's Activity tab, showing everything, only messages or only history. */
+export async function openActivity(panel: Locator, show: "All" | "Messages" | "History" = "All") {
   await panel.getByRole("tab", { name: "Activity" }).click();
   await panel.getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: show, exact: true }).click();
 }

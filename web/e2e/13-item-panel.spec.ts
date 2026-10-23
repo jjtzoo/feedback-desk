@@ -243,7 +243,7 @@ test("S13.05 Changing project, work type, category and priority saves each, and 
   await expect(classField(page, /^Category/)).toHaveText("Performance");
   await expect(classField(page, /^Priority/)).toHaveText("P1 · Blocking");
 
-  await openActivity(panelOf(page), "Changes");
+  await openActivity(panelOf(page), "History");
   const entries = panelOf(page).getByRole("tabpanel").getByRole("listitem");
   for (const change of [
     "corrected project rake-agent → project training-portal",
@@ -329,8 +329,14 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   await expect(lines).toHaveCount(messages.length);
 
   // The chat as it happened: Sig's greeting, what Aisha typed, Sig's questions and her answers.
-  await expect(lines.filter({ hasText: "G'day, I'm Sig." })).toContainText("Chat");
+  // It sits in its own read-only container, word for word in quotes, with the speaker named plainly.
+  const transcript = panel.getByRole("region", { name: "Intake transcript" });
+  await expect(transcript.getByRole("listitem")).toHaveCount(messages.filter((m) => m.message_type === "chat").length);
+  await expect(lines.filter({ hasText: "G'day, I'm Sig." })).toContainText("Assistant");
   await expect(lines.filter({ hasText: words })).toContainText("Aisha Rahman");
+  await expect(lines.filter({ hasText: words })).toContainText("Staff member");
+  await expect(lines.filter({ hasText: words }).locator("blockquote")).toHaveClass(/italic/);
+  await expect(transcript.getByRole("textbox")).toHaveCount(0);
   await expect(lines.filter({ hasText: "How much is this affecting your work" })).toHaveCount(1);
   await expect(lines.filter({ hasText: "What did you expect to happen" })).toHaveCount(1);
   await expect(lines.filter({ hasText: "Here's what I'll send" })).toHaveCount(1);
@@ -403,7 +409,7 @@ test("S13.10 The History tab lists every event with who and when, internal ones 
   expect(events.some((e) => !e.is_public) && events.some((e) => e.is_public)).toBe(true);
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "Changes");
+  await openActivity(panel, "History");
   const entries = panel.getByRole("tabpanel").getByRole("listitem");
   await expect(entries).toHaveCount(events.length);
   await expect(entries.filter({ hasText: "(internal)" })).toHaveCount(events.filter((e) => !e.is_public).length);

@@ -83,6 +83,8 @@ test("S15.02 'Reply to submitter' shows 'Reply from Darlene' on the tracker and 
   await darlene.getByRole("textbox", { name: "Reply to the submitter" }).fill(reply);
   await darlene.getByRole("button", { name: "Send reply" }).click();
   await expect(darlene.getByText("Reply sent to the submitter")).toBeVisible();
+  // The new entry is marked, not just appended to the feed.
+  await expect(darlene.getByText("Sent just now")).toBeVisible();
 
   await openTracker(page, ref);
   const latest = page.getByRole("region", { name: "Latest update" });

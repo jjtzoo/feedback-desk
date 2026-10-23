@@ -187,7 +187,9 @@ test("S01.12 After signing out from the account menu, Chris lands on the console
   await pick(page, "Chris");
   await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
   await expect(page).toHaveURL(/\/console$/);
-  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", /^Assigned to me/, /^Unassigned \/ needs review/, /^Overdue/, /^Approvals/, "Channels", "Releases", "Dashboard", "Admin"]);
+  await expect(consoleNav(page).getByRole("link")).toHaveText([/^Approvals/, "Work", /^Assigned to me/, /^Unassigned \/ needs review/, /^Overdue/, "Channels", "Releases", "Dashboard", "Admin"]);
+  // An Admin starts on what is open; the Digital team starts on what is theirs.
+  await expect(page.getByRole("tab", { name: /^All open/ })).toHaveAttribute("aria-selected", "true");
 });
 
 test("S01.13 Darlene typing /console/approvals sees 'Approvals are for Admins (Mike, Chris or Marc).'", async ({ page, signIn, team }) => {
