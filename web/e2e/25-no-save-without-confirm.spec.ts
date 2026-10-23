@@ -41,7 +41,7 @@ test.describe("25. Nothing saved without Confirm", () => {
 
     const marc = await team.as("Marc");
     await marc.goto("/console?inbox=open&q=zq25");
-    await marc.getByRole("button", { name: "Cards", exact: true }).click();
+    await marc.getByRole("radio", { name: "Cards", exact: true }).click();
     await expect(marc.getByRole("button", { name: /zq25ctl/ })).toBeVisible();
     await expect(marc.getByRole("button", { name: /zq25tab/ })).toHaveCount(0);
     const found = await getJson<{ total: number; items: { title: string }[] }>(marc, "/console/items?inbox=all&q=zq25tab");

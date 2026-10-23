@@ -51,13 +51,6 @@ Format:
 - Actual: the dialog closes and Tab stays inside, but focus is not on Decline afterwards (probably the page body). The dialogs open through a controlled `open` prop with no trigger, so Radix has nothing to return focus to.
 - Found: 2026-10-22
 
-## S13.08 Internal notes have no lock icon
-- Test: e2e/13-item-panel.spec.ts: S13.08 (the dashed border and the "Internal note" label are asserted first; only the lock icon is `test.fail()`)
-- Steps: as Darlene, raise a bug as a staff member, post an internal note (`POST /api/console/items/<ref>/note`), open the item panel and its Conversation tab.
-- Expected: the note is dashed, labelled "Internal note" and has a lock icon (checklist S13.08).
-- Actual: dashed border and label are there, no lock icon. `web/src/components/console/item-panel.tsx` has no lock icon.
-- Found: 2026-10-22
-
 ## S14.05 After Resolve, the newest tracker entry is "Update", with "Resolved" second
 - Test: e2e/14-status-changes.spec.ts: S14.05 (the "Resolved: <note>" entry is asserted present; only "it is the first entry" is `test.fail()`)
 - Steps: raise a RAKE Agent bug, approve it, start work, Resolve with a note, open the tracker as the submitter and read the newest entry in Tracking history.
@@ -100,13 +93,6 @@ Each failed or misreported once on 2026-10-22. The causes below come from the se
 - S02.02: OK shows only on steps that ask for a click. "Your console" (the Console button) and the console's "Smoke Signal home" (a link) spotlight something clickable but show Next, and the last step, "That's it", shows Done. The test asserts the app's rule ("steps that ask you to click"); whether the checklist means that is the user's call.
 - S02.08: both tours end with a "That's it" step the checklist does not list (6 steps for Mario, 8 for Chris).
 - S01.03: the picker shows a job title for staff, not an email (by design); the test reads "each with an email" as applying to the five Admin and Digital people.
-
-## S07.02 My feedback rows have no stage badge
-- Test: e2e/07-my-feedback.spec.ts: S07.02 (the rest of the row is checked first; only the badge is `test.fail()`)
-- Steps: sign in as a staff member with an item, open `/my`, read the row.
-- Expected: "FB reference, title, tool (or "Tool to confirm"), a plain status, "updated … ago", and a stage badge on wider screens" (Brief §4.1.8).
-- Actual: the row shows everything except the stage badge. `StageBadge` exists in `src/components/badges.tsx` but nothing renders it, and `src/app/(staff)/my/page.tsx` never uses it. Either the page should show it or the checklist line should go (a product call, given the Quiet UI direction).
-- Found: 2026-10-22
 
 ## Outside the checklist: the web server's /api proxy now and then drops a request with a 500
 - Test: none of its own; it surfaces as a one-off failure in any test (see "went wrong once" above).

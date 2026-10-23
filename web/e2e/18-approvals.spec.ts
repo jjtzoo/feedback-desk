@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { BUG, BUG_ANSWERS, getJson, postJson, raise, raiseBug } from "./helpers";
+import { BUG, BUG_ANSWERS, getJson, openActivity, postJson, raise, raiseBug } from "./helpers";
 
 // Manual checklist section 18: Admin approvals (/console/approvals). Staff raise feedback through the
 // API, Admins decide it on the screen, and the staff member's tracker and bell are read afterwards.
@@ -238,7 +238,7 @@ test("S18.07 The submitter's answer in Reply or add details toasts 'Added. The o
   await signIn("Chris");
   await page.goto(`/console?inbox=open&item=${ref}`);
   const panel = page.getByRole("dialog");
-  await panel.getByRole("tab", { name: /^Conversation/ }).click();
+  await openActivity(panel, "Messages");
   const entry = panel.getByRole("listitem").filter({ hasText: answer });
   await expect(entry).toBeVisible();
   await expect(entry).toContainText("Aisha Rahman");
@@ -289,7 +289,7 @@ test("S18.09 The History tab of an approved and a declined item shows who, when 
   ]) {
     await page.goto(`/console?inbox=open&item=${ref}`);
     const panel = page.getByRole("dialog");
-    await panel.getByRole("tab", { name: "History" }).click();
+    await openActivity(panel, "Changes");
     const entry = panel.getByRole("listitem").filter({ hasText: text });
     await expect(entry, ref).toBeVisible();
     await expect(entry).toContainText(`Chris · ${text}`);

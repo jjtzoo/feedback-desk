@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import { expect, type APIRequestContext, type Browser, type Locator, type Page } from "@playwright/test";
 
 import { API_CONTROL, TOUR_SEEN, WEB } from "./env";
 
@@ -179,4 +179,10 @@ export async function answerUntilCard(page: Page) {
     await expect(page.getByText("Sig is writing…")).toHaveCount(0, { timeout: 20_000 });
   }
   await expect(page.getByRole("button", { name: "Confirm" })).toBeVisible();
+}
+
+/** Open the console panel's Activity tab, showing everything, only messages or only changes. */
+export async function openActivity(panel: Locator, show: "All" | "Messages" | "Changes" = "All") {
+  await panel.getByRole("tab", { name: "Activity" }).click();
+  await panel.getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: show, exact: true }).click();
 }

@@ -44,7 +44,7 @@ async function confirm(page: Page) {
 /** A console inbox in Cards view, which lists every stage, so an item shows wherever it is. */
 async function inboxCards(page: Page, inbox: string) {
   await page.goto(`/console?inbox=${inbox}`);
-  await page.getByRole("button", { name: "Cards", exact: true }).click();
+  await page.getByRole("radio", { name: "Cards", exact: true }).click();
 }
 
 test("S04.01 The card is headed 'Your feedback' with Tool, Type, Title, Summary and a labelled Priority, and focus lands on it", async ({ page, signIn }) => {

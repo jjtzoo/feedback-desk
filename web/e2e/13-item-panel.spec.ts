@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, pdf, postJson, raise, raiseBug } from "./helpers";
+import { getJson, openActivity, pdf, postJson, raise, raiseBug } from "./helpers";
 
 // Manual checklist section 13: Digital Staff, the item panel. Submitters raise through the API and
 // Darlene (who owns RAKE Agent) looks at the panel on screen; Chris approves where an item must be
@@ -34,7 +34,7 @@ type Detail = {
 
 /** The panel is the page's only dialog. */
 const panelOf = (page: Page) => page.getByRole("dialog");
-const classification = (page: Page) => panelOf(page).getByRole("region", { name: "Classification" });
+const classification = (page: Page) => panelOf(page).getByRole("complementary", { name: "Properties" });
 /** The select under a Classification label ("Project (90%)", "Assignee", ...). */
 const classField = (page: Page, label: RegExp) => classification(page).locator("label").filter({ hasText: label }).getByRole("combobox");
 
@@ -113,12 +113,13 @@ test("S13.01 Clicking a card opens a panel on the right without leaving the boar
   // The board is still the page behind it.
   await expect(approved).toBeAttached();
   await expect(page.locator("button", { hasText: ref })).toBeAttached();
-  // On the right: once it has slid in, its right edge is the window's edge and its left edge is past the middle of a 1280 px window.
+  // On the right: once it has slid in, its right edge is the window's edge and its left edge leaves part of the page showing (the panel is wide, with the properties beside the brief).
   // Wait for the panel's own 200 ms slide-in to finish (not its subtree's, which has endless skeleton pulses).
   await panel.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
   const viewport = page.viewportSize()!;
   const box = (await panel.boundingBox())!;
-  expect(box.x).toBeGreaterThan(viewport.width / 2);
+  expect(box.x).toBeGreaterThan(viewport.width / 8);
+  expect(box.width).toBeGreaterThan(viewport.width / 2);
   expect(Math.round(box.x + box.width)).toBe(viewport.width);
 
   await page.keyboard.press("Escape");
@@ -184,7 +185,7 @@ test("S13.03 The Brief tab shows the recommendation first, then the brief's rows
   await expect(row("Open gaps")).toContainText("Steps to reproduce");
   await expect(panel.locator('dt:text-is("Open gaps")')).toHaveClass(/text-warning/);
 
-  // Top to bottom: recommendation, rows, then Classification.
+  // Top to bottom: recommendation, then the rows; the properties sit beside them in their own column.
   const top = async (locator: ReturnType<Page["locator"]>) => (await locator.boundingBox())!.y;
   const order = [
     await top(panel.getByText("Recommendation: implement.")),
@@ -192,9 +193,10 @@ test("S13.03 The Brief tab shows the recommendation first, then the brief's rows
     await top(panel.locator('dt:text-is("Submitter\'s words")')),
     await top(panel.locator('dt:text-is("Context")')),
     await top(panel.locator('dt:text-is("Open gaps")')),
-    await top(classification(page)),
   ];
   expect(order).toEqual([...order].sort((a, b) => a - b));
+  const left = async (locator: ReturnType<Page["locator"]>) => (await locator.boundingBox())!.x;
+  expect(await left(classification(page))).toBeGreaterThan(await left(panel.locator('dt:text-is("Problem")')));
 
   // A request carries "What they're asking for".
   const request = await raise(await team.as("Grace"), "Please add an export to PDF button to the RAKE Agent results page", ["Nice-to-have"], "rake-agent");
@@ -241,7 +243,7 @@ test("S13.05 Changing project, work type, category and priority saves each, and 
   await expect(classField(page, /^Category/)).toHaveText("Performance");
   await expect(classField(page, /^Priority/)).toHaveText("P1 · Blocking");
 
-  await panelOf(page).getByRole("tab", { name: "History" }).click();
+  await openActivity(panelOf(page), "Changes");
   const entries = panelOf(page).getByRole("tabpanel").getByRole("listitem");
   for (const change of [
     "corrected project rake-agent → project training-portal",
@@ -322,8 +324,7 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   const { messages } = await getJson<Detail>(page, `/console/items/${ref}`);
 
   const panel = await openItem(page, ref);
-  await panel.getByRole("tab", { name: /^Conversation/ }).click();
-  await expect(panel.getByRole("tab", { name: `Conversation (${messages.length})` })).toBeVisible();
+  await openActivity(panel, "Messages");
   const lines = panel.getByRole("tabpanel").getByRole("listitem");
   await expect(lines).toHaveCount(messages.length);
 
@@ -344,8 +345,6 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   await expect(note).toContainText("Internal note");
   await expect(note).toHaveClass(/border-dashed/);
 
-  // The lock comes last: the dashed border and the label are checked first, so only the lock is the known bug.
-  test.fail(true, "Known bug: an internal note has a dashed border and the label but no lock icon (src/components/console/item-panel.tsx)");
   await expect(note.locator('svg[class*="lucide-lock"]')).toHaveCount(1);
 });
 
@@ -404,7 +403,7 @@ test("S13.10 The History tab lists every event with who and when, internal ones 
   expect(events.some((e) => !e.is_public) && events.some((e) => e.is_public)).toBe(true);
 
   const panel = await openItem(page, ref);
-  await panel.getByRole("tab", { name: "History" }).click();
+  await openActivity(panel, "Changes");
   const entries = panel.getByRole("tabpanel").getByRole("listitem");
   await expect(entries).toHaveCount(events.length);
   await expect(entries.filter({ hasText: "(internal)" })).toHaveCount(events.filter((e) => !e.is_public).length);

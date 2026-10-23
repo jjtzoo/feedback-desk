@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, postJson, raiseBug } from "./helpers";
+import { getJson, openActivity, postJson, raiseBug } from "./helpers";
 
 // Manual checklist section 15 (Digital Staff: internal notes vs public updates). The person giving
 // feedback is a seeded staff member (the checklist says Mario, who is Digital Staff), so "his tracker"
@@ -24,10 +24,10 @@ async function bellTitles(page: Page) {
   return (await getJson<{ items: { title: string }[] }>(page, "/notifications")).items.map((n) => n.title);
 }
 
-/** The console panel for an item, open on the tab asked for. */
-async function openPanel(page: Page, ref: string, tab: RegExp) {
+/** The console panel for an item, open on its messages. */
+async function openPanel(page: Page, ref: string) {
   await page.goto(`/console?item=${ref}`);
-  await page.getByRole("tab", { name: tab }).click();
+  await openActivity(page.getByRole("dialog"), "Messages");
 }
 
 const historyOf = (page: Page) => page.getByRole("region", { name: "Tracking history" });
@@ -50,8 +50,8 @@ test("S15.01 An internal note shows 'Note added' and is not on the submitter's t
   const before = await bellTitles(page);
 
   const darlene = await team.as("Darlene");
-  await openPanel(darlene, ref, /^Conversation/);
-  await darlene.getByRole("button", { name: "Internal note", exact: true }).click();
+  await openPanel(darlene, ref);
+  await darlene.getByRole("radio", { name: "Internal note", exact: true }).click();
   await darlene.getByRole("textbox", { name: "Internal note (staff never see it)" }).fill(note);
   await darlene.getByRole("button", { name: "Add note" }).click();
 
@@ -78,8 +78,8 @@ test("S15.02 'Reply to submitter' shows 'Reply from Darlene' on the tracker and 
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I export a saved search");
 
   const darlene = await team.as("Darlene");
-  await openPanel(darlene, ref, /^Conversation/);
-  await darlene.getByRole("button", { name: "Reply to submitter", exact: true }).click();
+  await openPanel(darlene, ref);
+  await darlene.getByRole("radio", { name: "Reply to submitter", exact: true }).click();
   await darlene.getByRole("textbox", { name: "Reply to the submitter" }).fill(reply);
   await darlene.getByRole("button", { name: "Send reply" }).click();
   await expect(darlene.getByText("Reply sent to the submitter")).toBeVisible();
@@ -101,7 +101,7 @@ test("S15.03 A progress update shows as 'Update: …' on the tracker", async ({ 
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I share a saved search");
 
   const darlene = await team.as("Darlene");
-  await openPanel(darlene, ref, /^Brief/);
+  await openPanel(darlene, ref);
   await darlene.getByRole("button", { name: "Post update", exact: true }).click();
   const dialog = darlene.getByRole("dialog", { name: "Post a progress update" });
   await dialog.getByRole("textbox", { name: "Update", exact: true }).fill(update);
@@ -121,7 +121,7 @@ test("S15.04 Ask for info to 'The owner (internal)' becomes an internal note tha
   const before = await bellTitles(page);
 
   const chris = await team.as("Chris");
-  await openPanel(chris, ref, /^Brief/);
+  await openPanel(chris, ref);
   await chris.getByRole("button", { name: "Ask for info", exact: true }).click();
   const dialog = chris.getByRole("dialog", { name: "Ask for more information" });
   await dialog.getByRole("radio", { name: "The owner (internal)" }).check();
@@ -130,7 +130,7 @@ test("S15.04 Ask for info to 'The owner (internal)' becomes an internal note tha
   await expect(chris.getByText("Saved", { exact: true })).toBeVisible();
 
   // It landed in the conversation as an internal note, not as a reply.
-  await chris.getByRole("tab", { name: /^Conversation/ }).click();
+  await openActivity(chris.getByRole("dialog"), "Messages");
   const entry = chris.getByRole("listitem").filter({ hasText: question });
   await expect(entry).toContainText("Internal note");
   await expect(entry).toContainText(`Question for the owner: ${question}`);

@@ -82,6 +82,13 @@ test("S16.01 'Merge into it' closes the item, its tracker says 'Merged into FB-â
   const duplicates = panel.getByRole("region", { name: "Duplicates" });
   await expect(duplicates).toContainText(original);
   await duplicates.getByRole("button", { name: "Merge into it" }).click();
+
+  // The suggested merge goes through the same dialog as a typed one, pre-filled, and nothing happens until it is confirmed.
+  const dialog = darlene.getByRole("dialog", { name: "Merge into another item", exact: true });
+  await expect(dialog.getByLabel("Original reference")).toHaveValue(original);
+  expect((await getJson<Item>(darlene, `/console/items/${separate}`)).merged_into, "nothing is merged before the dialog is confirmed").toBeNull();
+  await dialog.locator('button[type="submit"]').click();
+  await expect(dialog).toHaveCount(0);
   await expect(duplicates).toContainText(`Merged into ${original}.`);
   // Closed: nothing can be merged or closed from it any more.
   await expect(duplicates.getByRole("button", { name: "Merge into it" })).toHaveCount(0);
