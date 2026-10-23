@@ -4,11 +4,12 @@ import asyncio
 
 import httpx
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
-from app import worker
+from app import agent_runtime, worker
+from app.config import get_settings
 from app.db import session_scope
-from app.models import Feedback, FeedbackEvent, Notification
+from app.models import Feedback, FeedbackEmbedding, FeedbackEvent, Notification
 from app.services import email as email_service
 from app.services import embeddings
 from tests.conftest import CHRIS, DARLENE, MARIO, STAFF, STAFF2, signed_in, submit_via_chat
@@ -196,6 +197,40 @@ async def test_panel_opens_when_duplicate_search_fails(
     monkeypatch.setattr(embeddings, "embed", broken)
     r = await darlene.get(f"/api/console/items/{ref}")
     assert r.status_code == 200 and r.json()["duplicates"] == []
+
+
+async def test_backfill_embeds_items_duplicate_search_is_missing(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = await raise_bug(staff)
+
+    async def stored_model() -> str | None:
+        async with session_scope() as db:
+            return await db.scalar(
+                select(FeedbackEmbedding.model)
+                .join(Feedback, Feedback.id == FeedbackEmbedding.feedback_id)
+                .where(Feedback.ref_no == ref)
+            )
+
+    async def backfill() -> int:
+        async with session_scope() as db:
+            return await embeddings.backfill(db)
+
+    async with session_scope() as db:
+        await db.execute(delete(FeedbackEmbedding))  # the call failed when the item was saved
+    assert await backfill() == 1 and await stored_model() == embeddings.STUB_MODEL
+    async with session_scope() as db:
+        await db.execute(update(FeedbackEmbedding).values(model="retired-model"))  # the model changed
+    assert await backfill() == 1 and await stored_model() == embeddings.STUB_MODEL
+    assert await backfill() == 0
+
+    # Gemini chosen but unreachable here: its embeddings stay rather than be overwritten by the stub.
+    async with session_scope() as db:
+        await db.execute(update(FeedbackEmbedding).values(model="gemini-embedding-001"))
+    monkeypatch.setenv("MODEL_PROVIDER", "gemini")
+    get_settings.cache_clear()
+    agent_runtime.reset()
+    assert await backfill() == 0 and await stored_model() == "gemini-embedding-001"
 
 
 async def test_staff_only_see_their_own_items(staff: httpx.AsyncClient) -> None:

@@ -7,6 +7,8 @@
   then marks it failed.
 - Runs the daily digest and the Friday release drafter when their local slot comes round.
   Cloud Scheduler may call the same jobs; job_runs makes each slot run once.
+- Embeds open items whose embedding is missing or from another model, a batch at a time,
+  so duplicate search finds them.
 """
 
 import asyncio
@@ -23,7 +25,7 @@ from app.config import get_settings
 from app.db import dispose_engine, session_scope
 from app.models import Notification
 from app.services import email as email_service
-from app.services import jobs
+from app.services import embeddings, jobs
 
 log = logging.getLogger("app.worker")
 
@@ -81,6 +83,13 @@ async def run_due_jobs() -> None:
                 log.info("job %s ran: %s", name, count)
 
 
+async def backfill_embeddings() -> None:
+    async with session_scope() as db:
+        count = await embeddings.backfill(db)
+    if count:
+        log.info("embedded %s items for duplicate search", count)
+
+
 async def main() -> None:
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -96,6 +105,7 @@ async def main() -> None:
             if time.monotonic() - last_jobs_check > 60:
                 last_jobs_check = time.monotonic()
                 await run_due_jobs()
+                await backfill_embeddings()
         except Exception:
             log.exception("worker loop error")
         with contextlib.suppress(OSError):
@@ -110,6 +120,7 @@ async def once() -> None:
     if get_settings().email_backend != "off":
         await send_batch(limit=100)
     await run_due_jobs()
+    await backfill_embeddings()
     await dispose_engine()
 
 

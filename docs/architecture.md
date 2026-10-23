@@ -85,7 +85,7 @@ Labels on everything: `project=feedback`, `environment=<env>`, `application=api|
 | --- | --- |
 | `feedback-api-<env>@` | Cloud SQL Client; Secret Manager Secret Accessor on its own secrets; Storage Object User on its bucket only; Service Account Token Creator on itself (to sign file links); Vertex AI User (Agent Engine and Vertex models); Logs Writer |
 | `feedback-web-<env>@` | Logs Writer |
-| `feedback-worker-<env>@` | Cloud SQL Client; Secret Manager Secret Accessor on its own secrets; Logs Writer |
+| `feedback-worker-<env>@` | Cloud SQL Client; Secret Manager Secret Accessor on its own secrets and `-google-api-key` (embeddings); Vertex AI User only when `MODEL_PROVIDER=vertex`; Logs Writer |
 | `feedback-scheduler-<env>@` | Cloud Run Jobs Executor on the worker job only |
 | `feedback-deployer@` (GitHub Actions through Workload Identity Federation) | Cloud Run Admin on the four services and two jobs; Artifact Registry Writer on `feedback`; Service Account User on the runtime accounts; Cloud Scheduler Admin |
 
@@ -102,6 +102,7 @@ Cloud Run, Artifact Registry, Cloud SQL Admin, Secret Manager, Cloud Storage, Cl
 | Email sending | Cloud Scheduler, every minute | `feedback-worker-<env>` job | Due notification emails |
 | Daily digest | the same job, first run after 8:00 weekdays (Australia/Sydney) | `jobs.run_digest` | Needs review over 24 h to the triage lead; approvals summary to Admins |
 | Friday release drafter | the same job, first run after 9:00 Friday | `jobs.run_release_drafter` | A draft per active project, owner notified |
+| Embedding backfill | the same job, every run | `embeddings.backfill` | Up to 20 open items whose embedding is missing or from another model; skipped when the chosen model is unreachable |
 
 ## Model spend guards (D36)
 

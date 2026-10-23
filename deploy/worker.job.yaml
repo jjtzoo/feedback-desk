@@ -1,6 +1,6 @@
-# Cloud Run job for the worker (spec v3 D33): one pass that sends due emails and runs the daily
-# digest and Friday drafter when due. Cloud Scheduler starts it every minute. Template filled
-# by the deploy scripts; it uses the API image.
+# Cloud Run job for the worker (spec v3 D33): one pass that sends due emails, runs the daily
+# digest and Friday drafter when due, and embeds items that duplicate search is missing. Cloud
+# Scheduler starts it every minute. Template filled by the deploy scripts; it uses the API image.
 apiVersion: run.googleapis.com/v1
 kind: Job
 metadata:
@@ -42,6 +42,8 @@ spec:
                 - {name: APP_ENV, value: "${DEPLOY_ENV}"}
                 - {name: APP_BASE_URL, value: "${APP_BASE_URL}"}
                 - {name: MODEL_PROVIDER, value: "${MODEL_PROVIDER}"}
+                - {name: GOOGLE_CLOUD_PROJECT, value: "${PROJECT_ID}"}
+                - {name: GOOGLE_CLOUD_LOCATION, value: "${REGION}"}
                 - {name: EMAIL_BACKEND, value: "${EMAIL_BACKEND}"}
                 - {name: SMTP_HOST, value: "${SMTP_HOST}"}
                 - {name: SMTP_PORT, value: "${SMTP_PORT}"}
@@ -53,5 +55,7 @@ spec:
                   valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-database-url, key: latest}}
                 - name: SECRET_KEY
                   valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-secret-key, key: latest}}
+                - name: GOOGLE_API_KEY
+                  valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-google-api-key, key: latest}}
                 - name: SMTP_PASSWORD
                   valueFrom: {secretKeyRef: {name: feedback-${DEPLOY_ENV}-smtp-password, key: latest}}

@@ -13,7 +13,8 @@ import re
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -149,6 +150,45 @@ async def store(db: AsyncSession, feedback_id: uuid.UUID, text: str) -> None:
         db.add(FeedbackEmbedding(feedback_id=feedback_id, embedding=vector, model=model))
     else:
         existing.embedding, existing.model = vector, model
+
+
+async def backfill(db: AsyncSession, limit: int = 20) -> int:
+    """Embed open items with no embedding (the call failed when they were saved) or one from another
+    model (the model changed), so duplicate search finds them again. Returns how many."""
+    from app.agent_runtime import model_choice
+
+    choice = model_choice()
+    if choice.provider in ("gemini", "vertex") and not choice.configured:
+        # The real model is chosen but unreachable here; the stub would overwrite its embeddings.
+        log.warning("embedding backfill skipped: %s", choice.detail)
+        return 0
+    current = _model_name()
+    stale = (
+        select(Feedback)
+        .outerjoin(FeedbackEmbedding, FeedbackEmbedding.feedback_id == Feedback.id)
+        .where(
+            Feedback.status.in_(OPEN_STATUSES),
+            Feedback.duplicate_of.is_(None),
+            or_(FeedbackEmbedding.feedback_id.is_(None), FeedbackEmbedding.model != current),
+        )
+        .order_by(Feedback.created_at)
+        .limit(limit)
+    )
+    done = 0
+    for fb in list(await db.scalars(stale)):
+        try:
+            vector, model = await embed(f"{fb.title}. {fb.summary}")
+        except Exception:
+            log.exception("embedding backfill stopped at %s", fb.ref_no)
+            break
+        # An upsert: an overlapping worker run may embed the same item.
+        await db.execute(
+            insert(FeedbackEmbedding)
+            .values(feedback_id=fb.id, embedding=vector, model=model)
+            .on_conflict_do_update(index_elements=["feedback_id"], set_={"embedding": vector, "model": model})
+        )
+        done += 1
+    return done
 
 
 @dataclass
