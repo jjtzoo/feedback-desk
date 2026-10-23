@@ -13,11 +13,12 @@ import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { UserMenu } from "@/components/user-menu";
+import { defaultInbox } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
 
 const NAV: { href: string; label: string; icon: LucideIcon; exact?: boolean; admin?: boolean }[] = [
-  { href: "/console", label: "Work", icon: LayoutList, exact: true },
   { href: "/console/approvals", label: "Approvals", icon: ClipboardCheck, admin: true },
+  { href: "/console", label: "Work", icon: LayoutList, exact: true },
   { href: "/console/channels", label: "Channels", icon: Megaphone },
   { href: "/console/releases", label: "Releases", icon: Rocket },
   { href: "/console/dashboard", label: "Dashboard", icon: ChartColumn },
@@ -54,7 +55,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const path = usePathname();
   const params = useSearchParams();
   const { counts } = useCounts();
-  const inbox = params.get("inbox") ?? "mine";
+  const inbox = params.get("inbox") ?? defaultInbox(me.role);
   return (
     <nav aria-label="Console" className="grid gap-1">
       {NAV.filter((n) => !n.admin || me.role === "admin").map(({ href, label, icon: Icon, exact }) => {

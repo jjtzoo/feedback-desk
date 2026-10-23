@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { api, errorText, type Detail, type FeedbackEvent, type Message, type Project, type Staff } from "@/lib/api";
+import { api, errorText, type Detail, type Project, type Staff } from "@/lib/api";
 import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, age, day, fileSize, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -58,7 +58,8 @@ export function ItemPanel({
   const [item, setItem] = useState<Detail | null>(null);
   const [dialog, setDialog] = useState<{ kind: ActionKind; text?: string } | null>(null);
   const [composer, setComposer] = useState<"reply" | "note">("reply");
-  const [feedFilter, setFeedFilter] = useState<"all" | "messages" | "changes">("all");
+  const [feedFilter, setFeedFilter] = useState<"all" | "messages" | "history">("all");
+  const [justSent, setJustSent] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -111,9 +112,21 @@ export function ItemPanel({
     if (await act(composer, { body: message })) {
       setMessage("");
       toast.success(composer === "reply" ? "Reply sent to the submitter" : "Note added");
+      setFeedFilter((f) => (f === "history" ? "all" : f));
+      setJustSent("latest");
     }
   }
 
+  // The new entry is brought into view and marked "Sent just now" for a few seconds, so the person sees it landed.
+  useEffect(() => {
+    if (!justSent) return;
+    document.getElementById("sent-just-now")?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const timer = setTimeout(() => setJustSent(null), 4000);
+    return () => clearTimeout(timer);
+  }, [justSent, item]);
+
+  const chat = item?.messages.filter((m) => m.message_type === "chat") ?? [];
+  const talk = item?.messages.filter((m) => m.message_type !== "chat") ?? [];
   const awaiting = item && (item.status === "awaiting_approval" || item.status === "needs_review");
   const open = item && !["declined", "closed", "acknowledged"].includes(item.status);
   const changeField = (field: string, value: string | null) => void act("", { [field]: value }, "patch");
@@ -314,69 +327,115 @@ export function ItemPanel({
 
                 </TabsContent>
 
-                <TabsContent value="activity" className="grid gap-3 pt-3">
+                <TabsContent value="activity" className="grid gap-4 pt-3">
                   <ToggleGroup type="single" value={feedFilter} onValueChange={(v) => v && setFeedFilter(v as typeof feedFilter)} variant="outline" size="sm" spacing={0} aria-label="Show">
                     <ToggleGroupItem value="all">All</ToggleGroupItem>
                     <ToggleGroupItem value="messages">Messages</ToggleGroupItem>
-                    <ToggleGroupItem value="changes">Changes</ToggleGroupItem>
+                    <ToggleGroupItem value="history">History</ToggleGroupItem>
                   </ToggleGroup>
-                  <ol className="grid gap-2">
-                    {feed(item, feedFilter).map((entry) =>
-                      entry.kind === "message" ? (
-                        <li
-                          key={entry.m.id}
-                          className={cn(
-                            "rounded-2xl border p-3 text-sm",
-                            entry.m.is_internal && "border-dashed border-warning/60 bg-warning-tint",
-                            !entry.m.is_internal && entry.m.author_type === "staff" && "bg-muted/50",
-                          )}
-                        >
-                          <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span className="font-semibold text-foreground">{entry.m.author_name ?? "Feedback"}</span>
-                            {entry.m.is_internal && <Lock className="size-3" aria-hidden="true" />}
-                            {MESSAGE_LABEL[entry.m.message_type]} · {when(entry.m.created_at)}
-                          </p>
-                          <p className="whitespace-pre-wrap">{entry.m.body}</p>
-                        </li>
-                      ) : (
-                        <li key={`${entry.at}-${entry.e.event_type}-${entry.e.actor_name}`} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
-                          <span>
-                            <span className="font-medium">{entry.e.actor_name ?? entry.e.actor_type}</span> · {entry.e.public_text ?? describe(entry.e.event_type, entry.e.before, entry.e.after)}
-                            {!entry.e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
-                          </span>
-                          <time className="font-mono text-xs text-muted-foreground" dateTime={entry.e.created_at}>
-                            {when(entry.e.created_at)}
-                          </time>
-                        </li>
-                      ),
-                    )}
-                  </ol>
-                  {open && (
-                    <form onSubmit={sendMessage} className={cn("grid gap-2 rounded-2xl border p-3 transition-colors", composer === "note" && "border-warning/60 bg-warning-tint")}>
-                      <ToggleGroup type="single" value={composer} onValueChange={(v) => v && setComposer(v as "reply" | "note")} variant="outline" size="sm" spacing={0} aria-label="Message type" className="justify-self-start bg-background">
-                        <ToggleGroupItem value="reply">Reply to submitter</ToggleGroupItem>
-                        <ToggleGroupItem value="note">
-                          <Lock aria-hidden="true" /> Internal note
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                      <Textarea
-                        rows={3}
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        aria-label={composer === "reply" ? "Reply to the submitter" : "Internal note (staff never see it)"}
-                        placeholder={composer === "reply" ? "They see this on their tracker and by email" : "Only the Digital team sees this"}
-                        className="rounded-xl bg-background"
-                      />
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          {composer === "note" && <Lock className="size-3" aria-hidden="true" />}
-                          {composer === "reply" ? "The submitter sees this." : "Only the Digital team sees this."}
-                        </p>
-                        <Button type="submit" variant={composer === "reply" ? "default" : "outline"} className="rounded-xl" disabled={busy || !message.trim()}>
-                          {composer === "reply" ? "Send reply" : "Add note"}
-                        </Button>
-                      </div>
-                    </form>
+
+                  {feedFilter !== "history" && (
+                    <>
+                      {chat.length > 0 && (
+                        <section aria-label="Intake transcript" className="rounded-2xl border bg-muted/30">
+                          <details open className="group">
+                            <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-2 p-3 text-sm font-semibold">
+                              Intake transcript
+                              <span className="text-xs font-normal text-muted-foreground">
+                                Word for word, as written in the chat. It can&apos;t be edited. ({chat.length})
+                              </span>
+                            </summary>
+                            <ol className="grid gap-3 border-t p-3">
+                              {chat.map((m) => (
+                                <li key={m.id} className="text-sm">
+                                  <p className="mb-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                                    <span className="font-semibold text-foreground">{m.author_type === "staff" ? (m.author_name ?? "Staff member") : "Assistant"}</span>
+                                    {m.author_type === "staff" && <span>Staff member</span>}
+                                    <span>{when(m.created_at)}</span>
+                                  </p>
+                                  <blockquote className="border-l-2 pl-3 whitespace-pre-wrap italic">&ldquo;{m.body}&rdquo;</blockquote>
+                                </li>
+                              ))}
+                            </ol>
+                          </details>
+                        </section>
+                      )}
+
+                      <section aria-label="Conversation" className="grid gap-2">
+                        <h3 className="text-sm font-semibold">Conversation</h3>
+                        {talk.length === 0 && <p className="text-sm text-muted-foreground">No replies or notes yet.</p>}
+                        <ol className="grid gap-2">
+                          {talk.map((m, i) => (
+                            <li
+                              key={m.id}
+                              id={justSent && i === talk.length - 1 ? "sent-just-now" : undefined}
+                              className={cn(
+                                "rounded-2xl border p-3 text-sm transition-shadow",
+                                m.is_internal && "border-dashed border-warning/60 bg-warning-tint",
+                                !m.is_internal && m.author_type === "staff" && "bg-muted/50",
+                                justSent && i === talk.length - 1 && "ring-2 ring-ring",
+                              )}
+                            >
+                              <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <span className="font-semibold text-foreground">{m.author_name ?? "Feedback"}</span>
+                                {m.is_internal && <Lock className="size-3" aria-hidden="true" />}
+                                {MESSAGE_LABEL[m.message_type]} · {when(m.created_at)}
+                                {justSent && i === talk.length - 1 && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">Sent just now</span>}
+                              </p>
+                              <p className="whitespace-pre-wrap">{m.body}</p>
+                            </li>
+                          ))}
+                        </ol>
+                        {open && (
+                          <form onSubmit={sendMessage} className={cn("grid gap-2 rounded-2xl border p-3 transition-colors", composer === "note" && "border-warning/60 bg-warning-tint")}>
+                            <ToggleGroup type="single" value={composer} onValueChange={(v) => v && setComposer(v as "reply" | "note")} variant="outline" size="sm" spacing={0} aria-label="Message type" className="justify-self-start bg-background">
+                              <ToggleGroupItem value="reply">Reply to submitter</ToggleGroupItem>
+                              <ToggleGroupItem value="note">
+                                <Lock aria-hidden="true" /> Internal note
+                              </ToggleGroupItem>
+                            </ToggleGroup>
+                            <Textarea
+                              rows={3}
+                              value={message}
+                              onChange={(e) => setMessage(e.target.value)}
+                              aria-label={composer === "reply" ? "Reply to the submitter" : "Internal note (staff never see it)"}
+                              placeholder={composer === "reply" ? "They see this on their tracker and by email" : "Only the Digital team sees this"}
+                              className="rounded-xl bg-background"
+                            />
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                {composer === "note" && <Lock className="size-3" aria-hidden="true" />}
+                                {composer === "reply" ? "The submitter sees this." : "Only the Digital team sees this."}
+                              </p>
+                              <Button type="submit" variant={composer === "reply" ? "default" : "outline"} className="rounded-xl" disabled={busy || !message.trim()}>
+                                {composer === "reply" ? "Send reply" : "Add note"}
+                              </Button>
+                            </div>
+                          </form>
+                        )}
+                      </section>
+                    </>
+                  )}
+
+                  {feedFilter !== "messages" && (
+                    <section aria-label="History" className="grid gap-2">
+                      <h3 className="text-sm font-semibold">History</h3>
+                      <ol className="grid gap-2">
+                        {[...item.events]
+                          .sort((x, y) => x.created_at.localeCompare(y.created_at))
+                          .map((e, i) => (
+                            <li key={`${e.created_at}-${i}`} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
+                              <span>
+                                <span className="font-medium">{e.actor_name ?? e.actor_type}</span> · {e.public_text ?? describe(e.event_type, e.before, e.after)}
+                                {!e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
+                              </span>
+                              <time className="font-mono text-xs text-muted-foreground" dateTime={e.created_at}>
+                                {when(e.created_at)}
+                              </time>
+                            </li>
+                          ))}
+                      </ol>
+                    </section>
                   )}
                 </TabsContent>
 
@@ -402,17 +461,6 @@ export function ItemPanel({
       </SheetContent>
     </Sheet>
   );
-}
-
-type FeedEntry = { kind: "message"; at: string; m: Message } | { kind: "event"; at: string; e: FeedbackEvent };
-
-/** Messages and changes as one timeline, oldest first. */
-function feed(item: Detail, filter: "all" | "messages" | "changes"): FeedEntry[] {
-  const entries: FeedEntry[] = [
-    ...(filter === "changes" ? [] : item.messages.map((m): FeedEntry => ({ kind: "message", at: m.created_at, m }))),
-    ...(filter === "messages" ? [] : item.events.map((e): FeedEntry => ({ kind: "event", at: e.created_at, e }))),
-  ];
-  return entries.sort((a, b) => a.at.localeCompare(b.at));
 }
 
 function describe(type: string, before: Record<string, unknown>, after: Record<string, unknown>): string {

@@ -11,6 +11,7 @@ import { BoardView } from "@/components/console/board-view";
 import { useCounts } from "@/components/console/counts";
 import { FilterMenu, type FilterField } from "@/components/console/filter-menu";
 import { ItemPanel } from "@/components/console/item-panel";
+import { useMe } from "@/components/me";
 import { RowActions } from "@/components/console/row-actions";
 import { WorkCard } from "@/components/console/work-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -22,6 +23,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, errorText, type Board, type Card, type ConsoleView, type ItemList, type Project, type Staff, type Status } from "@/lib/api";
 import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, WORK_TYPES, WORK_TYPE_LABEL, age, day } from "@/lib/format";
+import { defaultInbox } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
 
 const INBOXES = [
@@ -61,6 +63,7 @@ function Work() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const me = useMe();
   const { counts, refresh: refreshCounts } = useCounts();
   const [view, setView] = useState<ConsoleView | null>(null);
   const [board, setBoard] = useState<Board | null>(null);
@@ -71,7 +74,7 @@ function Work() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const inbox = params.get("inbox") ?? "mine";
+  const inbox = params.get("inbox") ?? defaultInbox(me.role);
   const item = params.get("item");
   const page = Number(params.get("page") ?? "1") || 1;
   const query = new URLSearchParams();

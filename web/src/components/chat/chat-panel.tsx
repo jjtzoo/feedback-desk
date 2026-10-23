@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, Loader2, Paperclip, Send, X } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { BackupForm } from "@/components/chat/backup-form";
@@ -449,6 +450,12 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
               <p className="mt-2 px-1 text-xs text-muted-foreground">Enter to send, Shift+Enter for a new line. Drop files here to attach them.</p>
             )}
             {allowance && <UsageMeter allowance={allowance} />}
+            <p className="mt-2 px-1 text-xs text-muted-foreground">
+              Looking for an update on something you already sent?{" "}
+              <Link href="/my" className="font-semibold text-foreground underline underline-offset-4">
+                Open My feedback
+              </Link>
+            </p>
           </form>
         </div>
       )}
