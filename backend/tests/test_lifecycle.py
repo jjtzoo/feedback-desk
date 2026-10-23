@@ -349,3 +349,24 @@ async def test_worker_sends_and_retries_then_fails(staff: httpx.AsyncClient, mon
 async def test_access_request_goes_to_chris(staff: httpx.AsyncClient) -> None:
     await submit_via_chat(staff, "I need access to the Training Portal admin area")
     assert "assigned" in await notes_for(CHRIS)
+
+
+async def test_console_counts_follow_the_inboxes_and_approvals(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    before = (await marc.get("/api/console/counts")).json()
+    mine_before = (await darlene.get("/api/console/counts")).json()["mine"]
+    ref = await raise_bug(staff)
+
+    after = (await marc.get("/api/console/counts")).json()
+    assert after["approvals"] == before["approvals"] + 1
+    assert after["open"] == before["open"] + 1
+    assert (await darlene.get("/api/console/counts")).json()["mine"] == mine_before + 1  # routed to the RAKE owner
+
+    assert (await marc.post(f"/api/console/items/{ref}/approve")).status_code == 200
+    approved = (await marc.get("/api/console/counts")).json()
+    assert approved["approvals"] == before["approvals"]
+
+    # Approvals are an Admin's number: the Digital team sees zero, staff cannot ask at all.
+    assert (await darlene.get("/api/console/counts")).json()["approvals"] == 0
+    assert (await staff.get("/api/console/counts")).status_code == 403

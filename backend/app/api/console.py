@@ -17,6 +17,7 @@ from app.schemas import (
     CardOut,
     CloseIn,
     ColumnOut,
+    CountsOut,
     DeclineIn,
     DetailOut,
     EventOut,
@@ -137,6 +138,11 @@ async def items(
         page_size=console.PAGE_SIZE,
         view=await console.get_view(db, user),
     )
+
+
+@router.get("/counts", response_model=CountsOut)
+async def counts(db: Db, user: DigitalUser) -> CountsOut:
+    return CountsOut(**await console.counts(db, user))
 
 
 @router.put("/view", status_code=204)

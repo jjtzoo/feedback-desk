@@ -286,6 +286,15 @@ class BoardOut(Out):
     view: Literal["board", "list", "cards"]
 
 
+class CountsOut(Out):
+    mine: int
+    needs_review: int
+    open: int
+    overdue: int
+    closed: int
+    approvals: int
+
+
 class ListOut(Out):
     items: list[CardOut]
     total: int
