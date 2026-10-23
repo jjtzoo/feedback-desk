@@ -85,12 +85,20 @@ def _google_credentials() -> tuple[bool, str]:
 
 def build_model(choice: ModelChoice) -> BaseLlm | str:
     """The model object or name to give the LlmAgent."""
-    s = get_settings()
     if choice.provider == "stub":
         from agent.stub import StubLlm
 
         return StubLlm()
-    # google-genai reads these from the process environment.
+    export_credentials(choice)
+    return choice.name
+
+
+def export_credentials(choice: ModelChoice) -> None:
+    """google-genai reads its credentials from the process environment, not from Settings.
+
+    Locally .env reaches Settings only, so anything that makes its own genai client (embeddings)
+    needs this before its first call, not only after the agent is built."""
+    s = get_settings()
     os.environ.pop("GOOGLE_GENAI_USE_VERTEXAI", None)  # deprecated name; set the new one only
     if choice.provider == "vertex":
         os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "true"
@@ -101,4 +109,3 @@ def build_model(choice: ModelChoice) -> BaseLlm | str:
     elif choice.provider == "gemini":
         os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] = "false"
         os.environ["GOOGLE_API_KEY"] = s.google_api_key
-    return choice.name

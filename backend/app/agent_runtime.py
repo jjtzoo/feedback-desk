@@ -14,7 +14,7 @@ from google.adk.sessions import BaseSessionService, DatabaseSessionService
 from google.genai import types
 
 from agent.agent import build_agent
-from agent.model import ModelChoice, resolve
+from agent.model import ModelChoice, export_credentials, resolve
 from app.config import get_settings
 from app.services import usage
 from app.services.actors import User
@@ -33,6 +33,8 @@ def model_choice() -> ModelChoice:
     global _choice
     if _choice is None:
         _choice = resolve()
+        if _choice.provider in ("gemini", "vertex"):
+            export_credentials(_choice)  # embeddings may call Gemini before the agent is built
     return _choice
 
 
