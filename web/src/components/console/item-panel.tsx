@@ -53,10 +53,14 @@ export function ItemPanel({
   const [composer, setComposer] = useState<"reply" | "note">("reply");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!reference) return;
-    api.get<Detail>(`/console/items/${reference}`).then(setItem).catch((e: unknown) => toast.error(errorText(e)));
+    api
+      .get<Detail>(`/console/items/${reference}`)
+      .then(setItem)
+      .catch((e: unknown) => setLoadError(errorText(e)));
   }, [reference]);
 
   useEffect(load, [load]);
@@ -109,7 +113,22 @@ export function ItemPanel({
   return (
     <Sheet open={reference !== null} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl">
-        {!item ? (
+        {!item && loadError ? (
+          <div className="grid gap-3 p-6" role="alert">
+            <SheetTitle className="text-xl font-bold">{reference} could not be opened</SheetTitle>
+            <SheetDescription>{loadError}</SheetDescription>
+            <Button
+              variant="outline"
+              className="h-10 justify-self-start rounded-xl"
+              onClick={() => {
+                setLoadError(null);
+                load();
+              }}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : !item ? (
           <div className="grid gap-3 p-6" aria-busy="true">
             <SheetTitle className="sr-only">Loading {reference}</SheetTitle>
             <Skeleton className="h-8 w-40" />

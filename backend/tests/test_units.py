@@ -1,6 +1,7 @@
-"""Unit tests: privacy masking, file checks, routing rules, draft guards and tool guards."""
+"""Unit tests: privacy masking, file checks, routing rules, draft guards, tool guards and model credentials."""
 
 import io
+import os
 import zipfile
 from dataclasses import dataclass, field
 from typing import Any
@@ -8,7 +9,9 @@ from typing import Any
 import pytest
 from sqlalchemy import select, update
 
-from agent import callbacks, tools
+from agent import callbacks, model, tools
+from app import agent_runtime
+from app.config import get_settings
 from app.db import session_scope
 from app.models import DigitalStaff, Feedback, Project, RoutingRule
 from app.services import files, privacy
@@ -221,3 +224,21 @@ async def test_submit_tool_refuses_without_confirm_even_if_the_guard_is_skipped(
         state={"draft": dict(COMPLETE), "draft_confirmed": False, "user": {"email": "a@redadair.example", "name": "A"}}
     )
     assert (await tools.submit_feedback(ctx))["error"] == "not_confirmed"  # type: ignore[arg-type]
+
+
+# --- model credentials ---------------------------------------------------------------------
+
+
+def test_choosing_gemini_exports_the_key_before_the_agent_is_built(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Locally .env reaches Settings only; embeddings make their own genai client from the environment.
+    settings = get_settings().model_copy(update={"model_provider": "gemini", "google_api_key": "test-key"})
+    monkeypatch.setattr(model, "get_settings", lambda: settings)
+    monkeypatch.setenv("GOOGLE_API_KEY", "")
+    monkeypatch.setenv("GOOGLE_GENAI_USE_ENTERPRISE", "true")
+    agent_runtime.reset()
+    try:
+        assert agent_runtime.model_choice().provider == "gemini"
+        assert os.environ["GOOGLE_API_KEY"] == "test-key"
+        assert os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] == "false"
+    finally:
+        agent_runtime.reset()
