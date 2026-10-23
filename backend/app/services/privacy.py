@@ -2,7 +2,11 @@
 
 import re
 
-_PASSWORD = re.compile(r"\b(password|passwd|pwd|passcode|pin)\b(\s*(is|was|:|=)\s*|\s+)(\S+)", re.IGNORECASE)
+# The separator is atomic and an existing marker is skipped, so masking twice changes nothing.
+_PASSWORD = re.compile(
+    r"(?<!\[)\b(password|passwd|pwd|passcode|pin)\b((?>\s*(?:is|was|:|=)\s*|\s+))(?!\[password removed\])(\S+)",
+    re.IGNORECASE,
+)
 _DIGIT_RUN = re.compile(r"(?<![\w-])\d(?:[ -]?\d){8,18}(?![\w-])")
 _ABUSE_WORDS = (
     "idiot",
@@ -35,7 +39,8 @@ def _tfn_ok(digits: str) -> bool:
 
 
 def mask(text: str) -> str:
-    """Replace passwords, card numbers and TFNs with a marker. Ordinary numbers are kept."""
+    """Replace passwords, card numbers and TFNs with a marker. Ordinary numbers are kept, and
+    already-masked text comes back unchanged."""
 
     def password(m: re.Match[str]) -> str:
         return f"{m.group(1)}{m.group(2)}[password removed]"

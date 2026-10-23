@@ -331,7 +331,7 @@ async def post_update(db: AsyncSession, user: User, ref_no: str, body: str, expe
     _first_response(fb)
     title = f"Update on {fb.ref_no}" + (f", expected by {day_text(expected_by)}" if expected_by else "")
     await notifications.notify_submitters(
-        db, fb, type="progress", title=title, body=body.strip()[:300], actor_email=user.email
+        db, fb, type="progress", title=title, body=body.strip(), actor_email=user.email
     )
     return await load(db, feedback_id=fb.id)
 
@@ -357,7 +357,7 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
     fb.resolved_at = _now()
     _first_response(fb)
     await notifications.notify_submitters(
-        db, fb, type="stage", title=f"{fb.ref_no} is resolved", body=note.strip()[:300], actor_email=user.email
+        db, fb, type="stage", title=f"{fb.ref_no} is resolved", body=note.strip(), actor_email=user.email
     )
     return await load(db, feedback_id=fb.id)
 
@@ -403,7 +403,7 @@ async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedbac
         fb,
         type="reply",
         title=f"{user.name} replied on {fb.ref_no}",
-        body=body.strip()[:300],
+        body=body.strip(),
         actor_email=user.email,
     )
     return await load(db, feedback_id=fb.id)
@@ -612,7 +612,7 @@ async def decline(db: AsyncSession, user: User, ref_no: str, reason: str) -> Fee
     _set_status(db, fb, user, "declined", f"Declined: {reason.strip()[:140]}")
     _first_response(fb)
     await notifications.notify_submitters(
-        db, fb, type="stage", title=f"{fb.ref_no} was declined", body=reason.strip()[:300], actor_email=user.email
+        db, fb, type="stage", title=f"{fb.ref_no} was declined", body=reason.strip(), actor_email=user.email
     )
     return await load(db, feedback_id=fb.id)
 
@@ -639,7 +639,7 @@ async def ask_info(db: AsyncSession, user: User, ref_no: str, question: str, ask
             fb,
             type="ask_info",
             title=f"A question about {fb.ref_no}",
-            body=question.strip()[:300],
+            body=question.strip(),
             actor_email=user.email,
         )
     else:
@@ -659,7 +659,7 @@ async def ask_info(db: AsyncSession, user: User, ref_no: str, question: str, ask
             fb,
             type="ask_info",
             title=f"{user.name} asked about {fb.ref_no}",
-            body=question.strip()[:300],
+            body=question.strip(),
             actor_email=user.email,
         )
     events.log(db, fb.id, user.actor, "asked_for_info", after={"ask": ask})

@@ -274,7 +274,7 @@ async def plus_one(db: AsyncSession, user: User, ref_no: str, comment: str) -> F
     fb.updated_at = _now()
     fb.submitter_replied_at = _now()
     await notifications.notify_assignee(
-        db, fb, type="plus_one", title=f"+1 on {fb.ref_no}: {fb.title}", body=comment[:300], actor_email=user.email
+        db, fb, type="plus_one", title=f"+1 on {fb.ref_no}: {fb.title}", body=comment, actor_email=user.email
     )
     return await load(db, feedback_id=fb.id)
 
@@ -454,7 +454,7 @@ async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) 
         fb,
         type="submitter_reply",
         title=f"{fb.ref_no}: {user.name} added details",
-        body=body[:300],
+        body=body.strip(),
         actor_email=user.email,
     )
     await db.flush()

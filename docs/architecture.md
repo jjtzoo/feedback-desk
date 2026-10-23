@@ -45,7 +45,7 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 | `feedback_followers` | Staff who added "+1 and comment" |
 | `attachments` | Files and their extracted text |
 | `feedback_embeddings` | pgvector embeddings for duplicate search |
-| `notifications`, `notification_mutes` | The bell and its emails; per-item mutes |
+| `notifications`, `notification_mutes` | The bell and its emails (title and body masked, then cut to 300 characters); per-item mutes |
 | `project_messages`, `releases`, `release_items` | Project channels and Friday releases |
 | `user_sessions`, `user_preferences`, `job_runs` | Sign-in sessions, remembered console view, scheduled-job slots |
 

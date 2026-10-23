@@ -34,6 +34,7 @@ Format:
 - Expected: the checklist asks for masking before anything is stored (Brief §5.5), as the saved message is.
 - Actual: the bell's notification body is "The Flipbook login is broken. My password is Hunter2, card 4111 1111 1111 1111, TFN 123 456 782". In `backend/app/services/feedback.py`, `submitter_reply` saves `mask(body.strip())` as the message (line 435) but passes the original `body[:300]` to `notifications.notify_assignee` (line 457). The notification is stored with the secrets, and is probably emailed the same way. Probably also the staff-chat paths that notify with raw text: not checked.
 - Found: 2026-10-22
+- Fixed: 2026-10-23 on `fix/mask-notification-text`. `notifications.notify` now masks every title and body before storing it (so the email is masked too), and cuts to 300 characters only after masking; callers no longer cut first, which could have split a card number below the length `mask` recognises. That covers all 23 notify calls, including channel mentions and console replies. `mask` no longer garbles already-masked text ("[password removed] removed]"), which the backup form's submitter quote hit. Tests: `test_notifications_are_masked_before_they_are_stored`, `test_masking_twice_changes_nothing`. Still no browser test: the checklist item covers the Conversation tab and the tracker only.
 
 ## S28.01 The chat's hidden file input is a Tab stop with no visible focus ring
 - Test: e2e/28-keyboard.spec.ts: S28.01 (landing, tracker and console pass; the chat ring check is `test.fail()`)
