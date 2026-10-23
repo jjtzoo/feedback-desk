@@ -10,6 +10,7 @@ from app import worker
 from app.db import session_scope
 from app.models import Feedback, FeedbackEvent, Notification
 from app.services import email as email_service
+from app.services import embeddings
 from tests.conftest import CHRIS, DARLENE, MARIO, STAFF, STAFF2, signed_in, submit_via_chat
 
 BUG = "RAKE gives a blank answer about leave, it's annoying"
@@ -182,6 +183,19 @@ async def test_merge_moves_the_submitter_to_the_original(
     assert t["status_text"] == f"Merged into {original}"
     assert (await other.get(f"/api/feedback/{original}/tracker")).status_code == 200  # now follows the original
     await other.aclose()
+
+
+async def test_panel_opens_when_duplicate_search_fails(
+    staff: httpx.AsyncClient, darlene: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ref = await raise_bug(staff)
+
+    async def broken(text: str) -> tuple[list[float], str]:
+        raise RuntimeError("embedding model unavailable")
+
+    monkeypatch.setattr(embeddings, "embed", broken)
+    r = await darlene.get(f"/api/console/items/{ref}")
+    assert r.status_code == 200 and r.json()["duplicates"] == []
 
 
 async def test_staff_only_see_their_own_items(staff: httpx.AsyncClient) -> None:

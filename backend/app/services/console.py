@@ -2,6 +2,7 @@
 Admin approvals (brief §4.4, §4.5). Every change writes feedback_events; public changes flow
 to the staff tracker and notify the submitter."""
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
@@ -27,6 +28,8 @@ from app.services import embeddings, events, notifications
 from app.services.actors import User
 from app.services.drafts import CATEGORY_LABEL, WORK_TYPE_LABEL
 from app.services.feedback import day_text, load
+
+log = logging.getLogger(__name__)
 
 PAGE_SIZE = 50
 BOARD_COLUMNS = (
@@ -242,11 +245,13 @@ async def detail(db: AsyncSession, user: User, ref_no: str) -> Detail:
     )
     followers = list(await db.scalars(select(FeedbackFollower).where(FeedbackFollower.feedback_id == fb.id)))
     linked = list(await db.scalars(select(Feedback).where(Feedback.duplicate_of == fb.id)))
-    dups = (
-        await embeddings.find_similar(db, fb.project_id, f"{fb.title}. {fb.summary}", exclude_id=fb.id)
-        if fb.project_id and fb.status in OPEN_STATUSES
-        else []
-    )
+    dups: list[embeddings.Similar] = []
+    if fb.project_id and fb.status in OPEN_STATUSES:
+        try:
+            dups = await embeddings.find_similar(db, fb.project_id, f"{fb.title}. {fb.summary}", exclude_id=fb.id)
+        except Exception:
+            # Duplicate search needs the embedding model; without it the panel still opens, minus the suggestions.
+            log.exception("duplicate search failed for %s; showing the panel without it", ref_no)
     merged = None
     if fb.duplicate_of:
         target = await db.get(Feedback, fb.duplicate_of)
