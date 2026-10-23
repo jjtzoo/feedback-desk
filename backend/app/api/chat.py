@@ -24,7 +24,7 @@ from sqlalchemy import select
 from sse_starlette.sse import EventSourceResponse
 
 from app import agent_runtime as runtime
-from app.api.deps import CurrentUser, Db, StreamUser
+from app.api.deps import STREAM_HEADERS, CurrentUser, Db, StreamUser
 from app.config import get_settings
 from app.db import session_scope
 from app.errors import Conflict, NotFound, ServiceError
@@ -103,7 +103,7 @@ async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> Ev
         raise ServiceError("rate_limited", "This chat has reached its message limit. Use the form instead.", 429)
     parts = await _message_parts(user, session_id, mask(body.text), body.attachment_ids)
     delta = {"messages": messages + 1, "user_turns": int(state.get("user_turns") or 0) + 1}
-    return EventSourceResponse(_stream(user, session_id, parts, delta))
+    return EventSourceResponse(_stream(user, session_id, parts, delta), headers=STREAM_HEADERS)
 
 
 @router.post("/chat/sessions/{session_id}/confirm")
@@ -113,7 +113,9 @@ async def confirm(session_id: str, body: ConfirmIn, user: StreamUser) -> EventSo
     draft = state.get("draft") or {}
     if not is_complete(draft) or draft_hash(draft) != body.draft_hash:
         raise Conflict("draft_changed", "The summary changed. Please check it again.")
-    return EventSourceResponse(_stream(user, session_id, [types.Part(text="Confirmed")], {"draft_confirmed": True}))
+    return EventSourceResponse(
+        _stream(user, session_id, [types.Part(text="Confirmed")], {"draft_confirmed": True}), headers=STREAM_HEADERS
+    )
 
 
 @router.post("/chat/sessions/{session_id}/plus-one", response_model=SavedOut)

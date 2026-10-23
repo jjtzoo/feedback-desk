@@ -48,5 +48,9 @@ async def admin_user(user: Annotated[User, Depends(current_user)]) -> User:
 
 CurrentUser = Annotated[User, Depends(current_user)]
 StreamUser = Annotated[User, Depends(stream_user)]
+
+# Event streams reach the browser through the web app's proxy, which gzips compressible responses
+# unless told not to; gzip holds small events in its buffer, so nothing would arrive live.
+STREAM_HEADERS = {"Cache-Control": "no-cache, no-transform"}
 DigitalUser = Annotated[User, Depends(digital_user)]
 AdminUser = Annotated[User, Depends(admin_user)]

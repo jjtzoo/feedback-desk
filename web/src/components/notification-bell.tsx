@@ -11,10 +11,13 @@ import { age, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 30_000;
+const RETRY_MS = 5_000;
+const RETRY_MAX_MS = 60_000;
 
 /**
- * The bell (brief §4.6): unread count live over server-sent events, falling back to polling
- * every 30 seconds if the stream drops. Clicking a notification opens its item.
+ * The bell (brief §4.6): unread count live over server-sent events. While the stream is down it
+ * polls every 30 seconds and keeps reconnecting (an API restart, a deploy, Cloud Run's request
+ * timeout); once the stream is back, polling stops. Clicking a notification opens its item.
  */
 export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }) {
   const [items, setItems] = useState<Notification[]>([]);
@@ -33,19 +36,38 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
 
   useEffect(() => {
     load();
+    let stream: EventSource | undefined;
     let poll: number | undefined;
-    const stream = new EventSource("/api/notifications/stream");
-    stream.addEventListener("unread", (e) => {
-      setUnread(JSON.parse((e as MessageEvent<string>).data).unread);
-      load();
-    });
-    stream.onerror = () => {
-      stream.close();
-      poll ??= window.setInterval(load, POLL_MS);
-    };
+    let retry: number | undefined;
+    let delay = RETRY_MS;
+
+    function connect() {
+      const source = new EventSource("/api/notifications/stream");
+      stream = source;
+      source.onopen = () => {
+        delay = RETRY_MS;
+        window.clearInterval(poll);
+        poll = undefined;
+      };
+      source.addEventListener("unread", (e) => {
+        setUnread(JSON.parse((e as MessageEvent<string>).data).unread);
+        load();
+      });
+      source.onerror = () => {
+        poll ??= window.setInterval(load, POLL_MS);
+        // A dropped connection the browser retries by itself; an error answer makes it give up.
+        if (source.readyState === EventSource.CLOSED) {
+          retry = window.setTimeout(connect, delay);
+          delay = Math.min(delay * 2, RETRY_MAX_MS);
+        }
+      };
+    }
+
+    connect();
     return () => {
-      stream.close();
-      if (poll) window.clearInterval(poll);
+      stream?.close();
+      window.clearInterval(poll);
+      window.clearTimeout(retry);
     };
   }, [load]);
 

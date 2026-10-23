@@ -9,7 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.deps import CurrentUser, Db, StreamUser
+from app.api.deps import STREAM_HEADERS, CurrentUser, Db, StreamUser
 from app.db import session_scope
 from app.schemas import NotificationOut, NotificationsOut, ReadIn
 from app.services import notifications
@@ -45,4 +45,4 @@ async def stream(request: Request, user: StreamUser) -> EventSourceResponse:
                     yield {"event": "unread", "data": json.dumps({"unread": unread})}
             await asyncio.sleep(STREAM_CHECK_SECONDS)
 
-    return EventSourceResponse(events(), ping=15)
+    return EventSourceResponse(events(), ping=15, headers=STREAM_HEADERS)
