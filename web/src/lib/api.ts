@@ -456,3 +456,13 @@ export async function streamChat(path: string, body: unknown, onEvent: (e: ChatE
     }
   }
 }
+
+/** What needs attention: one number per inbox, plus the Admin's approvals (0 for everyone else). */
+export interface Counts {
+  mine: number;
+  needs_review: number;
+  open: number;
+  overdue: number;
+  closed: number;
+  approvals: number;
+}

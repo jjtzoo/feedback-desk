@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Lock } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -13,8 +13,9 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { api, errorText, type Detail, type Project, type Staff } from "@/lib/api";
-import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, age, fileSize, when } from "@/lib/format";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { api, errorText, type Detail, type FeedbackEvent, type Message, type Project, type Staff } from "@/lib/api";
+import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, age, day, fileSize, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
@@ -38,19 +39,26 @@ export function ItemPanel({
   reference,
   projects,
   staff,
+  previous,
+  next,
+  onStep,
   onClose,
   onChanged,
 }: {
   reference: string | null;
   projects: Project[];
   staff: Staff[];
+  previous: string | null;
+  next: string | null;
+  onStep: (reference: string) => void;
   onClose: () => void;
   onChanged: () => void;
 }) {
   const me = useMe();
   const [item, setItem] = useState<Detail | null>(null);
-  const [dialog, setDialog] = useState<ActionKind | null>(null);
+  const [dialog, setDialog] = useState<{ kind: ActionKind; text?: string } | null>(null);
   const [composer, setComposer] = useState<"reply" | "note">("reply");
+  const [feedFilter, setFeedFilter] = useState<"all" | "messages" | "changes">("all");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -112,7 +120,7 @@ export function ItemPanel({
 
   return (
     <Sheet open={reference !== null} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent side="right" className="w-full gap-0 overflow-y-auto p-0 sm:max-w-2xl">
+      <SheetContent side="right" className="gap-0 overflow-y-auto p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-2xl data-[side=right]:lg:max-w-5xl">
         {!item && loadError ? (
           <div className="grid gap-3 p-6" role="alert">
             <SheetTitle className="text-xl font-bold">{reference} could not be opened</SheetTitle>
@@ -142,6 +150,14 @@ export function ItemPanel({
                 <span className="font-mono text-sm font-semibold">{item.reference}</span>
                 <PriorityBadge showCode priority={item.priority} />
                 <StatusBadge status={item.status} />
+                <span className="ml-auto flex gap-1">
+                  <Button variant="ghost" size="icon" className="size-9 rounded-lg" disabled={!previous} onClick={() => previous && onStep(previous)} aria-label="Previous item">
+                    <ChevronUp aria-hidden="true" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="size-9 rounded-lg" disabled={!next} onClick={() => next && onStep(next)} aria-label="Next item">
+                    <ChevronDown aria-hidden="true" />
+                  </Button>
+                </span>
               </div>
               <SheetTitle className="mt-2 text-xl leading-snug font-bold">{item.title}</SheetTitle>
               <SheetDescription>
@@ -154,10 +170,10 @@ export function ItemPanel({
                     <Button className="h-10 rounded-xl" disabled={busy} onClick={() => void act("approve").then((ok) => ok && toast.success("Approved"))}>
                       Approve
                     </Button>
-                    <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("decline")}>
+                    <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "decline" })}>
                       Decline
                     </Button>
-                    <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("ask")}>
+                    <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "ask" })}>
                       Ask for info
                     </Button>
                   </>
@@ -168,17 +184,17 @@ export function ItemPanel({
                   </Button>
                 )}
                 {item.status === "in_progress" && (
-                  <Button className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("resolve")}>
+                  <Button className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "resolve" })}>
                     Resolve
                   </Button>
                 )}
                 {open && !awaiting && (
-                  <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("update")}>
+                  <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "update" })}>
                     Post update
                   </Button>
                 )}
                 {open && (
-                  <Button variant="ghost" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog("close")}>
+                  <Button variant="ghost" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "close" })}>
                     Close
                   </Button>
                 )}
@@ -186,15 +202,64 @@ export function ItemPanel({
               {awaiting && me.role !== "admin" && <p className="mt-2 text-sm text-muted-foreground">Waiting for an Admin to approve. Work starts once it&apos;s approved.</p>}
             </header>
 
-            <Tabs defaultValue="brief" className="px-5 py-4">
-              <TabsList className="w-full">
-                <TabsTrigger value="brief">Brief</TabsTrigger>
-                <TabsTrigger value="talk">Conversation ({item.messages.length})</TabsTrigger>
-                <TabsTrigger value="history">History</TabsTrigger>
-                <TabsTrigger value="files">Files ({item.attachments.length})</TabsTrigger>
-              </TabsList>
+            <div className="grid gap-5 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+              <aside aria-label="Properties" className="order-first grid content-start gap-3 lg:sticky lg:top-44 lg:order-last lg:self-start">
+                <p className="text-sm font-semibold">Properties (corrections are logged)</p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                  <FieldSelect label={`Project (${percent(item.ai_confidence.project)})`} value={item.project?.slug ?? ""} options={projects.map((p) => [p.slug, p.name])} onChange={(v) => changeField("project_slug", v)} />
+                  <FieldSelect label={`Work type (${percent(item.ai_confidence.work_type)})`} value={item.work_type ?? ""} options={WORK_TYPES.map((w) => [w, WORK_TYPE_LABEL[w]])} onChange={(v) => changeField("work_type", v)} />
+                  <FieldSelect label={`Category (${percent(item.ai_confidence.category)})`} value={item.category ?? ""} options={CATEGORIES.map((c) => [c, CATEGORY_LABEL[c]])} onChange={(v) => changeField("category", v)} />
+                  <FieldSelect label={`Priority (${percent(item.ai_confidence.priority)})`} value={item.priority ?? ""} options={PRIORITIES.map((p) => [p, PRIORITY_LABEL[p]])} onChange={(v) => changeField("priority", v)} />
+                  <FieldSelect
+                    label="Assignee"
+                    value={item.assignee?.id ?? "none"}
+                    options={[["none", "Unassigned"], ...staff.filter((s) => s.active).map((s): [string, string] => [s.id, `${s.name}${s.is_away ? " (away)" : ""}`])]}
+                    onChange={(v) => changeField("assignee_id", v === "none" ? null : v)}
+                  />
+                </div>
+                <div className="grid gap-1 text-sm">
+                  <p className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Expected by</span>
+                    <span className={cn(item.overdue && "font-semibold text-destructive")}>{item.expected_by ? day(item.expected_by) : "Not set"}</span>
+                  </p>
+                  {item.followers.length > 0 && (
+                    <p className="text-muted-foreground">Also following: {item.followers.join(", ")}</p>
+                  )}
+                </div>
+              </aside>
 
-              <TabsContent value="brief" className="grid gap-5 pt-3">
+              <Tabs defaultValue="brief" className="min-w-0">
+                <TabsList className="w-full">
+                  <TabsTrigger value="brief">Brief</TabsTrigger>
+                  <TabsTrigger value="activity">Activity</TabsTrigger>
+                  <TabsTrigger value="files">Files ({item.attachments.length})</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="brief" className="grid gap-5 pt-3">
+                {(item.duplicates.length > 0 || item.linked.length > 0 || item.merged_into) && (
+                  <section className="grid gap-2 rounded-2xl border p-4" aria-label="Duplicates">
+                    <p className="text-sm font-semibold">Possible duplicates</p>
+                    {item.merged_into && <p className="text-sm">Merged into {item.merged_into}.</p>}
+                    {item.linked.length > 0 && <p className="text-sm text-muted-foreground">Merged here: {item.linked.join(", ")}</p>}
+                    {item.duplicates.map((d) => (
+                      <div key={d.reference} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                        <span>
+                          <span className="font-mono font-semibold">{d.reference}</span> · {d.title} · {Math.round(d.similarity * 100)}% similar
+                        </span>
+                        {open && (
+                          <Button variant="outline" size="sm" disabled={busy} onClick={() => setDialog({ kind: "merge", text: d.reference })}>
+                            Merge into it
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                    {open && (
+                      <Button variant="link" className="justify-self-start px-0" onClick={() => setDialog({ kind: "merge" })}>
+                        Merge into another reference…
+                      </Button>
+                    )}
+                  </section>
+                )}
                 {item.ai_recommendation?.decision && (
                   <p className="rounded-2xl bg-muted p-3 text-sm">
                                         <span>
@@ -247,129 +312,75 @@ export function ItemPanel({
                   )}
                 </dl>
 
-                <section className="grid gap-3 rounded-2xl border p-4" aria-label="Classification">
-                  <p className="text-sm font-semibold">Classification (corrections are logged)</p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <FieldSelect
-                      label={`Project (${percent(item.ai_confidence.project)})`}
-                      value={item.project?.slug ?? ""}
-                      options={projects.map((p) => [p.slug, p.name])}
-                      onChange={(v) => changeField("project_slug", v)}
-                    />
-                    <FieldSelect
-                      label={`Work type (${percent(item.ai_confidence.work_type)})`}
-                      value={item.work_type ?? ""}
-                      options={WORK_TYPES.map((w) => [w, WORK_TYPE_LABEL[w]])}
-                      onChange={(v) => changeField("work_type", v)}
-                    />
-                    <FieldSelect
-                      label={`Category (${percent(item.ai_confidence.category)})`}
-                      value={item.category ?? ""}
-                      options={CATEGORIES.map((c) => [c, CATEGORY_LABEL[c]])}
-                      onChange={(v) => changeField("category", v)}
-                    />
-                    <FieldSelect
-                      label={`Priority (${percent(item.ai_confidence.priority)})`}
-                      value={item.priority ?? ""}
-                      options={PRIORITIES.map((p) => [p, PRIORITY_LABEL[p]])}
-                      onChange={(v) => changeField("priority", v)}
-                    />
-                    <FieldSelect
-                      label="Assignee"
-                      value={item.assignee?.id ?? "none"}
-                      options={[["none", "Unassigned"], ...staff.filter((s) => s.active).map((s): [string, string] => [s.id, `${s.name}${s.is_away ? " (away)" : ""}`])]}
-                      onChange={(v) => changeField("assignee_id", v === "none" ? null : v)}
-                    />
-                  </div>
-                </section>
+                </TabsContent>
 
-                {(item.duplicates.length > 0 || item.linked.length > 0 || item.merged_into) && (
-                  <section className="grid gap-2 rounded-2xl border p-4" aria-label="Duplicates">
-                    <p className="text-sm font-semibold">Possible duplicates</p>
-                    {item.merged_into && <p className="text-sm">Merged into {item.merged_into}.</p>}
-                    {item.linked.length > 0 && <p className="text-sm text-muted-foreground">Merged here: {item.linked.join(", ")}</p>}
-                    {item.duplicates.map((d) => (
-                      <div key={d.reference} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span>
-                          <span className="font-mono font-semibold">{d.reference}</span> · {d.title} · {Math.round(d.similarity * 100)}% similar
-                        </span>
-                        {open && (
-                          <Button variant="outline" size="sm" disabled={busy} onClick={() => void act("merge", { into: d.reference })}>
-                            Merge into it
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    {open && (
-                      <Button variant="link" className="justify-self-start px-0" onClick={() => setDialog("merge")}>
-                        Merge into another reference…
-                      </Button>
+                <TabsContent value="activity" className="grid gap-3 pt-3">
+                  <ToggleGroup type="single" value={feedFilter} onValueChange={(v) => v && setFeedFilter(v as typeof feedFilter)} variant="outline" size="sm" spacing={0} aria-label="Show">
+                    <ToggleGroupItem value="all">All</ToggleGroupItem>
+                    <ToggleGroupItem value="messages">Messages</ToggleGroupItem>
+                    <ToggleGroupItem value="changes">Changes</ToggleGroupItem>
+                  </ToggleGroup>
+                  <ol className="grid gap-2">
+                    {feed(item, feedFilter).map((entry) =>
+                      entry.kind === "message" ? (
+                        <li
+                          key={entry.m.id}
+                          className={cn(
+                            "rounded-2xl border p-3 text-sm",
+                            entry.m.is_internal && "border-dashed border-warning/60 bg-warning-tint",
+                            !entry.m.is_internal && entry.m.author_type === "staff" && "bg-muted/50",
+                          )}
+                        >
+                          <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-semibold text-foreground">{entry.m.author_name ?? "Feedback"}</span>
+                            {entry.m.is_internal && <Lock className="size-3" aria-hidden="true" />}
+                            {MESSAGE_LABEL[entry.m.message_type]} · {when(entry.m.created_at)}
+                          </p>
+                          <p className="whitespace-pre-wrap">{entry.m.body}</p>
+                        </li>
+                      ) : (
+                        <li key={`${entry.at}-${entry.e.event_type}-${entry.e.actor_name}`} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
+                          <span>
+                            <span className="font-medium">{entry.e.actor_name ?? entry.e.actor_type}</span> · {entry.e.public_text ?? describe(entry.e.event_type, entry.e.before, entry.e.after)}
+                            {!entry.e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
+                          </span>
+                          <time className="font-mono text-xs text-muted-foreground" dateTime={entry.e.created_at}>
+                            {when(entry.e.created_at)}
+                          </time>
+                        </li>
+                      ),
                     )}
-                  </section>
-                )}
-                {item.followers.length > 0 && <p className="text-sm text-muted-foreground">Also following: {item.followers.join(", ")}</p>}
-              </TabsContent>
-
-              <TabsContent value="talk" className="grid gap-3 pt-3">
-                <ol className="grid gap-2">
-                  {item.messages.map((m) => (
-                    <li
-                      key={m.id}
-                      className={cn(
-                        "rounded-2xl border p-3 text-sm",
-                        m.is_internal && "border-dashed",
-                        m.author_type === "staff" && "bg-muted/50",
-                      )}
-                    >
-                      <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-semibold text-foreground">{m.author_name ?? "Feedback"}</span>
-                        {MESSAGE_LABEL[m.message_type]} · {when(m.created_at)}
-                      </p>
-                      <p className="whitespace-pre-wrap">{m.body}</p>
-                    </li>
-                  ))}
-                </ol>
-                {open && (
-                  <form onSubmit={sendMessage} className="grid gap-2 rounded-2xl border p-3">
-                    <div className="flex gap-1" role="group" aria-label="Message type">
-                      {(["reply", "note"] as const).map((k) => (
-                        <Button key={k} type="button" size="sm" variant={composer === k ? "secondary" : "ghost"} aria-pressed={composer === k} onClick={() => setComposer(k)}>
-                          {k === "reply" ? "Reply to submitter" : "Internal note"}
+                  </ol>
+                  {open && (
+                    <form onSubmit={sendMessage} className={cn("grid gap-2 rounded-2xl border p-3 transition-colors", composer === "note" && "border-warning/60 bg-warning-tint")}>
+                      <ToggleGroup type="single" value={composer} onValueChange={(v) => v && setComposer(v as "reply" | "note")} variant="outline" size="sm" spacing={0} aria-label="Message type" className="justify-self-start bg-background">
+                        <ToggleGroupItem value="reply">Reply to submitter</ToggleGroupItem>
+                        <ToggleGroupItem value="note">
+                          <Lock aria-hidden="true" /> Internal note
+                        </ToggleGroupItem>
+                      </ToggleGroup>
+                      <Textarea
+                        rows={3}
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        aria-label={composer === "reply" ? "Reply to the submitter" : "Internal note (staff never see it)"}
+                        placeholder={composer === "reply" ? "They see this on their tracker and by email" : "Only the Digital team sees this"}
+                        className="rounded-xl bg-background"
+                      />
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {composer === "note" && <Lock className="size-3" aria-hidden="true" />}
+                          {composer === "reply" ? "The submitter sees this." : "Only the Digital team sees this."}
+                        </p>
+                        <Button type="submit" variant={composer === "reply" ? "default" : "outline"} className="rounded-xl" disabled={busy || !message.trim()}>
+                          {composer === "reply" ? "Send reply" : "Add note"}
                         </Button>
-                      ))}
-                    </div>
-                    <Textarea
-                      rows={3}
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      aria-label={composer === "reply" ? "Reply to the submitter" : "Internal note (staff never see it)"}
-                      placeholder={composer === "reply" ? "They see this on their tracker and by email" : "Only the Digital team sees this"}
-                      className="rounded-xl"
-                    />
-                    <Button type="submit" variant={composer === "reply" ? "default" : "outline"} className="justify-self-end rounded-xl" disabled={busy || !message.trim()}>
-                      {composer === "reply" ? "Send reply" : "Add note"}
-                    </Button>
-                  </form>
-                )}
-              </TabsContent>
+                      </div>
+                    </form>
+                  )}
+                </TabsContent>
 
-              <TabsContent value="history" className="pt-3">
-                <ol className="grid gap-2 text-sm">
-                  {item.events.map((e, i) => (
-                    <li key={`${e.created_at}-${i}`} className="flex flex-wrap justify-between gap-2 border-b pb-2">
-                      <span>
-                        <span className="font-medium">{e.actor_name ?? e.actor_type}</span> · {e.public_text ?? describe(e.event_type, e.before, e.after)}
-                        {!e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
-                      </span>
-                      <time className="font-mono text-xs text-muted-foreground" dateTime={e.created_at}>
-                        {when(e.created_at)}
-                      </time>
-                    </li>
-                  ))}
-                </ol>
-              </TabsContent>
-
-              <TabsContent value="files" className="grid gap-3 pt-3">
+                <TabsContent value="files" className="grid gap-3 pt-3">
                 {item.attachments.length === 0 && <p className="text-sm text-muted-foreground">No files attached.</p>}
                 {item.attachments.map((a) => (
                   <a key={a.id} href={`/api/files/${a.id}`} target="_blank" rel="noreferrer" className="grid gap-2 rounded-2xl border p-3 hover:bg-muted/50">
@@ -382,14 +393,26 @@ export function ItemPanel({
                     </span>
                   </a>
                 ))}
-              </TabsContent>
-            </Tabs>
-            <ActionDialog kind={dialog} onClose={() => setDialog(null)} onSubmit={onDialog} />
+                </TabsContent>
+              </Tabs>
+            </div>
+            <ActionDialog key={`${dialog?.kind}-${dialog?.text}`} kind={dialog?.kind ?? null} initialText={dialog?.text} onClose={() => setDialog(null)} onSubmit={onDialog} />
           </>
         )}
       </SheetContent>
     </Sheet>
   );
+}
+
+type FeedEntry = { kind: "message"; at: string; m: Message } | { kind: "event"; at: string; e: FeedbackEvent };
+
+/** Messages and changes as one timeline, oldest first. */
+function feed(item: Detail, filter: "all" | "messages" | "changes"): FeedEntry[] {
+  const entries: FeedEntry[] = [
+    ...(filter === "changes" ? [] : item.messages.map((m): FeedEntry => ({ kind: "message", at: m.created_at, m }))),
+    ...(filter === "messages" ? [] : item.events.map((e): FeedEntry => ({ kind: "event", at: e.created_at, e }))),
+  ];
+  return entries.sort((a, b) => a.at.localeCompare(b.at));
 }
 
 function describe(type: string, before: Record<string, unknown>, after: Record<string, unknown>): string {

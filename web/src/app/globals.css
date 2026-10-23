@@ -42,6 +42,8 @@
   --color-warning-tint: var(--warning-tint);
   --color-info: var(--info);
   --color-info-tint: var(--info-tint);
+  --color-waiting: var(--waiting);
+  --color-waiting-tint: var(--waiting-tint);
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -86,6 +88,8 @@
   --warning-tint: #fef3c7;
   --info: #1d4ed8;
   --info-tint: #e8effd;
+  --waiting: #6d28d9; /* items waiting for a person to look: Needs review */
+  --waiting-tint: #efe9fd;
   /* Chart series, validated with the dataviz palette script (light and dark). */
   --series-1: #2a78d6;
   --series-2: #1baf7a;
@@ -122,6 +126,8 @@
   --warning-tint: #3a2a10;
   --info: #93b4ff;
   --info-tint: #17233d;
+  --waiting: #c4b5fd;
+  --waiting-tint: #261c45;
   --series-1: #3987e5;
   --series-2: #199e70;
   --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);

@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { StageBadge } from "@/components/badges";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -94,6 +95,7 @@ export default function MyFeedbackPage() {
                           </time>
                         </span>
                       </span>
+                      <StageBadge stage={i.stage} className="hidden shrink-0 sm:inline-flex" />
                       <ChevronRight className="size-5 text-muted-foreground" aria-hidden="true" />
                     </Link>
                   </li>

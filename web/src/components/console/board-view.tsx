@@ -8,6 +8,14 @@ import type { Card, Column } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const DROPPABLE = new Set(["approved", "in_progress", "resolved", "closed"]);
+const EMPTY: Record<string, string> = {
+  needs_review: "New items nobody has looked at yet appear here.",
+  awaiting_approval: "Items waiting for an Admin appear here.",
+  approved: "Approved items appear here.",
+  in_progress: "Items someone is working on appear here.",
+  resolved: "Resolved items appear here.",
+  closed: "Items closed in the last 30 days appear here.",
+};
 
 function DraggableCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: card.reference, data: { status: card.status } });
@@ -43,7 +51,7 @@ function ColumnView({ column, onOpen }: { column: Column; onOpen: (ref: string) 
         )}
       </header>
       <div className="grid content-start gap-2">
-        {column.items.length === 0 && <p className="rounded-2xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">No items</p>}
+        {column.items.length === 0 && <p className="rounded-2xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">{EMPTY[column.key] ?? "No items"}</p>}
         {column.items.map((card) => (
           <DraggableCard key={card.reference} card={card} onOpen={() => onOpen(card.reference)} />
         ))}
