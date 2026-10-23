@@ -186,6 +186,29 @@ async def test_merge_moves_the_submitter_to_the_original(
     await other.aclose()
 
 
+async def test_notifications_are_masked_before_they_are_stored(
+    staff: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    ref = await raise_bug(staff)
+    r = await staff.post(
+        f"/api/feedback/{ref}/replies",
+        json={"body": "My password is Hunter2, card 4111 1111 1111 1111, TFN 123 456 782"},
+    )
+    assert r.status_code == 200
+    # The card number straddles the 300-character cut: masked first, so no part of it survives.
+    r = await darlene.post(f"/api/console/items/{ref}/reply", json={"body": "x" * 285 + " card 4111 1111 1111 1111"})
+    assert r.status_code == 200
+    async with session_scope() as db:
+        rows = await db.execute(
+            select(Notification.type, Notification.body).where(Notification.type.in_(["submitter_reply", "reply"]))
+        )
+        bodies = dict(rows.all())
+    tracker = bodies["submitter_reply"]
+    assert not any(s in tracker for s in ("Hunter2", "4111", "123 456 782"))
+    assert all(m in tracker for m in ("[password removed]", "[card number removed]", "[TFN removed]"))
+    assert "4111" not in bodies["reply"] and len(bodies["reply"]) <= 300
+
+
 async def test_panel_opens_when_duplicate_search_fails(
     staff: httpx.AsyncClient, darlene: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

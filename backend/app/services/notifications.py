@@ -2,6 +2,8 @@
 
 Every notification is a row; the bell reads the rows, and the worker sends each row's email.
 The person who caused an event is never notified about it, and a muted item stays quiet.
+Title and body are masked here, before they are stored or emailed (brief §5.5), and cut only
+after masking so a card number split at the cut cannot slip through.
 """
 
 import uuid
@@ -13,8 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models import DigitalStaff, Feedback, FeedbackFollower, Notification, NotificationMute
+from app.services.privacy import mask
 
 KEEP_DAYS = 90
+MAX_CHARS = 300
 
 
 def tracker_link(fb: Feedback) -> str:
@@ -47,13 +51,14 @@ async def notify(
         )
         emails -= muted
     email_status = "skipped" if get_settings().email_backend == "off" else "queued"
+    title, body = mask(title)[:MAX_CHARS], mask(body)[:MAX_CHARS]
     for email in sorted(emails):
         db.add(
             Notification(
                 recipient_email=email,
                 feedback_id=feedback_id,
                 type=type,
-                title=title[:300],
+                title=title,
                 body=body,
                 link=link,
                 email_status=email_status,

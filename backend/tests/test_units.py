@@ -30,6 +30,11 @@ def test_masks_passwords_cards_and_tfns_but_keeps_ordinary_numbers() -> None:
     assert "1234567" in out and "0412345678" in out
 
 
+def test_masking_twice_changes_nothing() -> None:
+    once = privacy.mask("My password is Hunter2, pin 4321, card 4111 1111 1111 1111, TFN 123 456 782")
+    assert privacy.mask(once) == once and once.count("[password removed]") == 2
+
+
 def test_abuse_about_a_named_colleague_is_spotted() -> None:
     assert privacy.is_abusive_about("Darlene is useless and lazy", ["Darlene", "Mario"])
     assert not privacy.is_abusive_about("This report is useless", ["Darlene"])

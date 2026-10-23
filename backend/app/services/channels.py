@@ -72,7 +72,7 @@ async def post(db: AsyncSession, user: User, slug: str, body: str) -> ProjectMes
             [s.google_email for s in mentioned],
             type="mention",
             title=f"{user.name} mentioned you in #{project.slug}",
-            body=text[:300],
+            body=text,
             link=f"/console/channels/{project.slug}",
             actor_email=user.email,
         )
