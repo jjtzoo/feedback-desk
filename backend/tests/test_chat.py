@@ -6,7 +6,7 @@ import httpx
 import pytest
 from sqlalchemy import func, select
 
-from agent.stub import ASK_EXPECTED, ASK_IMPACT, ASK_PROJECT, NOISE, SHOW_SUMMARY
+from agent.stub import ASK_EXPECTED, ASK_IMPACT, ASK_PROJECT, EXISTING, NOISE, SHOW_SUMMARY
 from app import agent_runtime
 from app.api.chat import _without_card_fields
 from app.config import get_settings
@@ -124,6 +124,31 @@ async def test_noise_and_off_topic_save_nothing(staff: httpx.AsyncClient) -> Non
     for text in ["asdf", "hello", "check out http://spam.example cheap"]:
         assert texts(await say(staff, sid, text)) == [NOISE]
     assert await count() == 0
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "I already raised this as FB-0001, can you add that it's still happening?",
+        "Any update on my ticket about the RAKE export?",
+        "Can you look up the status of FB-0042 for me?",
+        "I've already reported this, I just want to follow up on my existing report",
+    ],
+)
+async def test_a_request_about_existing_feedback_is_pointed_to_it_not_turned_into_a_new_report(
+    staff: httpx.AsyncClient, message: str
+) -> None:
+    sid = await start_chat(staff)
+    events = await say(staff, sid, message)
+    reply = texts(events)[-1]
+    assert reply == EXISTING
+    assert "My feedback" in reply and "Reply or add details" in reply
+    assert first(events, "draft") is None  # no card, no intake questions
+    assert await count() == 0
+
+    # Someone who then says it is a new problem is not stuck: the normal conversation carries on.
+    events = await say(staff, sid, "Actually, this is a different problem: Flipbook crashes when I open the brochure")
+    assert texts(events)[-1] in (ASK_IMPACT, ASK_EXPECTED, ASK_PROJECT)
 
 
 async def test_typing_yes_does_not_save(staff: httpx.AsyncClient) -> None:
