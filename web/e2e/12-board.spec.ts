@@ -533,6 +533,22 @@ test("S12.13 The project, work type, category and priority filters and the searc
   await expectRefs(page, "Cards", refsOf(both));
 });
 
+// Outside the checklist (FINDINGS: the Work filters stayed empty with no message when the project list failed).
+test("The console says so, and loads the filters on Try again, when the project list does not load", async ({ page, signIn }) => {
+  await signIn("Marc");
+  let failing = true;
+  await page.route("**/api/projects", (route) => (failing ? route.fulfill({ status: 500, body: "{}" }) : route.continue()));
+  await page.goto("/console");
+  const alert = page.getByRole("alert").filter({ hasText: "did not load" });
+  await expect(alert).toBeVisible();
+
+  failing = false;
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await expect(alert).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Project", exact: true }).click();
+  await expect(page.getByRole("option", { name: "RAKE Agent" })).toBeVisible();
+});
+
 test("S12.14 List view has the columns Ref, Title, Project, Type, Priority, Stage, Assignee, Age and Expected by (red when overdue)", async ({ page, signIn }) => {
   await signIn("Darlene");
   await openWork(page, "List");
