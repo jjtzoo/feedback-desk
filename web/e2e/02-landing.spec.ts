@@ -92,14 +92,14 @@ async function openToolMenu(page: Page) {
   await expect(page.getByRole("listbox")).toBeVisible();
 }
 
-test("S02.01 As Mario, / shows the red hero band 'Spotted something not working? Let us know', a 'Hi Mario' line above it and a Give feedback button", async ({ page, signIn }) => {
+test("S02.01 As Mario, / shows the red band 'What can we help you with?', a 'Hi Mario' line above it and a Give feedback button", async ({ page, signIn }) => {
   await signIn("Mario");
   await openLanding(page);
 
   const hero = page.locator("section.bg-primary");
   await expect(hero).toBeVisible();
   const heading = hero.getByRole("heading", { level: 1 });
-  await expect(heading).toHaveText("Spotted something not working? Let us know");
+  await expect(heading).toHaveText("What can we help you with?");
 
   const hi = hero.getByText("Hi Mario", { exact: true });
   await expect(hi).toBeVisible();
