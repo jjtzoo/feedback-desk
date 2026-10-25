@@ -11,7 +11,7 @@ Docker Compose remains the supported way to run the stack (spec, "Local setup").
 import argparse
 from pathlib import Path
 
-import pgserver
+from pgserver.postgres_server import get_server
 from sqlalchemy.engine import make_url
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +21,7 @@ INIT_SQL = (BACKEND_DIR.parent / "db" / "init" / "01-schemas.sql").read_text()
 
 def start(data_dir: Path = DEFAULT_DATA_DIR, database: str = "feedback", fresh: bool = False) -> str:
     """Start (or reuse) the server, make sure `database` exists with its schemas, return an asyncpg URL."""
-    server = pgserver.get_server(data_dir, cleanup_mode=None)
+    server = get_server(data_dir, cleanup_mode=None)
     exists = server.psql(f"SELECT 1 FROM pg_database WHERE datname = '{database}';")
     if fresh and "(1 row)" in exists:
         server.psql(f'DROP DATABASE "{database}" WITH (FORCE);')
@@ -51,7 +51,7 @@ def _run_init(uri: str) -> None:
 
 
 def stop(data_dir: Path = DEFAULT_DATA_DIR) -> None:
-    pgserver.get_server(data_dir, cleanup_mode="stop").cleanup()
+    get_server(data_dir, cleanup_mode="stop").cleanup()
 
 
 if __name__ == "__main__":
