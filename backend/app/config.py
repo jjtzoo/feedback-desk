@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     google_cloud_location: str = "australia-southeast1"
     google_application_credentials: str = ""
     duplicate_threshold: float = 0.85
+    # Different people reporting the same open item before the console suggests a priority review (D38).
+    priority_review_reporters: int = 3
     # For the cost log (brief §8: under AUD 0.05 per item). AUD per million tokens for model_name;
     # check current prices (3.1 Flash-Lite USD 0.25 / 1.50 on 2026-10-21; 2.5 Flash USD 0.30 / 2.50).
     model_price_input_aud_per_m: float = 0.38

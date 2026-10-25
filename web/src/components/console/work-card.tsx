@@ -1,6 +1,6 @@
 "use client";
 
-import { Flag, Paperclip } from "lucide-react";
+import { Flag, Paperclip, TrendingUp, Users } from "lucide-react";
 
 import { PriorityBadge, WorkTypeBadge } from "@/components/badges";
 import type { Card } from "@/lib/api";
@@ -30,6 +30,11 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
             <Flag className="size-3" aria-hidden="true" /> Flagged
           </span>
         )}
+        {card.priority_review && (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
+            <TrendingUp className="size-3" aria-hidden="true" /> Review priority
+          </span>
+        )}
       </span>
       <span className="line-clamp-2 font-semibold leading-snug">{card.title}</span>
       <span className="text-sm text-muted-foreground">
@@ -50,6 +55,13 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
           <span className="inline-flex items-center gap-1">
             <Paperclip className="size-3.5" aria-hidden="true" />
             <span className="sr-only">Has files</span>
+          </span>
+        )}
+        {card.reporters > 1 && (
+          <span className="inline-flex items-center gap-1" title={`Reported by ${card.reporters} people`}>
+            <Users className="size-3.5" aria-hidden="true" />
+            {card.reporters}
+            <span className="sr-only"> people reported this</span>
           </span>
         )}
         {card.assignee && <span className="ml-auto truncate">{card.assignee.name}</span>}

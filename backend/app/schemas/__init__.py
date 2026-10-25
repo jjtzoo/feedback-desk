@@ -271,6 +271,8 @@ class CardOut(Out):
     unread_reply: bool
     flagged: bool
     channel: str
+    reporters: int
+    priority_review: bool
 
 
 class ColumnOut(Out):

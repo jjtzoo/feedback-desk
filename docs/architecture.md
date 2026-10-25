@@ -42,7 +42,7 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 | `feedback` | One row per item: classification, status (nine values), assignee, developer brief, context, dates |
 | `feedback_messages` | Chat transcript, replies, internal notes, progress updates, follow-ups |
 | `feedback_events` | Append-only audit and routing training signal; `is_public` drives the tracker |
-| `feedback_followers` | Staff who added "+1 and comment" |
+| `feedback_followers` | Staff who added "+1 and comment" (one row per person, never the submitter). The console's reporter tally is 1 + these rows; at `PRIORITY_REVIEW_REPORTERS` (3) it suggests a priority review, never applies one (D38, proposed) |
 | `attachments` | Files and their extracted text |
 | `feedback_embeddings` | pgvector embeddings for duplicate search |
 | `notifications`, `notification_mutes` | The bell and its emails (title and body masked, then cut to 300 characters); per-item mutes |

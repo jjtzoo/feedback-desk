@@ -12,6 +12,7 @@ from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.errors import Conflict, Forbidden, ServiceError
 from app.models import (
     Attachment,
@@ -190,6 +191,26 @@ async def has_files(db: AsyncSession, ids: list[uuid.UUID]) -> set[uuid.UUID]:
     if not ids:
         return set()
     return set(await db.scalars(select(Attachment.feedback_id).where(Attachment.feedback_id.in_(ids)).distinct()))
+
+
+async def reporter_counts(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, int]:
+    """How many people reported each item: the submitter plus each distinct colleague who added a
+    +1 (or was merged in). Followers are unique per person and never include the submitter."""
+    if not ids:
+        return {}
+    rows = await db.execute(
+        select(FeedbackFollower.feedback_id, func.count())
+        .where(FeedbackFollower.feedback_id.in_(ids))
+        .group_by(FeedbackFollower.feedback_id)
+    )
+    extra = {fid: int(n) for fid, n in rows.all()}
+    return {i: 1 + extra.get(i, 0) for i in ids}
+
+
+def needs_priority_review(fb: Feedback, reporters: int) -> bool:
+    """Suggest, never apply, a priority review once enough different people report the same open
+    item (D38). Staff never see the count, so asking colleagues to +1 has nothing to aim at."""
+    return fb.status in OPEN_STATUSES and fb.priority != "P1" and reporters >= get_settings().priority_review_reporters
 
 
 async def get_view(db: AsyncSession, user: User) -> str:
