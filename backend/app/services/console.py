@@ -351,6 +351,8 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
             author_name=user.name,
             message_type="progress",
             body=note.strip()[:4000],
+            # Stamped just before the status event below, so the tracker lists "Resolved: ..." as the newest entry.
+            created_at=datetime.now(UTC) - timedelta(milliseconds=1),
         )
     )
     _set_status(db, fb, user, "resolved", f"Resolved: {note.strip()[:140]}")

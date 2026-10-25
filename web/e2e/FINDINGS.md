@@ -67,18 +67,20 @@ Format:
 - Expected: the checklist says the note becomes the tracker's last entry, "Resolved: <note>". Reading "last" as "newest" is an assumption: confirm the reading before treating this as a bug.
 - Actual: the newest entry is "Update: <note>" and "Resolved: <note>" is second. Resolving writes the note and the status change in one transaction; the status event is flushed before the message, so the message gets the later `created_at` and the history sorts it first. Both entries are shown; only the order is odd.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/badges-order-tour`. `resolve()` stamps its progress message 1 ms before the status event, so "Resolved: <note>" is the newest tracker entry and "Update: <note>" sits below it. S14.05 passes and its `test.fail()` is out; `test_lifecycle.py` checks the order.
 
 ## Outside the checklist: small things the browser tests noticed
 - Fixed 2026-10-25 on `fix/keyboard-and-small-ui`: the dashboard's "Open by project" section had `aria-labelledby="bl-Open by project"`, an id with spaces, so the section had no accessible name. `BarList` now uses `useId()`.
 - Fixed 2026-10-25 on `fix/keyboard-and-small-ui`: the item panel (and My feedback) read "now ago" in the first minute. `ago()` in `web/src/lib/format.ts` gives "just now"; S07.02, S13.02 and the backup-form header check now expect it.
 - S13.06: the tracker says "Reassigned to Mario" where the checklist says "Assigned to Mario". Treated as wording, not a bug; the test asserts the app's wording. Found 2026-10-22.
-- Guide tour (S02.03, S02.04, S02.05), from reading `web/src/components/guide.tsx`: the spotlight's solid `ring-4 ring-primary` never renders (Tailwind v4 rings are box-shadows and the inline dimming `boxShadow` overrides them), so the only red is the pulsing outline at 60 % opacity; the small card is shorter but not narrower. While the small card asks for a click, mouse clicks elsewhere are blocked but the keyboard is not: Tab reaches page controls, and Radix triggers that open on keydown (the account menu, "Already know which tool?") still open. The "Try it out" card covers about 352 x 130 px at the bottom right, and controls under it can't be clicked until Next. Pressing Guide during "Try it out" gives a "Try it out … Have a look at Welcome to Smoke Signal" card; moving between the staff area and the console mid-tour ends the tour without marking it seen. Found 2026-10-23.
+- Fixed 2026-10-25 on `fix/badges-order-tour` (all but the card still covering a corner, which is now one 64 px row): the spotlight ring is a 4 px box-shadow, keys other than Tab and Esc are blocked outside the highlighted control while a click is awaited, leaving an area mid-tour marks it seen, and the Guide button restarts the tour cleanly. S02.03 expects the ring. Original note: guide tour (S02.03, S02.04, S02.05), from reading `web/src/components/guide.tsx`: the spotlight's solid `ring-4 ring-primary` never renders (Tailwind v4 rings are box-shadows and the inline dimming `boxShadow` overrides them), so the only red is the pulsing outline at 60 % opacity; the small card is shorter but not narrower. While the small card asks for a click, mouse clicks elsewhere are blocked but the keyboard is not: Tab reaches page controls, and Radix triggers that open on keydown (the account menu, "Already know which tool?") still open. The "Try it out" card covers about 352 x 130 px at the bottom right, and controls under it can't be clicked until Next. Pressing Guide during "Try it out" gives a "Try it out … Have a look at Welcome to Smoke Signal" card; moving between the staff area and the console mid-tour ends the tour without marking it seen. Found 2026-10-23.
 
 ## S12.04 The board card shows the work type as plain text, not a badge
 - Test: e2e/12-board.spec.ts: S12.04 (asserts the work type as text in the card's meta line; not marked `test.fail()`)
 - Expected: the checklist lists "work type badge" and "priority badge" on a card.
 - Actual: the priority is a badge; the work type is plain text in the meta line. Confirm whether the checklist or the card is right.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/badges-order-tour`. The card shows the work type as a `WorkTypeBadge` beside the priority; the meta line is now "tool · submitter". S12.04 asserts the badge.
 
 ## Closed: results that went wrong once (Stage 3 repeat runs, 2026-10-23)
 Each failed or misreported once on 2026-10-22. The causes below come from the server logs and the code; after the test fixes, every test in each file passed 10 separate runs in a row (`e2e/evidence/stress.json`).
@@ -110,6 +112,7 @@ Each failed or misreported once on 2026-10-22. The causes below come from the se
 - Expected: "FB reference, title, tool (or "Tool to confirm"), a plain status, "updated … ago", and a stage badge on wider screens" (Brief §4.1.8).
 - Actual: the row shows everything except the stage badge. `StageBadge` exists in `src/components/badges.tsx` but nothing renders it, and `src/app/(staff)/my/page.tsx` never uses it. Either the page should show it or the checklist line should go (a product call, given the Quiet UI direction).
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/badges-order-tour`. Each row shows the `StageBadge` on screens from `sm` up. S07.02 passes and its `test.fail()` is out.
 
 ## Outside the checklist: the web server's /api proxy now and then drops a request with a 500
 - Test: none of its own; it surfaces as a one-off failure in any test (see "went wrong once" above).
@@ -126,3 +129,10 @@ Each failed or misreported once on 2026-10-22. The causes below come from the se
 - Actual: the request's sign-in lookup (the `CurrentUser` dependency's session) stays `idle in transaction` for as long as the page is open: seen at 96 s and growing. It holds share locks on `app.digital_staff` and `app.user_sessions` and keeps one pooled connection per open tab. Consequences: a `TRUNCATE`, and any migration that alters those tables (`ALTER TABLE` during a deploy), waits until every tab closes; and with many staff online the connection pool and Cloud SQL's connection limit fill up.
 - Found: 2026-10-22
 - Fixed: 74dd7f3 (merged in 9874225), with `backend/tests/test_streams.py`. What is left: the stream holds a transaction for the few milliseconds it takes to write each event.
+
+## Outside the checklist: the chat setup now and then returns no confirm card
+- Test: none of its own; `raise()` in `e2e/helpers.ts` throws "No confirm card for: <message>" in the first test of a file or later in it (seen 2026-10-25 in S07.01, S12.01, S14.01, S14.02, S14.03, S14.06).
+- Steps: run specs 07, 12 and 14 in one go on a busy machine; the same test passes when run alone.
+- Expected: the stub model answers every setup message with a draft.
+- Actual: no `draft` event in the stream. It also failed on the code before these changes (S14.03 on `3492ef6`), so it is not from them. Not investigated: the proxy drop above and a slow machine (the backend suite took 17 minutes) are both suspects.
+- Found: 2026-10-25

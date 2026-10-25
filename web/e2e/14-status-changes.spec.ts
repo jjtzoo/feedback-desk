@@ -204,9 +204,6 @@ test("S14.05 Resolve needs a note; with a note it becomes the tracker's last ent
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
   await expect(history(page)).toContainText(`Resolved: ${note}`);
 
-  // resolve() also adds the note as a progress message; the events are written before the messages, so
-  // the message gets the later stamp and the tracker's newest entry reads "Update: ..." above "Resolved: ...".
-  test.fail(true, "Known bug: the tracker's newest entry after Resolve is 'Update: <note>', not 'Resolved: <note>' (backend/app/services/console.py resolve(), feedback.py history sort)");
   await expect(history(page).getByRole("listitem").first()).toContainText(`Resolved: ${note}`);
 });
 
