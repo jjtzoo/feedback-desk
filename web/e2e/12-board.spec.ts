@@ -549,8 +549,9 @@ test("The console says so, and loads the filters on Try again, when the project 
   failing = false;
   await alert.getByRole("button", { name: "Try again" }).click();
   await expect(alert).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Project", exact: true }).click();
-  await expect(page.getByRole("option", { name: "RAKE Agent" })).toBeVisible();
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Project", exact: true }).click();
+  await expect(page.getByRole("menuitemradio", { name: "RAKE Agent" })).toBeVisible();
 });
 
 test("S12.14 List view has the columns Ref, Title, Project, Type, Priority, Stage, Assignee, Age and Expected by (red when overdue)", async ({ page, signIn }) => {
