@@ -2,9 +2,9 @@
 
 import { Flag, Paperclip } from "lucide-react";
 
-import { PriorityBadge } from "@/components/badges";
+import { PriorityBadge, WorkTypeBadge } from "@/components/badges";
 import type { Card } from "@/lib/api";
-import { STATUS_LABEL, WORK_TYPE_LABEL, age, day, when } from "@/lib/format";
+import { STATUS_LABEL, age, day, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A card on the board and in Cards view (brief §4.4). */
@@ -24,6 +24,7 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
       <span className="flex flex-wrap items-center gap-1.5 pr-4">
         <span className="font-mono text-xs font-semibold">{card.reference}</span>
         <PriorityBadge showCode priority={card.priority} className="h-5 px-2 text-[11px]" />
+        <WorkTypeBadge workType={card.work_type} className="h-5 px-2 text-[11px]" />
         {card.flagged && (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-destructive">
             <Flag className="size-3" aria-hidden="true" /> Flagged
@@ -32,7 +33,7 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
       </span>
       <span className="line-clamp-2 font-semibold leading-snug">{card.title}</span>
       <span className="text-sm text-muted-foreground">
-        {[card.work_type && WORK_TYPE_LABEL[card.work_type], card.project?.name ?? "Tool to confirm", card.submitter_name].filter(Boolean).join(" · ")}
+        {[card.project?.name ?? "Tool to confirm", card.submitter_name].join(" · ")}
       </span>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         {showStatus && <span className="font-semibold text-foreground">{STATUS_LABEL[card.status]}</span>}

@@ -163,7 +163,8 @@ test("S02.03 OK on 'Give feedback' shrinks the card to 'Click Give feedback', pu
   await expect(pulse(page)).toHaveCSS("animation-name", "pulse");
   const primary = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
   expect(await pulse(page).evaluate((el) => getComputedStyle(el).getPropertyValue("--tw-ring-color"))).toContain(primary);
-  await expect(spotlight(page)).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.55) 0px 0px 0px 9999px");
+  // A solid 4 px primary ring round the control, then the dimming over the rest of the page.
+  await expect(spotlight(page)).toHaveCSS("box-shadow", /^rgb\(\d+, \d+, \d+\) 0px 0px 0px 4px, rgba\(0, 0, 0, 0\.55\) 0px 0px 0px 9999px$/);
 
   // The spotlight is the control with 6 px around it; it animates into place.
   await expect(async () => {

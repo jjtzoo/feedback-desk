@@ -226,7 +226,8 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
   const busy = boardCard(page, world.p1);
   await expect(busy.getByText(world.p1, { exact: true })).toBeVisible();
   await expect(busy.getByText(TEXT.p1, { exact: true })).toBeVisible();
-  await expect(busy.getByText("Fix · RAKE Agent · Liam Carter", { exact: true })).toBeVisible();
+  await expect(busy.getByText("Fix", { exact: true })).toHaveClass(/bg-secondary/); // the work type badge
+  await expect(busy.getByText("RAKE Agent · Liam Carter", { exact: true })).toBeVisible();
   await expect(busy.getByText("P1 · Blocking", { exact: true })).toHaveClass(/border-primary/);
   await expect(busy.locator("time")).toHaveText(/^(now|\d+ [mhd])$/);
   const overdue = busy.getByText(/^Overdue · .*15 Sept?$/);
@@ -245,7 +246,8 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
 
   // A plain card has none of the extras.
   const plain = boardCard(page, world.plain);
-  await expect(plain.getByText("Fix · RAKE Agent · Tom Nguyen", { exact: true })).toBeVisible();
+  await expect(plain.getByText("Fix", { exact: true })).toHaveClass(/bg-secondary/);
+  await expect(plain.getByText("RAKE Agent · Tom Nguyen", { exact: true })).toBeVisible();
   await expect(plain.getByText(/^P\d · /)).not.toHaveClass(/border-primary/);
   await expect(plain.getByText("Has files")).toHaveCount(0);
   await expect(plain.getByLabel("Unread reply from the submitter")).toHaveCount(0);

@@ -57,7 +57,6 @@ test("S07.02 a row shows the reference, title, tool or 'Tool to confirm', a plai
   await expect(noTool).toContainText(/being checked/i);
 
   // The stage badge on its own: the status line above also starts with "Received", so match the whole badge text.
-  test.fail(true, "Known bug: the My feedback row has no stage badge (web/src/app/(staff)/my/page.tsx never renders StageBadge)");
   await expect(row.getByText("Received", { exact: true })).toBeVisible();
 });
 
