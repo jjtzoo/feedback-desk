@@ -19,4 +19,4 @@ RUN useradd --system --uid 10001 --home-dir /srv app && mkdir -p /srv/.uploads &
 USER app
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*'"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 620 --proxy-headers --forwarded-allow-ips='*'"]
