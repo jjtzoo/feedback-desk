@@ -67,14 +67,17 @@ export interface ActionResult {
 /** One dialog for every action that needs words (update, resolve, close, decline, ask, merge). */
 export function ActionDialog({
   kind,
+  initialText = "",
   onClose,
   onSubmit,
 }: {
   kind: ActionKind | null;
+  /** Pre-fills the text, such as the original's reference when merging a suggested duplicate. */
+  initialText?: string;
   onClose: () => void;
   onSubmit: (kind: ActionKind, result: ActionResult) => Promise<boolean>;
 }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const [expectedBy, setExpectedBy] = useState("");
   const [wontFix, setWontFix] = useState(false);
   const [ask, setAsk] = useState<"submitter" | "owner">("submitter");

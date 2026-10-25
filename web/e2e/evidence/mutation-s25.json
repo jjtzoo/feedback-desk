@@ -1,8 +1,9 @@
 {
-  "ran": "2026-10-22T03:49:53.747Z",
+  "ran": "2026-10-25T23:06:22.075Z",
+  "commit": "0d4d32a",
+  "uncommitted": true,
   "spec": "25-no-save-without-confirm.spec.ts",
-  "fingerprint": "c2503332feed9022",
-  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
+  "fingerprint": "856349789d9a657c",
   "caught": {
     "S25.01": true,
     "S25.02": true,

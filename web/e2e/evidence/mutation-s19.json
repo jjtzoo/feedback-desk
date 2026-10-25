@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-22T05:48:51.627Z",
-  "commit": "b54e713",
+  "ran": "2026-10-25T23:03:26.766Z",
+  "commit": "0d4d32a",
   "uncommitted": true,
   "spec": "19-admin-page.spec.ts",
-  "fingerprint": "d0c53a9e46fa49a9",
+  "fingerprint": "b710f500e8d3ea40",
   "caught": {
     "S19.01": true,
     "S19.02": true,
@@ -15,6 +15,5 @@
     "S19.08": true,
     "S19.09": true,
     "S19.10": true
-  },
-  "uncommittedCorrected": "2026-10-22: recorded as false by a path bug in fingerprint.mjs; web/src and backend had uncommitted changes all day"
+  }
 }

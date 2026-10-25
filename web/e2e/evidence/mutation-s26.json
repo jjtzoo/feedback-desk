@@ -1,8 +1,9 @@
 {
-  "ran": "2026-10-22T03:55:34.672Z",
+  "ran": "2026-10-25T23:07:26.315Z",
+  "commit": "0d4d32a",
+  "uncommitted": true,
   "spec": "26-masking.spec.ts",
-  "fingerprint": "8517ae35ccbd250d",
-  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
+  "fingerprint": "733fd283d057fa67",
   "caught": {
     "S26.01": true,
     "S26.02": true,

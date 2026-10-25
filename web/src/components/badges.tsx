@@ -26,32 +26,35 @@ export function PriorityBadge({ priority, showCode = false, className }: { prior
   );
 }
 
+// One tone per status, used wherever a status is shown (list, cards, panel, approvals).
+const STATUS_TONE: Record<Status, string> = {
+  new: "border border-border text-foreground",
+  needs_review: "bg-waiting-tint text-waiting",
+  awaiting_approval: "bg-warning-tint text-warning",
+  approved: "bg-info-tint text-info",
+  in_progress: "bg-info text-background",
+  resolved: "bg-success-tint text-success",
+  acknowledged: "border border-success/50 text-success",
+  declined: "bg-brand-tint text-brand-text",
+  closed: "bg-secondary text-muted-foreground",
+};
+
+const STATUS_ICON: Record<Status, typeof Clock3> = {
+  new: CircleDot,
+  needs_review: Clock3,
+  awaiting_approval: Clock3,
+  approved: CheckCircle2,
+  in_progress: Hammer,
+  resolved: CheckCircle2,
+  acknowledged: ThumbsUp,
+  declined: XCircle,
+  closed: CheckCircle2,
+};
+
 export function StatusBadge({ status, className }: { status: Status; className?: string }) {
-  const tone: Record<Status, string> = {
-    new: "border border-border text-foreground",
-    needs_review: "bg-warning-tint text-warning",
-    awaiting_approval: "bg-warning-tint text-warning",
-    approved: "bg-info-tint text-info",
-    in_progress: "bg-warning-tint text-warning",
-    resolved: "bg-success-tint text-success",
-    acknowledged: "bg-success-tint text-success",
-    declined: "bg-secondary text-muted-foreground",
-    closed: "bg-secondary text-muted-foreground",
-  };
-  const icon: Record<Status, typeof Clock3> = {
-    new: CircleDot,
-    needs_review: Clock3,
-    awaiting_approval: Clock3,
-    approved: CheckCircle2,
-    in_progress: Hammer,
-    resolved: CheckCircle2,
-    acknowledged: ThumbsUp,
-    declined: XCircle,
-    closed: CheckCircle2,
-  };
-  const Icon = icon[status];
+  const Icon = STATUS_ICON[status];
   return (
-    <span className={cn(base, tone[status], className)}>
+    <span className={cn(base, STATUS_TONE[status], className)}>
       <Icon className="size-3.5" aria-hidden="true" />
       {STATUS_LABEL[status]}
     </span>
@@ -62,7 +65,7 @@ export function StageBadge({ stage, className }: { stage: Stage; className?: str
   const tone: Record<Stage, string> = {
     received: "border border-border text-foreground",
     approved: "bg-info-tint text-info",
-    in_progress: "bg-warning-tint text-warning",
+    in_progress: "bg-info text-background",
     resolved: "bg-success-tint text-success",
     closed: "bg-secondary text-muted-foreground",
   };

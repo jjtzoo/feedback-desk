@@ -5,9 +5,11 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { PriorityBadge, StatusBadge } from "@/components/badges";
+import { useCounts } from "@/components/console/counts";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
 import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorText, type Detail } from "@/lib/api";
 import { WORK_TYPE_LABEL, age } from "@/lib/format";
@@ -15,6 +17,7 @@ import { WORK_TYPE_LABEL, age } from "@/lib/format";
 /** Approvals queue for Admins (brief §4.5): P1 first, a recommendation on every item, one decision is enough. */
 export default function ApprovalsPage() {
   const me = useMe();
+  const { refresh: refreshCounts } = useCounts();
   const [items, setItems] = useState<Detail[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ kind: ActionKind; ref: string } | null>(null);
@@ -37,6 +40,7 @@ export default function ApprovalsPage() {
       await api.post(`/console/items/${ref}/approve`);
       toast.success(`${ref} approved`);
       load();
+      refreshCounts();
     } catch (e) {
       toast.error(errorText(e));
     } finally {
@@ -51,6 +55,7 @@ export default function ApprovalsPage() {
       else await api.post(`/console/items/${dialog.ref}/ask-info`, { question: r.text, ask: r.ask });
       toast.success(kind === "decline" ? `${dialog.ref} declined` : "Question sent");
       load();
+      refreshCounts();
       return true;
     } catch (e) {
       toast.error(errorText(e));
@@ -68,9 +73,25 @@ export default function ApprovalsPage() {
         <h1 className="text-2xl font-extrabold">Approvals</h1>
         <p className="text-sm text-muted-foreground">One Admin&apos;s decision is enough.</p>
       </div>
-      {error && <p className="text-destructive" role="alert">{error}</p>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            {error}
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl"
+              onClick={() => {
+                setError(null);
+                load();
+              }}
+            >
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       {!items && !error && <Skeleton className="h-40 rounded-3xl" aria-busy="true" />}
-      {items?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">No items awaiting approval. New items appear here once routed.</p>}
+      {items?.length === 0 && <p className="rounded-3xl border border-dashed p-10 text-center text-muted-foreground">All caught up. Items waiting for a decision appear here once they are routed.</p>}
       {items?.map((i) => (
         <article key={i.reference} className="rounded-3xl border bg-card p-5 shadow-card">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -105,7 +126,7 @@ export default function ApprovalsPage() {
           </div>
         </article>
       ))}
-      <ActionDialog kind={dialog?.kind ?? null} onClose={() => setDialog(null)} onSubmit={onDialog} />
+      <ActionDialog key={`${dialog?.ref}-${dialog?.kind}`} kind={dialog?.kind ?? null} onClose={() => setDialog(null)} onSubmit={onDialog} />
     </div>
   );
 }

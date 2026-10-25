@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { raiseBug } from "./helpers";
+import { openActivity, raiseBug } from "./helpers";
 
 // Manual checklist section 26: passwords, card numbers and TFNs are masked before anything is stored.
 // People raise through the API (the backend does the masking) and the results are read on screen: the
@@ -71,7 +71,7 @@ async function openPanel(page: Page, ref: string) {
 
 /** The Conversation tab's lines. */
 async function conversation(panel: Locator) {
-  await panel.getByRole("tab", { name: /^Conversation/ }).click();
+  await openActivity(panel, "Messages");
   return panel.getByRole("tabpanel");
 }
 

@@ -2,9 +2,9 @@
 
 import { Flag, Paperclip, TrendingUp, Users } from "lucide-react";
 
-import { PriorityBadge, WorkTypeBadge } from "@/components/badges";
+import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
 import type { Card } from "@/lib/api";
-import { STATUS_LABEL, age, day, when } from "@/lib/format";
+import { age, day, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A card on the board and in Cards view (brief §4.4). */
@@ -41,7 +41,7 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
         {[card.project?.name ?? "Tool to confirm", card.submitter_name].join(" · ")}
       </span>
       <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-        {showStatus && <span className="font-semibold text-foreground">{STATUS_LABEL[card.status]}</span>}
+        {showStatus && <StatusBadge status={card.status} className="h-5 px-2 text-[11px]" />}
         <time dateTime={card.created_at} title={when(card.created_at)} className="font-mono tabular">
           {age(card.created_at)}
         </time>

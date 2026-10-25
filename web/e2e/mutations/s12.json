@@ -9,9 +9,9 @@
   "S12.08": ["\"Only approved items can be started.", "\"Only approved items can be startedx."],
   "S12.09": ["approved`", "approvedx`"],
   "S12.10": ["moved to In progress`", "moved to In progressx`"],
-  "S12.11": ["viewButton(page, \"List\")).toHaveAttribute(\"aria-pressed\", \"true\")", "viewButton(page, \"List\")).toHaveAttribute(\"aria-pressed\", \"false\")"],
+  "S12.11": ["viewButton(page, \"List\")).toHaveAttribute(\"aria-checked\", \"true\")", "viewButton(page, \"List\")).toHaveAttribute(\"aria-checked\", \"false\")"],
   "S12.12": ["OVERDUE.map((key) => world[key])", "OVERDUE.slice(1).map((key) => world[key])"],
   "S12.13": ["${f.value}(&|$)", "${f.value}x(&|$)"],
-  "S12.14": ["\"Expected by\"]", "\"Expected byx\"]"],
+  "S12.14": ["\"Expected by\", \"Actions\"]", "\"Expected byx\", \"Actions\"]"],
   "S12.15": ["toEqual(refsOf(urgent))", "toEqual(refsOf(urgent).reverse())"]
 }

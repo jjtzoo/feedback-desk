@@ -184,7 +184,7 @@ test("S21.04 Open items equals the number of items in the console's All open inb
 
   // Cards view lists every stage, one card per item.
   await page.goto("/console?inbox=open");
-  await page.getByRole("button", { name: "Cards", exact: true }).click();
+  await page.getByRole("radio", { name: "Cards", exact: true }).click();
   const cards = page.getByRole("button", { name: /FB-\d{4}/ });
   await expect(cards).toHaveCount(shown);
   await expect(cards.filter({ hasText: refs.resolved })).toHaveCount(1);

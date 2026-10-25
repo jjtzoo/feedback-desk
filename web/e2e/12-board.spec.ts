@@ -104,8 +104,9 @@ const COLUMN = 'section[aria-label$=" items"]';
 const column = (page: Page, title: string) => page.getByRole("region", { name: new RegExp(`^${title}, \\d+ items$`) });
 // The card's text runs on without spaces ("FB-0001P1"), so the reference ends where the digits do, not at a word edge.
 const boardCard = (page: Page, ref: string) => page.locator(CARD).filter({ hasText: new RegExp(`${ref}(?!\\d)`) });
-const viewButton = (page: Page, view: View) => page.getByRole("group", { name: "View" }).getByRole("button", { name: view, exact: true });
-const inboxTab = (page: Page, label: string) => page.getByRole("tab", { name: label, exact: true });
+// The view switch is a toggle group (radio buttons); a tab's name ends with its count when it has one ("Overdue, 2 items").
+const viewButton = (page: Page, view: View) => page.getByRole("radiogroup", { name: "View" }).getByRole("radio", { name: view, exact: true });
+const inboxTab = (page: Page, label: string) => page.getByRole("tab", { name: new RegExp(`^${label.replaceAll("/", "\\/")}(\\s*, \\d+ items)?$`) });
 
 /**
  * The page's first loads: the board, and the projects that fill the Project filter. A failed load
@@ -136,7 +137,7 @@ async function reloadWork(page: Page) {
 async function openWork(page: Page, view: View, query = "") {
   await gotoWork(page, query);
   await viewButton(page, view).click();
-  await expect(viewButton(page, view)).toHaveAttribute("aria-pressed", "true");
+  await expect(viewButton(page, view)).toHaveAttribute("aria-checked", "true");
   if (view === "Board") await expect(page.locator(COLUMN).first()).toBeVisible();
   if (view === "List") await expect(page.getByRole("columnheader", { name: "Ref" })).toBeVisible();
 }
@@ -171,8 +172,8 @@ test("S12.01 As Darlene, /console opens the Work page on 'Assigned to me' in Boa
   await expect(page.getByRole("heading", { level: 1, name: "Work" })).toBeVisible();
   await expect(inboxTab(page, "Assigned to me")).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(COLUMN).first()).toBeVisible();
-  await expect(viewButton(page, "Board")).toHaveAttribute("aria-pressed", "true");
-  await expect(viewButton(page, "List")).toHaveAttribute("aria-pressed", "false");
+  await expect(viewButton(page, "Board")).toHaveAttribute("aria-checked", "true");
+  await expect(viewButton(page, "List")).toHaveAttribute("aria-checked", "false");
   await expect(page.getByRole("columnheader")).toHaveCount(0);
 });
 
@@ -413,7 +414,7 @@ test.describe("moving cards", () => {
 test("S12.11 The chosen view (List) survives a reload and signing out and in; Mario, who never chose, gets Board", async ({ page, signIn }) => {
   const stillList = async () => {
     await expect(page.getByRole("columnheader", { name: "Ref" })).toBeVisible();
-    await expect(viewButton(page, "List")).toHaveAttribute("aria-pressed", "true");
+    await expect(viewButton(page, "List")).toHaveAttribute("aria-checked", "true");
     await expect(page.locator(COLUMN)).toHaveCount(0);
   };
 
@@ -432,8 +433,8 @@ test("S12.11 The chosen view (List) survives a reload and signing out and in; Ma
   await signIn("Mario");
   await gotoWork(page);
   await expect(page.locator(COLUMN).first()).toBeVisible();
-  await expect(viewButton(page, "Board")).toHaveAttribute("aria-pressed", "true");
-  await expect(viewButton(page, "List")).toHaveAttribute("aria-pressed", "false");
+  await expect(viewButton(page, "Board")).toHaveAttribute("aria-checked", "true");
+  await expect(viewButton(page, "List")).toHaveAttribute("aria-checked", "false");
   await expect(page.getByRole("columnheader")).toHaveCount(0);
 });
 
@@ -468,10 +469,10 @@ test("S12.13 The project, work type, category and priority filters and the searc
   await signIn("Marc");
   const open = (await allCards(page)).filter((c) => OPEN.includes(c.status));
   const filters = [
-    { label: "Project", option: "RAKE Agent", all: "All projects", param: "project", value: "rake-agent", match: (c: Card) => c.project?.slug === "rake-agent" },
-    { label: "Work type", option: "Improvement", all: "All work types", param: "work_type", value: "improvement", match: (c: Card) => c.work_type === "improvement" },
-    { label: "Category", option: "Bug", all: "All categories", param: "category", value: "bug", match: (c: Card) => c.category === "bug" },
-    { label: "Priority", option: "P2", all: "All priorities", param: "priority", value: "P2", match: (c: Card) => c.priority === "P2" },
+    { label: "Project", option: "RAKE Agent", param: "project", value: "rake-agent", match: (c: Card) => c.project?.slug === "rake-agent" },
+    { label: "Work type", option: "Improvement", param: "work_type", value: "improvement", match: (c: Card) => c.work_type === "improvement" },
+    { label: "Category", option: "Bug", param: "category", value: "bug", match: (c: Card) => c.category === "bug" },
+    { label: "Priority", option: "P2", param: "priority", value: "P2", match: (c: Card) => c.priority === "P2" },
   ];
   // An FB number, a word from a title and a person's name.
   const searches = [world.due, "dark", "Rafael"];
@@ -489,10 +490,13 @@ test("S12.13 The project, work type, category and priority filters and the searc
     expect(kept, `search ${q} drops some`).toBeLessThan(open.length);
   }
 
+  // One Filter button; each choice becomes a removable chip.
   const pick = async (label: string, option: string) => {
-    await page.getByRole("combobox", { name: label }).click();
-    await page.getByRole("option", { name: option, exact: true }).click();
+    await page.getByRole("button", { name: "Filter", exact: true }).click();
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
+    await page.getByRole("menuitemradio", { name: option, exact: true }).click();
   };
+  const clear = (label: string) => page.getByRole("button", { name: `Remove ${label} filter`, exact: true }).click();
   const search = async (text: string) => {
     const box = page.getByRole("textbox", { name: "Search", exact: true });
     await box.fill(text);
@@ -507,7 +511,7 @@ test("S12.13 The project, work type, category and priority filters and the searc
       await pick(f.label, f.option);
       await expect(page).toHaveURL(new RegExp(`[?&]${f.param}=${f.value}(&|$)`));
       await expectRefs(page, view, refsOf(open.filter(f.match)));
-      await pick(f.label, f.all);
+      await clear(f.label);
       await expectRefs(page, view, refsOf(open));
     }
     for (const q of searches) {
@@ -528,8 +532,8 @@ test("S12.13 The project, work type, category and priority filters and the searc
   await expect(page).toHaveURL(/[?&]priority=P2(&|$)/);
   await expectRefs(page, "Cards", refsOf(both));
   await reloadWork(page);
-  await expect(page.getByRole("combobox", { name: "Project" })).toHaveText("RAKE Agent");
-  await expect(page.getByRole("combobox", { name: "Priority" })).toHaveText("P2");
+  await expect(page.getByText("Project: RAKE Agent", { exact: true })).toBeVisible();
+  await expect(page.getByText("Priority: P2", { exact: true })).toBeVisible();
   await expectRefs(page, "Cards", refsOf(both));
 });
 
@@ -545,17 +549,18 @@ test("The console says so, and loads the filters on Try again, when the project 
   failing = false;
   await alert.getByRole("button", { name: "Try again" }).click();
   await expect(alert).toHaveCount(0);
-  await page.getByRole("combobox", { name: "Project", exact: true }).click();
-  await expect(page.getByRole("option", { name: "RAKE Agent" })).toBeVisible();
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Project", exact: true }).click();
+  await expect(page.getByRole("menuitemradio", { name: "RAKE Agent" })).toBeVisible();
 });
 
 test("S12.14 List view has the columns Ref, Title, Project, Type, Priority, Stage, Assignee, Age and Expected by (red when overdue)", async ({ page, signIn }) => {
   await signIn("Darlene");
   await openWork(page, "List");
-  await expect(page.getByRole("columnheader")).toHaveText(["Ref", "Title", "Project", "Type", "Priority", "Stage", "Assignee", "Age", "Expected by"]);
+  await expect(page.getByRole("columnheader")).toHaveText(["Ref", "Title", "Project", "Type", "Priority", "Stage", "Assignee", "Age", "Expected by", "Actions"]);
 
   const overdue = page.getByRole("row").filter({ hasText: world.p1 });
-  await expect(overdue.getByRole("cell")).toHaveText([world.p1, TEXT.p1, "RAKE Agent", "Fix", "P1 · Blocking", "Approved", "Darlene", /^(now|\d+ [mhd])$/, /15 Sep/]);
+  await expect(overdue.getByRole("cell")).toHaveText([world.p1, TEXT.p1, "RAKE Agent", "Fix", "P1 · Blocking", "Approved", "Darlene", /^(now|\d+ [mhd])$/, /15 Sep/, ""]);
   await expect(overdue.getByRole("cell").nth(8)).toHaveClass(/text-destructive/);
 
   const ahead = page.getByRole("row").filter({ hasText: world.due });

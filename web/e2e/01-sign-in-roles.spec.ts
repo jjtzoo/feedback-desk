@@ -152,7 +152,7 @@ test("S01.09 'Smoke Signal home' in the console header opens the staff home page
   await page.goto("/console");
   await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Smoke Signal home" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Tell us what's");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Spotted something not working?");
   await expect(page).toHaveURL(/\/$/);
 });
 
@@ -173,7 +173,7 @@ test("S01.11 Darlene's console side menu shows Work, Channels, Releases, Dashboa
   await signIn("Darlene");
   await page.goto("/console");
   await expect(consoleNav(page)).toBeVisible();
-  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", "Channels", "Releases", "Dashboard", "Admin"]);
+  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", /^Assigned to me/, /^Unassigned \/ needs review/, /^Overdue/, "Channels", "Releases", "Dashboard", "Admin"]);
   await expect(consoleNav(page).getByRole("link", { name: "Approvals" })).toHaveCount(0);
 });
 
@@ -187,7 +187,9 @@ test("S01.12 After signing out from the account menu, Chris lands on the console
   await pick(page, "Chris");
   await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
   await expect(page).toHaveURL(/\/console$/);
-  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", "Approvals", "Channels", "Releases", "Dashboard", "Admin"]);
+  await expect(consoleNav(page).getByRole("link")).toHaveText([/^Approvals/, "Work", /^Assigned to me/, /^Unassigned \/ needs review/, /^Overdue/, "Channels", "Releases", "Dashboard", "Admin"]);
+  // An Admin starts on what is open; the Digital team starts on what is theirs.
+  await expect(page.getByRole("tab", { name: /^All open/ })).toHaveAttribute("aria-selected", "true");
 });
 
 test("S01.13 Darlene typing /console/approvals sees 'Approvals are for Admins (Mike, Chris or Marc).'", async ({ page, signIn, team }) => {

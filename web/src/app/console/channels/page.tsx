@@ -20,6 +20,7 @@ export default function ChannelsPage() {
     <div className="mx-auto grid max-w-4xl gap-6 p-4 sm:p-6">
       <div>
         <h1 className="text-2xl font-extrabold">Channels</h1>
+        <p className="text-sm text-muted-foreground">Team chat for each tool, outside any single feedback item. Notes on one item belong on that item.</p>
         <p className="text-sm text-muted-foreground">Private to the Digital team. Staff never see these.</p>
       </div>
       {error && <p className="text-destructive" role="alert">{error}</p>}

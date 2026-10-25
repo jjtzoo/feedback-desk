@@ -57,7 +57,7 @@ async function choose(page: Page, trigger: Locator, option: string) {
 /** A console inbox in Cards view, which lists every stage, so an item shows wherever it is. */
 async function inboxCards(page: Page, inbox: string) {
   await page.goto(`/console?inbox=${inbox}`);
-  await page.getByRole("button", { name: "Cards", exact: true }).click();
+  await page.getByRole("radio", { name: "Cards", exact: true }).click();
 }
 
 async function openChat(page: Page) {

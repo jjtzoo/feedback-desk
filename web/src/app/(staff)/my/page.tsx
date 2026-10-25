@@ -95,7 +95,7 @@ export default function MyFeedbackPage() {
                           </time>
                         </span>
                       </span>
-                      <StageBadge stage={i.stage} className="hidden sm:inline-flex" />
+                      <StageBadge stage={i.stage} className="hidden shrink-0 sm:inline-flex" />
                       <ChevronRight className="size-5 text-muted-foreground" aria-hidden="true" />
                     </Link>
                   </li>

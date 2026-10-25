@@ -33,6 +33,7 @@ from app.services.feedback import day_text, load
 log = logging.getLogger(__name__)
 
 PAGE_SIZE = 50
+APPROVAL_STATUSES = ("awaiting_approval", "needs_review")
 BOARD_COLUMNS = (
     ("needs_review", "Needs review", ("needs_review", "new")),
     ("awaiting_approval", "Awaiting approval", ("awaiting_approval",)),
@@ -185,6 +186,21 @@ async def board(db: AsyncSession, user: User, f: Filters) -> list[Column]:
         overdue = sum(1 for i in items if i.expected_by and i.expected_by < today and i.status in OPEN_STATUSES)
         cols.append(Column(key, title, items, len(items), overdue))
     return cols
+
+
+INBOXES = ("mine", "needs_review", "open", "overdue", "closed")
+
+
+async def counts(db: AsyncSession, user: User) -> dict[str, int]:
+    """What needs attention, for the sidebar and the inbox tabs: one number per inbox, plus the Admin's approvals."""
+    require_digital(user)
+    out: dict[str, int] = {}
+    for inbox in INBOXES:
+        ids = _filtered(user, Filters(inbox=inbox)).with_only_columns(Feedback.id).subquery()
+        out[inbox] = int(await db.scalar(select(func.count()).select_from(ids)) or 0)
+    waiting = select(func.count()).where(Feedback.status.in_(APPROVAL_STATUSES))
+    out["approvals"] = int(await db.scalar(waiting) or 0) if user.is_admin else 0
+    return out
 
 
 async def has_files(db: AsyncSession, ids: list[uuid.UUID]) -> set[uuid.UUID]:
@@ -596,7 +612,7 @@ async def approvals(db: AsyncSession, user: User) -> list[Feedback]:
         await db.scalars(
             select(Feedback)
             .options(selectinload(Feedback.project), selectinload(Feedback.assignee))
-            .where(Feedback.status.in_(("awaiting_approval", "needs_review")))
+            .where(Feedback.status.in_(APPROVAL_STATUSES))
             .order_by(rank, Feedback.created_at)
         )
     )
