@@ -182,6 +182,16 @@ def test_draft_validation_rejects_unknown_values() -> None:
     assert draft["brief"]["steps"] == ["Open RAKE", "Ask anything"] and draft["confidence"]["project"] == 0.9
 
 
+def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
+    praise = {k: v for k, v in COMPLETE.items() if k != "priority"} | {"category": "praise", "work_type": "no_change"}
+    draft, errors = apply_update({}, praise, {"rake-agent"})
+    assert not errors and draft["priority"] == "P4" and not missing(draft)
+    bug, _ = apply_update({}, {k: v for k, v in COMPLETE.items() if k != "priority"}, {"rake-agent"})
+    assert "priority" in missing(bug)  # anything else still waits for the impact question
+    kept, _ = apply_update({}, {**praise, "priority": "P2"}, {"rake-agent"})
+    assert kept["priority"] == "P2"  # a priority the model did set is left alone
+
+
 def test_draft_hash_changes_with_any_field() -> None:
     a, _ = apply_update({}, COMPLETE, {"rake-agent"})
     b, _ = apply_update(a, {"priority": "P1"}, {"rake-agent"})

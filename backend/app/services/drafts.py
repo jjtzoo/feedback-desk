@@ -98,6 +98,10 @@ def apply_update(draft: Draft, updates: dict[str, Any], valid_slugs: set[str]) -
             new["flag_abuse"] = bool(value)
         else:
             errors.append(f"Unknown field {field}.")
+    # Praise has no impact to ask about, so it never waits on a priority: without one the confirm
+    # card would never show.
+    if new.get("category") == "praise" and not new.get("priority"):
+        new["priority"] = "P4"
     return new, errors
 
 
