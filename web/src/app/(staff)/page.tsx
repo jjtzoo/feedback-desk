@@ -17,9 +17,9 @@ import { api, type MyItem, type Project } from "@/lib/api";
 import { age } from "@/lib/format";
 
 const STEPS = [
-  { title: "Describe it in your own words", body: "Sig, the assistant, asks only what the team needs to act on it. You can attach a screenshot." },
-  { title: "Review and confirm", body: "Nothing is submitted until you select Confirm." },
-  { title: "Follow its progress", body: "You receive a reference such as FB-0137, a named owner and a tracker showing each stage." },
+  { title: "Tell Sig in your own words", body: "Sig asks up to three quick questions, and you can attach a screenshot." },
+  { title: "Check the summary", body: "Nothing is sent until you select Confirm." },
+  { title: "Follow it like a parcel", body: "You get a reference such as FB-0137 and a tracker that shows who has it and where it's up to." },
 ];
 
 const GROUPS: { key: Project["project_group"]; label: string }[] = [
@@ -63,17 +63,17 @@ function Landing() {
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pt-8 pb-28 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
           <div>
             <p className="text-sm font-semibold text-white/80">Hi {firstName}</p>
-            <h1 className="mt-4 max-w-[17ch] text-4xl leading-[1.05] font-extrabold sm:text-5xl">
-              Tell us what&apos;s{" "}
-              <span className="rounded-xl bg-card px-2 text-primary [box-decoration-break:clone]">not working</span>, or what could work better
+            <h1 className="mt-4 max-w-[19ch] text-4xl leading-[1.05] font-extrabold text-balance sm:text-5xl">
+              Spotted something{" "}
+              <span className="rounded-xl bg-card px-2 text-primary [box-decoration-break:clone]">not working</span>? Let&nbsp;us&nbsp;know
             </h1>
             <p className="mt-5 max-w-[54ch] text-lg leading-relaxed text-white/85">
-              Report a problem, request access or suggest an improvement for any intranet platform or agent. It takes about two minutes, and you
-              can follow its progress at every stage.
+              Tell Sig about a problem, an idea or access you need, for any intranet platform or agent. It takes about two minutes, and you can
+              check where it&apos;s up to any time.
             </p>
             <Button asChild className="mt-7 h-12 rounded-xl bg-card px-6 text-base text-primary hover:bg-card/90">
               <Link href="/chat">
-                Start a conversation <ArrowRight />
+                Give feedback <ArrowRight />
               </Link>
             </Button>
           </div>
@@ -86,7 +86,7 @@ function Landing() {
                 <p className="flex items-center gap-2 font-bold">
                   Sig <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">AI</span>
                 </p>
-                <p className="text-sm text-muted-foreground">Asks a few questions, then sends it on</p>
+                <p className="text-sm text-muted-foreground">Asks a few questions, then passes it to the right person</p>
               </div>
             </div>
             <div className="mt-4 grid gap-3 text-[15px]">
@@ -209,7 +209,7 @@ function Landing() {
             {recent?.length === 0 && (
               <div className="mt-3 grid justify-items-center gap-3 text-center">
                 <Image src="/brand/sig/sig-3d.svg" alt="" width={80} height={96} unoptimized />
-                <p className="text-sm text-muted-foreground">No feedback submitted yet. Anything you send will appear here with its progress.</p>
+                <p className="text-sm text-muted-foreground">Nothing here yet. Anything you send shows up here, with where it&apos;s up to.</p>
               </div>
             )}
             <ul className="mt-3 divide-y">
@@ -232,13 +232,13 @@ function Landing() {
 
         <div className="flex flex-wrap gap-x-8 gap-y-3 text-sm text-muted-foreground">
           <span className="inline-flex items-center gap-2">
-            <ShieldCheck className="size-4" aria-hidden="true" /> Visible only to the Digital Team
+            <ShieldCheck className="size-4" aria-hidden="true" /> Only you and the team handling it can see it
           </span>
           <span className="inline-flex items-center gap-2">
-            <Users className="size-4" aria-hidden="true" /> Every item has an owner and an approver
+            <Users className="size-4" aria-hidden="true" /> A named person looks after every item
           </span>
           <span className="inline-flex items-center gap-2">
-            <Link2 className="size-4" aria-hidden="true" /> Every item has a reference and a tracker
+            <Link2 className="size-4" aria-hidden="true" /> Track any item by its reference
           </span>
         </div>
       </div>

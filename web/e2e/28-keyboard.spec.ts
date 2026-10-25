@@ -120,7 +120,7 @@ test("S28.01 Tab through the landing page, chat, tracker and console: a visible 
     "Smoke Signal",
     ...HEADER,
     "Account: Liam Carter",
-    /^Start a conversation/,
+    /^Give feedback/,
     /^Something's broken/,
     /^I need access/,
     /^I have an idea/,
