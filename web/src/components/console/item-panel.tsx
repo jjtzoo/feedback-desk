@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { FileText, Lock } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorText, type Detail, type Project, type Staff } from "@/lib/api";
-import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, age, fileSize, when } from "@/lib/format";
+import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, ago, fileSize, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
@@ -145,7 +145,7 @@ export function ItemPanel({
               </div>
               <SheetTitle className="mt-2 text-xl leading-snug font-bold">{item.title}</SheetTitle>
               <SheetDescription>
-                {[item.work_type && WORK_TYPE_LABEL[item.work_type], item.project?.name ?? "Tool to confirm", item.submitter_name].filter(Boolean).join(" · ")} · {age(item.created_at)} ago
+                {[item.work_type && WORK_TYPE_LABEL[item.work_type], item.project?.name ?? "Tool to confirm", item.submitter_name].filter(Boolean).join(" · ")} · {ago(item.created_at)}
                 {item.channel === "fallback" && " · backup form"}
               </SheetDescription>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -323,6 +323,7 @@ export function ItemPanel({
                     >
                       <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-semibold text-foreground">{m.author_name ?? "Feedback"}</span>
+                        {m.is_internal && <Lock className="size-3.5" aria-hidden="true" />}
                         {MESSAGE_LABEL[m.message_type]} · {when(m.created_at)}
                       </p>
                       <p className="whitespace-pre-wrap">{m.body}</p>

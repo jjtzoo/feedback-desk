@@ -138,8 +138,8 @@ test("S13.02 The panel header shows the reference, badges, title, tool, submitte
   await expect(header.getByText("P2 · Major")).toBeVisible();
   await expect(header.getByText("Awaiting approval", { exact: true })).toBeVisible();
   await expect(header.getByRole("heading", { name: title })).toBeVisible();
-  // "Fix · tool · submitter · age ago": the age is "now" in the first minute, then "3 m", "2 h", "1 d".
-  await expect(header).toContainText(/Fix · RAKE Agent · Aisha Rahman · (now|\d+ [mhd]) ago/);
+  // "Fix · tool · submitter · age": "just now" in the first minute, then "3 m ago", "2 h ago", "1 d ago".
+  await expect(header).toContainText(/Fix · RAKE Agent · Aisha Rahman · (just now|\d+ [mhd] ago)/);
   await expect(header).not.toContainText("backup form");
 
   // The same through the backup form.
@@ -150,7 +150,7 @@ test("S13.02 The panel header shows the reference, badges, title, tool, submitte
   });
   await openItem(page, saved.reference);
   await expect(header.getByRole("heading", { name: /RAKE Agent export stops halfway through/ })).toBeVisible();
-  await expect(header).toContainText(/RAKE Agent · Mei Lin · (now|\d+ [mhd]) ago · backup form/);
+  await expect(header).toContainText(/RAKE Agent · Mei Lin · (just now|\d+ [mhd] ago) · backup form/);
   await expect(header.getByText("P2 · Major")).toBeVisible();
 });
 
@@ -344,8 +344,6 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   await expect(note).toContainText("Internal note");
   await expect(note).toHaveClass(/border-dashed/);
 
-  // The lock comes last: the dashed border and the label are checked first, so only the lock is the known bug.
-  test.fail(true, "Known bug: an internal note has a dashed border and the label but no lock icon (src/components/console/item-panel.tsx)");
   await expect(note.locator('svg[class*="lucide-lock"]')).toHaveCount(1);
 });
 

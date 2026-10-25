@@ -6,6 +6,7 @@
   "S13.05": ["priority P2 → priority P1", "priority P2 → priority P3"],
   "S13.06": ["Reassigned to Mario", "Reassigned to Mariox", 2],
   "S13.07": ["toHaveCount(1)", "toHaveCount(2)"],
+  "S13.08": ["lucide-lock\"]", "lucide-lockx\"]"],
   "S13.09": [".toBe(file.buffer.length)", ".toBe(file.buffer.length + 1)"],
   "S13.10": ["toHaveCount(events.length)", "toHaveCount(events.length + 1)"],
   "S13.11": ["Waiting for an Admin to approve.", "Waiting for an Adminx to approve."]

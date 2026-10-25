@@ -43,6 +43,7 @@ Format:
 - Expected: every control reached by Tab shows a visible focus ring, with no invisible stops.
 - Actual: after "Back to home", Tab lands on a clipped 1 x 1 px file input (`input#chat-files`, `web/src/components/chat/chat-panel.tsx`) before the "Attach a file" button, and nothing shows focus.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/keyboard-and-small-ui`. The file input has `tabIndex={-1}`, so "Attach a file" is the only stop. S28.01 passes, its `test.fail()` is out, mutation 28 caught 5/5.
 
 ## S28.03 After Esc closes a dialog, focus does not return to the button that opened it
 - Test: e2e/28-keyboard.spec.ts: S28.03 (`test.fail()`)
@@ -50,6 +51,7 @@ Format:
 - Expected: the dialog closes and focus returns to the Decline button; Tab stays inside while it is open.
 - Actual: the dialog closes and Tab stays inside, but focus is not on Decline afterwards (probably the page body). The dialogs open through a controlled `open` prop with no trigger, so Radix has nothing to return focus to.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/keyboard-and-small-ui`. `ActionDialog` remembers the focused element when the dialog opens and focuses it again on close (`onOpenAutoFocus` / `onCloseAutoFocus`). S28.03 passes, its `test.fail()` is out. Its mutation now expects focus on the card instead of inverting the check, because `not.toBeFocused()` passes in the tick before focus returns.
 
 ## S13.08 Internal notes have no lock icon
 - Test: e2e/13-item-panel.spec.ts: S13.08 (the dashed border and the "Internal note" label are asserted first; only the lock icon is `test.fail()`)
@@ -57,6 +59,7 @@ Format:
 - Expected: the note is dashed, labelled "Internal note" and has a lock icon (checklist S13.08).
 - Actual: dashed border and label are there, no lock icon. `web/src/components/console/item-panel.tsx` has no lock icon.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/keyboard-and-small-ui`. Internal notes show a `Lock` icon (hidden from screen readers; the "Internal note" label already says it). S13.08 passes, its `test.fail()` is out, mutation 13 caught 11/11.
 
 ## S14.05 After Resolve, the newest tracker entry is "Update", with "Resolved" second
 - Test: e2e/14-status-changes.spec.ts: S14.05 (the "Resolved: <note>" entry is asserted present; only "it is the first entry" is `test.fail()`)
@@ -66,8 +69,8 @@ Format:
 - Found: 2026-10-22
 
 ## Outside the checklist: small things the browser tests noticed
-- The dashboard's "Open by project" section has `aria-labelledby="bl-Open by project"`, an id with spaces, so the section has no accessible name (`web/src/app/console/dashboard/page.tsx`). Found 2026-10-22.
-- The item panel's age reads "now ago" during the first minute. Found 2026-10-22.
+- Fixed 2026-10-25 on `fix/keyboard-and-small-ui`: the dashboard's "Open by project" section had `aria-labelledby="bl-Open by project"`, an id with spaces, so the section had no accessible name. `BarList` now uses `useId()`.
+- Fixed 2026-10-25 on `fix/keyboard-and-small-ui`: the item panel (and My feedback) read "now ago" in the first minute. `ago()` in `web/src/lib/format.ts` gives "just now"; S07.02, S13.02 and the backup-form header check now expect it.
 - S13.06: the tracker says "Reassigned to Mario" where the checklist says "Assigned to Mario". Treated as wording, not a bug; the test asserts the app's wording. Found 2026-10-22.
 - Guide tour (S02.03, S02.04, S02.05), from reading `web/src/components/guide.tsx`: the spotlight's solid `ring-4 ring-primary` never renders (Tailwind v4 rings are box-shadows and the inline dimming `boxShadow` overrides them), so the only red is the pulsing outline at 60 % opacity; the small card is shorter but not narrower. While the small card asks for a click, mouse clicks elsewhere are blocked but the keyboard is not: Tab reaches page controls, and Radix triggers that open on keydown (the account menu, "Already know which tool?") still open. The "Try it out" card covers about 352 x 130 px at the bottom right, and controls under it can't be clicked until Next. Pressing Guide during "Try it out" gives a "Try it out … Have a look at Welcome to Smoke Signal" card; moving between the staff area and the console mid-tour ends the tour without marking it seen. Found 2026-10-23.
 
