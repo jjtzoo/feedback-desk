@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Lock } from "lucide-react";
+import { FileText, Lock, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -142,6 +142,16 @@ export function ItemPanel({
                 <span className="font-mono text-sm font-semibold">{item.reference}</span>
                 <PriorityBadge showCode priority={item.priority} />
                 <StatusBadge status={item.status} />
+                {item.reporters > 1 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                    <Users className="size-3.5" aria-hidden="true" /> Reported by {item.reporters} people
+                  </span>
+                )}
+                {item.priority_review && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
+                    <TrendingUp className="size-3.5" aria-hidden="true" /> Priority review suggested
+                  </span>
+                )}
               </div>
               <SheetTitle className="mt-2 text-xl leading-snug font-bold">{item.title}</SheetTitle>
               <SheetDescription>
