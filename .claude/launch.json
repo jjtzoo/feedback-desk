@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "api",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "uv", "--directory", "backend", "run", "python", "-m", "scripts.dev_server"],
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["--directory", "backend", "run", "python", "-m", "scripts.dev_server"],
       "port": 8001
     },
     {

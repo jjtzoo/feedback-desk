@@ -5,6 +5,7 @@ user from session state, which only the API writes (D12).
 """
 
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -19,6 +20,7 @@ from app.services.actors import User
 from app.services.drafts import GENERAL, apply_update, missing
 
 log = logging.getLogger(__name__)
+UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
 
 
 async def list_projects() -> dict[str, Any]:
@@ -112,12 +114,35 @@ async def update_draft(
     """
     updates = {k: v for k, v in locals().items() if k != "tool_context"}
     async with session_scope() as db:
-        slugs = {p.slug for p in await catalog.list_projects(db)}
-    draft, errors = apply_update(dict(tool_context.state.get("draft") or {}), updates, slugs)
+        projects = await catalog.list_projects(db)
+    draft, errors = apply_update(dict(tool_context.state.get("draft") or {}), updates, {p.slug for p in projects})
+    result: dict[str, Any] = {}
+    slug = draft.get("project_slug")
+    chosen = next((p for p in projects if p.slug == slug), None)
+    said = str(tool_context.state.get("user_text") or "")
+    if chosen and slug != tool_context.state.get("project_hint") and not _names(said, chosen):
+        if UNSURE_RE.search(said.lower()):
+            # They were asked and don't know: the Digital team checks it (needs review), no more questions.
+            draft["project_slug"] = GENERAL
+            draft.setdefault("confidence", {})["project"] = 0.3
+        else:
+            # "The page is slow" names no tool: don't let a guess pass for an answer.
+            draft.setdefault("confidence", {})["project"] = min(float(draft["confidence"].get("project", 1.0)), 0.5)
+            result["note"] = (
+                f"They have not named {chosen.name} or anything that identifies it. Ask "
+                "'Which tool is this about?' before the summary, unless you already asked."
+            )
     tool_context.state["draft"] = draft
     # Any edit means the person has not confirmed this version (D12).
     tool_context.state["draft_confirmed"] = False
-    return {"draft": draft, "missing": missing(draft), "errors": errors}
+    return {"draft": draft, "missing": missing(draft), "errors": errors, **result}
+
+
+def _names(said: str, project: Any) -> bool:
+    """Whether the person's words name the project: its name, an alias or a keyword, as whole words."""
+    low = said.lower()
+    words = [project.name, project.slug.replace("-", " "), *project.aliases, *project.keywords]
+    return any(re.search(rf"\b{re.escape(w.lower())}\b", low) for w in words if w)
 
 
 async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str, Any]:
