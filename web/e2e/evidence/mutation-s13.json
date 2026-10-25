@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-22T23:01:33.209Z",
-  "commit": "9288b7f",
+  "ran": "2026-10-25T03:24:14.537Z",
+  "commit": "e801289",
   "uncommitted": true,
   "spec": "13-item-panel.spec.ts",
-  "fingerprint": "91fcc96ae96e14f1",
+  "fingerprint": "7b596e1c138f4529",
   "caught": {
     "S13.01": true,
     "S13.02": true,
@@ -12,6 +12,7 @@
     "S13.05": true,
     "S13.06": true,
     "S13.07": true,
+    "S13.08": true,
     "S13.09": true,
     "S13.10": true,
     "S13.11": true

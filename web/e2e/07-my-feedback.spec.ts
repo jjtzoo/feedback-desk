@@ -50,7 +50,7 @@ test("S07.02 a row shows the reference, title, tool or 'Tool to confirm', a plai
   await expect(row).toContainText(title);
   await expect(row).toContainText("RAKE Agent");
   await expect(row).toContainText(/waiting for approval/i);
-  await expect(row.locator("time")).toHaveText(/^updated .+ ago$/);
+  await expect(row.locator("time")).toHaveText(/^updated (just now|.+ ago)$/);
 
   const noTool = page.getByRole("link", { name: new RegExp(unsure) });
   await expect(noTool).toContainText("Tool to confirm");

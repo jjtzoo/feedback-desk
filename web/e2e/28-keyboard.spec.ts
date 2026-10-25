@@ -106,7 +106,6 @@ async function reachCard(page: Page, description: string) {
 }
 
 test("S28.01 Tab through the landing page, chat, tracker and console: a visible focus ring on every control, in a sensible order", async ({ page, signIn, team }) => {
-  test.fail(true, "Known bug: the chat's hidden file input (#chat-files, 1 x 1 px) is a Tab stop with no visible focus ring"); // S28.01
   test.setTimeout(120_000);
   await signIn("Liam");
   // An approved item, so the landing page lists it, the tracker has an owner to email and the board has a card.
@@ -199,7 +198,6 @@ test("S28.02 In the chat, focus moves to the 'Your feedback' heading when the ca
 });
 
 test("S28.03 Esc closes a dialog and focus returns to the button that opened it; Tab stays inside while it is open", async ({ page, signIn, team }) => {
-  test.fail(true, "Known bug: after Esc closes the Decline dialog, focus does not return to the Decline button"); // S28.03
   await signIn("Chris");
   // An item waiting for approval gives Chris a Decline button on the Approvals page.
   const ref = await raiseBug(await team.as("Tom"), "rake-agent", "RAKE Agent shows an error when I press escape");

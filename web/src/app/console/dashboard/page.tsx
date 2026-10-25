@@ -1,7 +1,7 @@
 "use client";
 
 import { TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,10 +26,11 @@ function Stat({ label, value, note, warn }: { label: string; value: string; note
 
 /** One-series ranked bars with direct value labels (no legend needed for one series). */
 function BarList({ title, rows }: { title: string; rows: { label: string; count: number }[] }) {
+  const headingId = useId();
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby={`bl-${title}`}>
-      <h2 id={`bl-${title}`} className="font-bold">
+    <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby={headingId}>
+      <h2 id={headingId} className="font-bold">
         {title}
       </h2>
       {rows.length === 0 ? (
