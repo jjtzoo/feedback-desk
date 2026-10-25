@@ -1,6 +1,8 @@
 """Sprint 1: schema, seed, health, Google sign-in rules and roles (S1-2, S1-3)."""
 
 import asyncio
+import json
+from typing import cast
 
 import httpx
 import pytest
@@ -9,6 +11,7 @@ from sqlalchemy import func, select, text
 from app.config import get_settings
 from app.db import session_scope
 from app.errors import Forbidden
+from app.main import app
 from app.models import DigitalStaff, Project, RoutingRule
 from app.seed import seed_all
 from app.services import auth
@@ -142,6 +145,41 @@ async def test_sign_out_revokes_the_session() -> None:
     client.cookies.set("fb_session", cookie or "")
     assert (await client.get("/api/me")).status_code == 401
     await client.aclose()
+
+
+async def test_a_write_is_committed_before_its_response_is_sent() -> None:
+    """A client that acts on a 2xx at once must find the data saved. Sign-in is the sharpest case:
+    the browser loads the next page with the new cookie straight away."""
+    found: list[bool] = []
+    body = json.dumps({"email": STAFF}).encode()
+
+    async def receive() -> dict[str, object]:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    async def send(message: dict[str, object]) -> None:
+        if message["type"] != "http.response.start":
+            return
+        headers = cast(list[tuple[bytes, bytes]], message["headers"])
+        cookie = next(v.decode() for k, v in headers if k == b"set-cookie" and v.startswith(b"fb_session="))
+        # Another connection, as the browser's next request would be, while this response is going out.
+        async with session_scope() as db:
+            found.append(await auth.user_for_session(db, cookie.split(";")[0].split("=", 1)[1]) is not None)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "POST",
+        "scheme": "http",
+        "path": "/api/auth/dev/sign-in",
+        "raw_path": b"/api/auth/dev/sign-in",
+        "query_string": b"",
+        "headers": [(b"host", b"testserver"), (b"content-type", b"application/json")],
+        "client": ("127.0.0.1", 1),
+        "server": ("testserver", 80),
+    }
+    await app(scope, receive, send)
+    assert found == [True]
 
 
 async def test_google_start_needs_the_oauth_client(anon: httpx.AsyncClient) -> None:
