@@ -507,9 +507,9 @@ Four one-week sprints, one per brief phase. Points are relative size, not hours;
 
 **Gate accepted when:** the pilot is complete, no P1 bugs are open, Marc and Chris sign off UAT, and the tile is live on the intranet.
 
-### Build status (2026-10-20)
+### Build status (2026-10-25)
 
-Built against this spec, ahead of the sprint gates; committed on a working branch, nothing deployed.
+Built against this spec, ahead of the sprint gates; merged to `main`, nothing deployed.
 
 | Area | Status |
 | --- | --- |
@@ -526,8 +526,8 @@ Built against this spec, ahead of the sprint gates; committed on a working branc
 | Friday releases (S4-1) | Built: drafter, owner review, publish, What's new, contributor notifications. The drafter assembles from sources; AI rewording comes with the key. |
 | Deployment (S1-1, S4-2) | Written, not run: `deploy.sh`, `deploy.ps1`, Cloud Run YAML, worker job, scheduler, CI workflow. Needs Google Cloud access (asks 1, 9) and the company GitHub repository (ask 5). Agent Engine deployment still to do once access exists. |
 | Pilot and launch (S4-3, S4-4) | Not started. |
-| Browser tests | Playwright tests of the manual checklist on the stub model and a local database: 219 of 227 items have a test, 214 pass and are shown able to fail, 91 of them also passed 10 runs in a row, 8 known bugs, 1 skipped (S10.09, no Docker here); mobile, dark mode and reduced motion not yet. Per requirement F1 to F18: `docs/testing/feature-evidence.md`; run reports: `docs/testing/browser-tests-2026-10-22.md`, `docs/testing/browser-tests-2026-10-23.md`; bugs: `web/e2e/FINDINGS.md`. Not run on staging or against Gemini. |
-| Checks | Backend: 74 tests, Ruff, mypy strict. Web: ESLint, TypeScript, production build. Screens checked in a browser at desktop and 375 px, light and dark. |
+| Browser tests | Playwright tests of the manual checklist on the stub model and a local database: 219 of 227 items have a test; on the full run of 2026-10-25, 216 pass, 2 are known bugs awaiting a product decision (S22.01 allowance meter, S22.05 limit mid-chat, D36) and 1 is skipped (S10.09, needs Docker, which this machine does not have); 214 tests are shown able to fail; 91 of them also passed 10 runs in a row on 2026-10-23; mobile (S27), dark mode (S29) and reduced motion (S30) have no test yet. Random test failures on 2026-10-25 were traced to the API committing after it replied; fixed (`Db` in `app/api/deps.py` commits before the response) and covered by a backend test. Per requirement F1 to F18: `docs/testing/feature-evidence.md`; run reports: `docs/testing/browser-tests-2026-10-22.md`, `docs/testing/browser-tests-2026-10-23.md`; bugs: `web/e2e/FINDINGS.md`. Not run on staging or against Gemini. |
+| Checks | Backend: 81 tests, Ruff, mypy strict. Web: ESLint, TypeScript, production build. Screens checked in a browser at desktop and 375 px, light and dark. |
 
 ## UI
 

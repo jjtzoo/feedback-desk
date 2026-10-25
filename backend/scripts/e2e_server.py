@@ -61,7 +61,18 @@ class Api:
         env = {**os.environ, "MODEL_PROVIDER": provider}
         while True:
             self.child = subprocess.Popen(
-                [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(E2E_PORT)],
+                [
+                    sys.executable,
+                    "-m",
+                    "uvicorn",
+                    "app.main:app",
+                    "--host",
+                    "127.0.0.1",
+                    "--port",
+                    str(E2E_PORT),
+                    "--timeout-keep-alive",
+                    "620",  # longer than the web proxy's idle time, as in the Dockerfile
+                ],
                 cwd=BACKEND_DIR,
                 env=env,
             )
