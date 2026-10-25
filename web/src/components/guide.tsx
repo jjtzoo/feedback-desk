@@ -308,7 +308,11 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
       <div className="pointer-events-none fixed inset-0 z-50">
         <div
           role="status"
-          className="pointer-events-auto absolute right-4 bottom-4 flex w-[min(22rem,calc(100vw-2rem))] items-center gap-2 rounded-2xl bg-popover p-2 pl-4 text-popover-foreground shadow-card ring-1 ring-foreground/10"
+          className={cn(
+            "pointer-events-auto absolute right-4 flex w-[min(22rem,calc(100vw-2rem))] items-center gap-2 rounded-2xl bg-popover p-2 pl-4 text-popover-foreground shadow-card ring-1 ring-foreground/10",
+            // Out of the way of the control being tried: the bottom corner, unless that control sits low on the screen.
+            rect && rect.top > window.innerHeight / 2 ? "top-4" : "bottom-4",
+          )}
         >
           {/* One row, so it covers as little of the page as possible while the person tries the feature. */}
           <p className="min-w-0 flex-1 text-sm">

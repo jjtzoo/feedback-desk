@@ -45,6 +45,7 @@ function Work() {
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [pendingMove, setPendingMove] = useState<{ ref: string; column: "resolved" | "closed" } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lookupsFailed, setLookupsFailed] = useState(false);
 
   const inbox = params.get("inbox") ?? "mine";
   const item = params.get("item");
@@ -63,10 +64,12 @@ function Work() {
     [params, pathname, router],
   );
 
-  useEffect(() => {
-    api.get<Project[]>("/projects").then(setProjects).catch(() => undefined);
-    api.get<Staff[]>("/admin/digital-staff").then(setStaff).catch(() => undefined);
+  const loadLookups = useCallback(() => {
+    api.get<Project[]>("/projects").then(setProjects).catch(() => setLookupsFailed(true));
+    api.get<Staff[]>("/admin/digital-staff").then(setStaff).catch(() => setLookupsFailed(true));
   }, []);
+
+  useEffect(loadLookups, [loadLookups]);
 
   const load = useCallback(() => {
     const current = view ?? "board";
@@ -179,6 +182,18 @@ function Work() {
         <FilterSelect label="Category" all="All categories" value={params.get("category")} options={CATEGORIES.map((c) => [c, CATEGORY_LABEL[c]])} onChange={(v) => setParam("category", v)} />
         <FilterSelect label="Priority" all="All priorities" value={params.get("priority")} options={PRIORITIES.map((p) => [p, p])} onChange={(v) => setParam("priority", v)} />
       </div>
+
+      {lookupsFailed && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-destructive" role="alert">
+          The Project filter and the assignee list did not load.
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={() => {
+              setLookupsFailed(false);
+              loadLookups();
+            }}>
+            Try again
+          </Button>
+        </p>
+      )}
 
       {error && <p className="text-destructive" role="alert">{error}</p>}
 

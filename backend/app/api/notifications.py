@@ -4,15 +4,16 @@ The page falls back to polling every 30 seconds if the stream drops."""
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Cookie, Request
 from fastapi.responses import Response
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import STREAM_HEADERS, CurrentUser, Db, StreamUser
 from app.db import session_scope
 from app.schemas import NotificationOut, NotificationsOut, ReadIn
-from app.services import notifications
+from app.services import auth, notifications
 
 router = APIRouter(tags=["notifications"])
 STREAM_CHECK_SECONDS = 3
@@ -31,18 +32,27 @@ async def read(body: ReadIn, db: Db, user: CurrentUser) -> Response:
 
 
 @router.get("/notifications/stream")
-async def stream(request: Request, user: StreamUser) -> EventSourceResponse:
-    """Sends {"unread": n} whenever something new arrives. Checks Postgres (no Redis, D26)."""
+async def stream(
+    request: Request, user: StreamUser, fb_session: Annotated[str | None, Cookie()] = None
+) -> EventSourceResponse:
+    """Sends {"unread": n} whenever something new arrives. Checks Postgres (no Redis, D26), and
+    the sign-in each time: signing out, or a revoked or expired session, ends the stream."""
 
     async def events() -> AsyncIterator[dict[str, str]]:
         last: str | None = "start"
         while not await request.is_disconnected():
             async with session_scope() as db:
+                signed_in = await auth.user_for_session(db, fb_session) is not None
+            if not signed_in:
+                return
+            unread: int | None = None
+            async with session_scope() as db:
                 newest = await notifications.latest_id(db, user.email)
                 if newest != last:
                     last = newest
                     unread = await notifications.unread_count(db, user.email)
-                    yield {"event": "unread", "data": json.dumps({"unread": unread})}
+            if unread is not None:  # sent outside any transaction, so an open tab holds nothing
+                yield {"event": "unread", "data": json.dumps({"unread": unread})}
             await asyncio.sleep(STREAM_CHECK_SECONDS)
 
     return EventSourceResponse(events(), ping=15, headers=STREAM_HEADERS)
