@@ -152,7 +152,7 @@ test("S01.09 'Smoke Signal home' in the console header opens the staff home page
   await page.goto("/console");
   await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Smoke Signal home" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Spotted something not working?");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("What can we help you with?");
   await expect(page).toHaveURL(/\/$/);
 });
 

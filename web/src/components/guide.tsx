@@ -27,7 +27,7 @@ const STEPS: Record<Area, Step[]> = {
     },
     {
       title: "Start here",
-      body: "Pick the card that fits. Sig, the assistant, asks up to three short questions, then shows a summary. Nothing is sent until you select Confirm.",
+      body: "Pick the one that fits. Sig, the assistant, asks up to three short questions, then shows a summary. Nothing is sent until you select Confirm.",
       target: "start-cards",
       path: "/",
     },

@@ -7,7 +7,7 @@
   "S01.06": ["toHaveClass(/text-destructive/)", "toHaveClass(/text-destructivex/)"],
   "S01.07": ["toHaveText([\"Sign out\"])", "toHaveText([\"Sign outx\"])"],
   "S01.08": ["{ name: \"Console\" });", "{ name: \"Consolex\" });"],
-  "S01.09": ["Spotted something not working?", "Spotted something not working?x"],
+  "S01.09": ["What can we help you with?", "What can we help you with?x"],
   "S01.10": ["toBe(\"/console\")", "toBe(\"/consolex\")"],
   "S01.11": ["/^Overdue/, \"Channels\", \"Releases\"", "/^Overdue/, \"Channelsx\", \"Releases\""],
   "S01.12": ["[/^Approvals/, \"Work\"", "[/^Approvalsx/, \"Work\""],
