@@ -28,11 +28,27 @@ Each case runs through the real chat API in a throwaway local database (pgserver
 
 Routing misses: "The intranet home page tile for Flipbook goes to a 404" went to `intranet` (labelled `flipbook`); "It would help if the helpers platform remembered my last question" was `new_feature` (labelled `improvement`); "Something on the system is off, the numbers look weird" saved nothing because one agent turn timed out. On 2026-10-21 the same set scored 97.5 / 97.5 / 100; one run each, so the difference is within run-to-run noise.
 
+### Later the same day: no tool named, and apps we don't look after
+
+Found by hand in the local app: "page is slow to load" was filed under the intranet without asking which tool. Four cases were added (two with no tool named, two naming an app we don't look after), taking the set to 32.
+
+| Run | Result | Cost |
+| --- | --- | --- |
+| New cases after the fix | 4 of 4 | about A$0.03 |
+| Full set | 32 of 32 | about A$0.21 |
+| Routing set, first try | Pass, but 92.5 % / 90 % / 95 %: after "Not sure" the agent kept asking about the tool, so two vague items never reached a card | about A$0.57 |
+| Routing set, after "ask about the tool once" | Pass: 97.5 % project, 97.5 % work type, 100 % assignee | about A$0.56 |
+| Full set, final | 32 of 32 | about A$0.21 |
+
+Gemini cost of all runs on 2026-10-26: about A$2.30.
+
 ## Fixes this run led to
 
 - Follow-ups on existing feedback: the instruction now says not to start a report and to point to My feedback, Reply or add details (`backend/agent/instruction.md`, "Feedback that already exists"); the stub does the same, tested in `test_a_request_about_existing_feedback_is_pointed_to_it_not_turned_into_a_new_report`.
 - HR and policy questions (leave, pay, rosters) are not feedback: no draft, point to RAKE.
 - Praise gets priority P4 in code (`apply_update`), so its card always shows (`test_praise_gets_the_lowest_priority_so_its_card_can_show`).
+- No tool named: `update_draft` checks the person's own words (kept in session state as `user_text`) for the chosen tool's name, aliases or keywords; if none appear and the page did not pass the tool, it caps the confidence at 0.5 and tells the agent to ask "Which tool is this about?". If they said they don't know, it files the item under `general` (needs review). The agent asks about the tool once only (`test_a_tool_only_counts_as_named_when_the_person_said_it`).
+- Apps we don't look after (Outlook, Teams, a printer): no report, a kind pointer to IT support, and an offer to pass it on if it is connected to one of our tools.
 
 ## How far to trust it
 

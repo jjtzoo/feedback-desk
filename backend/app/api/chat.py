@@ -101,8 +101,14 @@ async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> Ev
     messages = int(state.get("messages") or 0)
     if messages >= settings.max_messages_per_session:
         raise ServiceError("rate_limited", "This chat has reached its message limit. Use the form instead.", 429)
-    parts = await _message_parts(user, session_id, mask(body.text), body.attachment_ids)
-    delta = {"messages": messages + 1, "user_turns": int(state.get("user_turns") or 0) + 1}
+    text = mask(body.text)
+    parts = await _message_parts(user, session_id, text, body.attachment_ids)
+    delta = {
+        "messages": messages + 1,
+        "user_turns": int(state.get("user_turns") or 0) + 1,
+        # The person's own words (masked), so update_draft can tell whether they named the tool.
+        "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
+    }
     return EventSourceResponse(_stream(user, session_id, parts, delta), headers=STREAM_HEADERS)
 
 

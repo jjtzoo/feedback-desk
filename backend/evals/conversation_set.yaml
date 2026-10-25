@@ -34,6 +34,14 @@ cases:
   - {name: off-topic-policy, expect: no_card, messages: ["How many days of annual leave do I get?"], require: ["RAKE"]}
   - {name: noise, expect: no_card, messages: ["asdf"]}
 
+  # No tool named: ask which tool instead of guessing one (found by hand on 2026-10-26: "page is slow to load" was filed under the intranet).
+  - {name: no-tool-page-slow, expect: no_card, messages: ["page is slow to load", "It's blocking my work"], require: ["which tool"]}
+  - {name: no-tool-system, expect: no_card, messages: ["the system keeps crashing", "Blocking my work"], require: ["which tool"]}
+
+  # An app we don't look after: a kind redirect to IT support, no report.
+  - {name: other-app-outlook, expect: no_card, messages: ["Outlook keeps freezing when I open my calendar"], require: ["IT support"]}
+  - {name: other-app-then-ours, expect: card, messages: ["My printer won't print the induction booklet", "Oh actually it's the Training Portal, the booklet download is blank", "It's annoying", "I expected the PDF but got a blank page"]}
+
   # Varied ways people really write: vague, short, rambling, mixed, praise, access, questions.
   - {name: vague, expect: card, messages: ["the thing is broken again", "the training portal", "Blocking my work", "I expected my course to load but it shows an error"]}
   - {name: very-short, expect: card, messages: ["rake slow", "It's slowing me down", "I expected an answer in a few seconds but it takes a minute"]}
