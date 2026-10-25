@@ -12,7 +12,10 @@ from app.services.actors import User
 
 SESSION_COOKIE = "fb_session"
 
-Db = Annotated[AsyncSession, Depends(get_db)]
+# "function": commit when the route returns, before the response is sent. With FastAPI's default
+# ("request") the commit runs after the response, so a client acting on a 2xx at once (sign in, then
+# load the page) could read the data before it was committed, and a failed commit still looked saved.
+Db = Annotated[AsyncSession, Depends(get_db, scope="function")]
 
 
 async def _signed_in(db: AsyncSession, fb_session: str | None) -> User:
