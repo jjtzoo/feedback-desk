@@ -40,8 +40,9 @@ from app.services import console, usage
 router = APIRouter(prefix="/console", tags=["console"])
 
 
-def _card(fb: Feedback, files: set[uuid.UUID]) -> CardOut:
+def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) -> CardOut:
     today = datetime.now(UTC).date()
+    count = reporters.get(fb.id, 1)
     return CardOut(
         id=fb.id,
         reference=fb.ref_no,
@@ -64,6 +65,8 @@ def _card(fb: Feedback, files: set[uuid.UUID]) -> CardOut:
         ),
         flagged=fb.flagged,
         channel=fb.channel,
+        reporters=count,
+        priority_review=console.needs_priority_review(fb, count),
     )
 
 
@@ -99,11 +102,17 @@ async def board(
     q: str | None = None,
 ) -> BoardOut:
     cols = await console.board(db, user, _filters(inbox, project, category, priority, None, work_type, assignee, q))
-    files = await console.has_files(db, [i.id for c in cols for i in c.items])
+    ids = [i.id for c in cols for i in c.items]
+    files = await console.has_files(db, ids)
+    reporters = await console.reporter_counts(db, ids)
     return BoardOut(
         columns=[
             ColumnOut(
-                key=c.key, title=c.title, count=c.count, overdue=c.overdue, items=[_card(i, files) for i in c.items]
+                key=c.key,
+                title=c.title,
+                count=c.count,
+                overdue=c.overdue,
+                items=[_card(i, files, reporters) for i in c.items],
             )
             for c in cols
         ],
@@ -131,8 +140,9 @@ async def items(
     f = _filters(inbox, project, category, priority, status, work_type, assignee, q, date_from, date_to, sort, page)
     rows, total = await console.list_items(db, user, f)
     files = await console.has_files(db, [r.id for r in rows])
+    reporters = await console.reporter_counts(db, [r.id for r in rows])
     return ListOut(
-        items=[_card(r, files) for r in rows],
+        items=[_card(r, files, reporters) for r in rows],
         total=total,
         page=page,
         page_size=console.PAGE_SIZE,
@@ -156,7 +166,7 @@ async def _detail(db: Db, user: DigitalUser, ref: str) -> DetailOut:
     fb = d.feedback
     files = {fb.id} if d.attachments else set()
     return DetailOut(
-        **_card(fb, files).model_dump(),
+        **_card(fb, files, {fb.id: 1 + len(d.followers)}).model_dump(),
         submitter_email=fb.submitter_email,
         target_type=fb.target_type,
         area=fb.area,

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import httpx
+import pytest
 from sqlalchemy import text
 
 from app.db import session_scope
@@ -83,6 +84,51 @@ async def assert_sign_in_tables_unlocked() -> None:
 async def test_notification_stream_holds_no_transaction(darlene: httpx.AsyncClient) -> None:
     async with streaming(darlene, "GET", "/api/notifications/stream"):
         await assert_sign_in_tables_unlocked()
+
+
+async def test_notification_stream_ends_when_the_person_signs_out(
+    darlene: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("app.api.notifications.STREAM_CHECK_SECONDS", 0.05)
+    sent: list[dict[str, Any]] = []
+    first_event = asyncio.Event()
+    asked = False
+
+    async def receive() -> dict[str, Any]:
+        nonlocal asked
+        if not asked:
+            asked = True
+            return {"type": "http.request", "body": b"", "more_body": False}
+        await asyncio.Event().wait()  # the browser stays connected
+        return {"type": "http.disconnect"}
+
+    async def send(message: dict[str, Any]) -> None:
+        sent.append(message)
+        if message["type"] == "http.response.body" and message.get("body"):
+            first_event.set()
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/api/notifications/stream",
+        "raw_path": b"/api/notifications/stream",
+        "root_path": "",
+        "query_string": b"",
+        "headers": [(b"host", b"testserver"), (b"cookie", f"fb_session={darlene.cookies['fb_session']}".encode())],
+        "client": ("testclient", 50000),
+        "server": ("testserver", 80),
+    }
+    task = asyncio.create_task(app(scope, receive, send))
+    try:
+        await asyncio.wait_for(first_event.wait(), 10)
+        assert not task.done()
+        assert (await darlene.post("/api/auth/signout")).status_code == 204
+        await asyncio.wait_for(task, 5)  # it stops on its own; before the fix this waited for the browser
+    finally:
+        task.cancel()
 
 
 async def test_chat_stream_holds_no_transaction(staff: httpx.AsyncClient) -> None:

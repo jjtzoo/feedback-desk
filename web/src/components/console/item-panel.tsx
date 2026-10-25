@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, FileText, Lock } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Lock, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, errorText, type Detail, type Project, type Staff } from "@/lib/api";
-import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, age, day, fileSize, when } from "@/lib/format";
+import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, ago, day, fileSize, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
@@ -163,6 +163,16 @@ export function ItemPanel({
                 <span className="font-mono text-sm font-semibold">{item.reference}</span>
                 <PriorityBadge showCode priority={item.priority} />
                 <StatusBadge status={item.status} />
+                {item.reporters > 1 && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                    <Users className="size-3.5" aria-hidden="true" /> Reported by {item.reporters} people
+                  </span>
+                )}
+                {item.priority_review && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
+                    <TrendingUp className="size-3.5" aria-hidden="true" /> Priority review suggested
+                  </span>
+                )}
                 <span className="ml-auto flex gap-1">
                   <Button variant="ghost" size="icon" className="size-9 rounded-lg" disabled={!previous} onClick={() => previous && onStep(previous)} aria-label="Previous item">
                     <ChevronUp aria-hidden="true" />
@@ -174,7 +184,7 @@ export function ItemPanel({
               </div>
               <SheetTitle className="mt-2 text-xl leading-snug font-bold">{item.title}</SheetTitle>
               <SheetDescription>
-                {[item.work_type && WORK_TYPE_LABEL[item.work_type], item.project?.name ?? "Tool to confirm", item.submitter_name].filter(Boolean).join(" · ")} · {age(item.created_at)} ago
+                {[item.work_type && WORK_TYPE_LABEL[item.work_type], item.project?.name ?? "Tool to confirm", item.submitter_name].filter(Boolean).join(" · ")} · {ago(item.created_at)}
                 {item.channel === "fallback" && " · backup form"}
               </SheetDescription>
               <div className="mt-3 flex flex-wrap gap-2">

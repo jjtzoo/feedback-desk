@@ -29,7 +29,8 @@ def main() -> None:
 
     command.upgrade(Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini")), "head")
     asyncio.run(seed())
-    uvicorn.run("app.main:app", host="127.0.0.1", port=int(os.environ.get("PORT", "8001")))
+    # Longer than the web proxy's idle time, so the API never closes a connection the proxy is about to reuse.
+    uvicorn.run("app.main:app", host="127.0.0.1", port=int(os.environ.get("PORT", "8001")), timeout_keep_alive=620)
 
 
 if __name__ == "__main__":

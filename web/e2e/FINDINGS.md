@@ -43,6 +43,7 @@ Format:
 - Expected: every control reached by Tab shows a visible focus ring, with no invisible stops.
 - Actual: after "Back to home", Tab lands on a clipped 1 x 1 px file input (`input#chat-files`, `web/src/components/chat/chat-panel.tsx`) before the "Attach a file" button, and nothing shows focus.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/keyboard-and-small-ui`. The file input has `tabIndex={-1}`, so "Attach a file" is the only stop. S28.01 passes, its `test.fail()` is out, mutation 28 caught 5/5.
 
 ## S28.03 After Esc closes a dialog, focus does not return to the button that opened it
 - Test: e2e/28-keyboard.spec.ts: S28.03 (`test.fail()`)
@@ -50,6 +51,15 @@ Format:
 - Expected: the dialog closes and focus returns to the Decline button; Tab stays inside while it is open.
 - Actual: the dialog closes and Tab stays inside, but focus is not on Decline afterwards (probably the page body). The dialogs open through a controlled `open` prop with no trigger, so Radix has nothing to return focus to.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/keyboard-and-small-ui`. `ActionDialog` remembers the focused element when the dialog opens and focuses it again on close (`onOpenAutoFocus` / `onCloseAutoFocus`). S28.03 passes, its `test.fail()` is out. Its mutation now expects focus on the card instead of inverting the check, because `not.toBeFocused()` passes in the tick before focus returns.
+
+## S13.08 Internal notes have no lock icon
+- Test: e2e/13-item-panel.spec.ts: S13.08 (the dashed border and the "Internal note" label are asserted first; only the lock icon is `test.fail()`)
+- Steps: as Darlene, raise a bug as a staff member, post an internal note (`POST /api/console/items/<ref>/note`), open the item panel and its Conversation tab.
+- Expected: the note is dashed, labelled "Internal note" and has a lock icon (checklist S13.08).
+- Actual: dashed border and label are there, no lock icon. `web/src/components/console/item-panel.tsx` has no lock icon.
+- Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/keyboard-and-small-ui`. Internal notes show a `Lock` icon (hidden from screen readers; the "Internal note" label already says it). S13.08 passes, its `test.fail()` is out, mutation 13 caught 11/11.
 
 ## S14.05 After Resolve, the newest tracker entry is "Update", with "Resolved" second
 - Test: e2e/14-status-changes.spec.ts: S14.05 (the "Resolved: <note>" entry is asserted present; only "it is the first entry" is `test.fail()`)
@@ -57,18 +67,20 @@ Format:
 - Expected: the checklist says the note becomes the tracker's last entry, "Resolved: <note>". Reading "last" as "newest" is an assumption: confirm the reading before treating this as a bug.
 - Actual: the newest entry is "Update: <note>" and "Resolved: <note>" is second. Resolving writes the note and the status change in one transaction; the status event is flushed before the message, so the message gets the later `created_at` and the history sorts it first. Both entries are shown; only the order is odd.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/badges-order-tour`. `resolve()` stamps its progress message 1 ms before the status event, so "Resolved: <note>" is the newest tracker entry and "Update: <note>" sits below it. S14.05 passes and its `test.fail()` is out; `test_lifecycle.py` checks the order.
 
 ## Outside the checklist: small things the browser tests noticed
-- The dashboard's "Open by project" section has `aria-labelledby="bl-Open by project"`, an id with spaces, so the section has no accessible name (`web/src/app/console/dashboard/page.tsx`). Found 2026-10-22.
-- The item panel's age reads "now ago" during the first minute. Found 2026-10-22.
+- Fixed 2026-10-25 on `fix/keyboard-and-small-ui`: the dashboard's "Open by project" section had `aria-labelledby="bl-Open by project"`, an id with spaces, so the section had no accessible name. `BarList` now uses `useId()`.
+- Fixed 2026-10-25 on `fix/keyboard-and-small-ui`: the item panel (and My feedback) read "now ago" in the first minute. `ago()` in `web/src/lib/format.ts` gives "just now"; S07.02, S13.02 and the backup-form header check now expect it.
 - S13.06: the tracker says "Reassigned to Mario" where the checklist says "Assigned to Mario". Treated as wording, not a bug; the test asserts the app's wording. Found 2026-10-22.
-- Guide tour (S02.03, S02.04, S02.05), from reading `web/src/components/guide.tsx`: the spotlight's solid `ring-4 ring-primary` never renders (Tailwind v4 rings are box-shadows and the inline dimming `boxShadow` overrides them), so the only red is the pulsing outline at 60 % opacity; the small card is shorter but not narrower. While the small card asks for a click, mouse clicks elsewhere are blocked but the keyboard is not: Tab reaches page controls, and Radix triggers that open on keydown (the account menu, "Already know which tool?") still open. The "Try it out" card covers about 352 x 130 px at the bottom right, and controls under it can't be clicked until Next. Pressing Guide during "Try it out" gives a "Try it out … Have a look at Welcome to Smoke Signal" card; moving between the staff area and the console mid-tour ends the tour without marking it seen. Found 2026-10-23.
+- Fixed 2026-10-25 on `fix/badges-order-tour` (all but the card still covering a corner, which is now one 64 px row): the spotlight ring is a 4 px box-shadow, keys other than Tab and Esc are blocked outside the highlighted control while a click is awaited, leaving an area mid-tour marks it seen, and the Guide button restarts the tour cleanly. S02.03 expects the ring. Original note: guide tour (S02.03, S02.04, S02.05), from reading `web/src/components/guide.tsx`: the spotlight's solid `ring-4 ring-primary` never renders (Tailwind v4 rings are box-shadows and the inline dimming `boxShadow` overrides them), so the only red is the pulsing outline at 60 % opacity; the small card is shorter but not narrower. While the small card asks for a click, mouse clicks elsewhere are blocked but the keyboard is not: Tab reaches page controls, and Radix triggers that open on keydown (the account menu, "Already know which tool?") still open. The "Try it out" card covers about 352 x 130 px at the bottom right, and controls under it can't be clicked until Next. Pressing Guide during "Try it out" gives a "Try it out … Have a look at Welcome to Smoke Signal" card; moving between the staff area and the console mid-tour ends the tour without marking it seen. Found 2026-10-23.
 
 ## S12.04 The board card shows the work type as plain text, not a badge
 - Test: e2e/12-board.spec.ts: S12.04 (asserts the work type as text in the card's meta line; not marked `test.fail()`)
 - Expected: the checklist lists "work type badge" and "priority badge" on a card.
 - Actual: the priority is a badge; the work type is plain text in the meta line. Confirm whether the checklist or the card is right.
 - Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/badges-order-tour`. The card shows the work type as a `WorkTypeBadge` beside the priority; the meta line is now "tool · submitter". S12.04 asserts the badge.
 
 ## Closed: results that went wrong once (Stage 3 repeat runs, 2026-10-23)
 Each failed or misreported once on 2026-10-22. The causes below come from the server logs and the code; after the test fixes, every test in each file passed 10 separate runs in a row (`e2e/evidence/stress.json`).
@@ -94,12 +106,23 @@ Each failed or misreported once on 2026-10-22. The causes below come from the se
 - S02.08: both tours end with a "That's it" step the checklist does not list (6 steps for Mario, 8 for Chris).
 - S01.03: the picker shows a job title for staff, not an email (by design); the test reads "each with an email" as applying to the five Admin and Digital people.
 
+## S07.02 My feedback rows have no stage badge
+- Test: e2e/07-my-feedback.spec.ts: S07.02 (the rest of the row is checked first; only the badge is `test.fail()`)
+- Steps: sign in as a staff member with an item, open `/my`, read the row.
+- Expected: "FB reference, title, tool (or "Tool to confirm"), a plain status, "updated … ago", and a stage badge on wider screens" (Brief §4.1.8).
+- Actual: the row shows everything except the stage badge. `StageBadge` exists in `src/components/badges.tsx` but nothing renders it, and `src/app/(staff)/my/page.tsx` never uses it. Either the page should show it or the checklist line should go (a product call, given the Quiet UI direction).
+- Found: 2026-10-22
+- Fixed: 2026-10-25 on `fix/badges-order-tour`. Each row shows the `StageBadge` on screens from `sm` up. S07.02 passes and its `test.fail()` is out.
+
 ## Outside the checklist: the web server's /api proxy now and then drops a request with a 500
 - Test: none of its own; it surfaces as a one-off failure in any test (see "went wrong once" above).
 - Steps: run the browser tests for a few hours; watch the web server's output for `Failed to proxy`.
 - Expected: every `/api/*` request reaches the API.
 - Actual: about 1 in 12,000 proxied requests fails with `read ECONNRESET` or `socket hang up`, and the browser gets `500 Internal Server Error`. Seen 3 times on 2026-10-22: `GET /api/feedback/FB-0003/tracker` (S09.03, first full run), `GET /api/projects` (S12.13) and `POST /api/console/items/FB-0001/approve` (an S21 mutation run). Likely cause: `web/src/proxy.ts` rewrites `/api/*` through Next's keep-alive agent, which has no idle timeout, while uvicorn closes idle keep-alive connections after 5 s (`timeout_keep_alive` default, set neither in `e2e_server.py` nor in the Dockerfile); a request sent on a socket uvicorn is closing fails. Possible fixes (a separate change): a uvicorn `--timeout-keep-alive` longer than the proxy's idle time, or no keep-alive on the proxy leg.
+- Fixed: 2026-10-25 on `fix/proxy-keep-alive`. uvicorn now runs with `--timeout-keep-alive 620` in the Dockerfile, `scripts/dev_server.py` and `scripts/e2e_server.py`, so the API never closes an idle connection first (Next's proxy, httpxy over Node's global agent, drops idle sockets after about 5 s; 620 s is above Google's load balancer idle time too). No new test: the drop was about 1 in 12,000 requests, so it can only be shown by a long run; the repeat runs and the full suite are the check.
 - Related: when `GET /api/projects` (or `/api/admin/digital-staff`) fails, the console's Work filters stay empty for the life of the page with no message (`web/src/app/console/page.tsx`, `.catch(() => undefined)`); and the notification stream checks the sign-in only when it opens, so after signing out an open page keeps getting unread counts until it navigates.
+- Fixed: 2026-10-25 on `fix/findings-polish`, both. The console shows "The Project filter and the assignee list did not load" with a Try again button (browser test "The console says so, and loads the filters on Try again…", shown able to fail). The notification stream re-checks the session each cycle in its own short transaction and ends when the person has signed out or the session is revoked or expired (`test_notification_stream_ends_when_the_person_signs_out`; the first version of the check ran inside the event's transaction and `test_notification_stream_holds_no_transaction` caught it).
+- Fixed: 2026-10-25 on `fix/findings-polish`, the tour's "Try it out" card covering a corner: it now sits at the top when the control being tried is in the lower half of the screen, at the bottom otherwise (it is one row, about 64 px, since `fix/badges-order-tour`).
 - Found: 2026-10-22 (from the web server log; written up 2026-10-23)
 
 ## Outside the checklist: the live notification stream holds a database transaction open
@@ -109,3 +132,11 @@ Each failed or misreported once on 2026-10-22. The causes below come from the se
 - Actual: the request's sign-in lookup (the `CurrentUser` dependency's session) stays `idle in transaction` for as long as the page is open: seen at 96 s and growing. It holds share locks on `app.digital_staff` and `app.user_sessions` and keeps one pooled connection per open tab. Consequences: a `TRUNCATE`, and any migration that alters those tables (`ALTER TABLE` during a deploy), waits until every tab closes; and with many staff online the connection pool and Cloud SQL's connection limit fill up.
 - Found: 2026-10-22
 - Fixed: 74dd7f3 (merged in 9874225), with `backend/tests/test_streams.py`. What is left: the stream holds a transaction for the few milliseconds it takes to write each event.
+
+## Outside the checklist: a write is answered before it is committed, so the next request can miss it
+- Test: none of its own; it surfaced on 2026-10-25 as "No confirm card for: …" from `raise()`, a page showing Sign in straight after a successful dev sign-in, `GET /console/items … -> 401` (S12.15), and a board that never loaded (S12.11), in S02.03 to S02.15, S07.01, S12.01, S12.11, S12.15 and S14.01 to S14.06. Each passed when run alone.
+- Steps: run specs 07, 12 and 14 in one go on a busy machine (the backend suite took 17 minutes that day).
+- Expected: once the API answers 204 to a sign-in, the next request with that cookie is signed in; once it answers 2xx to any write, the write is saved.
+- Actual: `Db` (`app/api/deps.py`) used FastAPI's default dependency scope, "request", whose exit code (`get_db`'s `commit()`) runs after the response is sent (`fastapi/routing.py`, `await response(...)` inside the request exit stack). A client that acted on the 2xx at once could reach the API before the commit: a new session was not there yet (401, so the page went to Sign in and `raise()` got no chat), and a commit that failed after the response would have been reported as a success. Every write route was affected, not only sign-in; real browsers do the same (sign in, then load the page), so this was an app bug, not a test one.
+- Found: 2026-10-25
+- Fixed: 2026-10-25 on `fix/chat-setup-flake`. `Db` is `Depends(get_db, scope="function")`, so the commit runs when the route returns, before the response. `test_a_write_is_committed_before_its_response_is_sent` drives the app through raw ASGI and looks the new session up from another connection at the moment the response starts. `raise()` now puts every status and event it got into its error, so a failed setup explains itself. It failed the same way on the code before that day's other changes (S14.03 on `3492ef6`), which is how it was told apart from them. After the fix, specs 07, 12 and 14 in one run: 27 passed, no setup failures (3.2 min, against 4 to 11 min before).

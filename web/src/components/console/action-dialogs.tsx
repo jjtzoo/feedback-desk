@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -83,6 +83,8 @@ export function ActionDialog({
   const [ask, setAsk] = useState<"submitter" | "owner">("submitter");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The dialog opens from a controlled prop, so Radix has no trigger to give focus back to.
+  const opener = useRef<HTMLElement | null>(null);
 
   if (!kind) return null;
   const copy = COPY[kind];
@@ -140,7 +142,18 @@ export function ActionDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className="sm:max-w-lg"
+        onOpenAutoFocus={() => {
+          opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        }}
+        onCloseAutoFocus={(e) => {
+          if (opener.current?.isConnected) {
+            e.preventDefault();
+            opener.current.focus();
+          }
+        }}
+      >
         <form onSubmit={submit} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{copy.title}</DialogTitle>

@@ -190,6 +190,10 @@ export interface Card {
   unread_reply: boolean;
   flagged: boolean;
   channel: "chat" | "fallback";
+  /** The submitter plus each distinct colleague who added a +1. */
+  reporters: number;
+  /** Enough people reported it that a priority review is suggested (never applied by itself). */
+  priority_review: boolean;
 }
 
 export interface Column {

@@ -74,16 +74,27 @@ function events(body: string): { name: string; data: Record<string, unknown> }[]
  */
 export async function raise(page: Page, message: string, answers: string[] = [], project: string | null = null) {
   const api = page.request;
-  const start = await (await api.post("/api/chat/sessions", { data: { project_slug: project, context: {} }, timeout: TIMEOUT })).json();
-  const say = async (text: string) =>
-    events(await (await api.post(`/api/chat/sessions/${start.session_id}/messages`, { data: { text, attachment_ids: [] }, timeout: TIMEOUT })).text());
+  // Every response is kept, so a failed setup says what the API actually sent back.
+  const seen: string[] = [];
+  const opened = await api.post("/api/chat/sessions", { data: { project_slug: project, context: {} }, timeout: TIMEOUT });
+  const startBody = await opened.text();
+  seen.push(`start ${opened.status()} ${startBody.slice(0, 300)}`);
+  const start = opened.ok() ? (JSON.parse(startBody) as { session_id?: string; mode?: string }) : {};
+  if (!start.session_id) throw new Error(`No chat for: ${message}\n${seen.join("\n")}`);
+  const say = async (text: string) => {
+    const r = await api.post(`/api/chat/sessions/${start.session_id}/messages`, { data: { text, attachment_ids: [] }, timeout: TIMEOUT });
+    const body = await r.text();
+    const evs = r.ok() ? events(body) : [];
+    seen.push(`say ${r.status()} ${r.ok() ? evs.map((e) => e.name).join(",") : body.slice(0, 300)}`);
+    return evs;
+  };
   let evs = await say(message);
   for (const a of answers) {
     if (evs.some((e) => e.name === "draft")) break;
     evs = await say(a);
   }
   const draft = evs.find((e) => e.name === "draft");
-  if (!draft) throw new Error(`No confirm card for: ${message}`);
+  if (!draft) throw new Error(`No confirm card for: ${message}\n${seen.join("\n")}`);
   const done = events(
     await (await api.post(`/api/chat/sessions/${start.session_id}/confirm`, { data: { draft_hash: draft.data.hash }, timeout: TIMEOUT })).text(),
   ).find((e) => e.name === "done");

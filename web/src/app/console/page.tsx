@@ -73,6 +73,7 @@ function Work() {
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lookupsFailed, setLookupsFailed] = useState(false);
 
   const inbox = params.get("inbox") ?? defaultInbox(me.role);
   const item = params.get("item");
@@ -97,10 +98,12 @@ function Work() {
   );
   const setParam = useCallback((key: string, value: string | null) => setParams({ [key]: value }), [setParams]);
 
-  useEffect(() => {
-    api.get<Project[]>("/projects").then(setProjects).catch(() => undefined);
-    api.get<Staff[]>("/admin/digital-staff").then(setStaff).catch(() => undefined);
+  const loadLookups = useCallback(() => {
+    api.get<Project[]>("/projects").then(setProjects).catch(() => setLookupsFailed(true));
+    api.get<Staff[]>("/admin/digital-staff").then(setStaff).catch(() => setLookupsFailed(true));
   }, []);
+
+  useEffect(loadLookups, [loadLookups]);
 
   const load = useCallback(() => {
     const current = view ?? "board";
@@ -260,6 +263,18 @@ function Work() {
         </form>
         <FilterMenu fields={filterFields} values={filterValues} onChange={setParams} />
       </div>
+
+      {lookupsFailed && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-destructive" role="alert">
+          The Project filter and the assignee list did not load.
+          <Button variant="outline" size="sm" className="rounded-xl" onClick={() => {
+              setLookupsFailed(false);
+              loadLookups();
+            }}>
+            Try again
+          </Button>
+        </p>
+      )}
 
       {error && (
         <Alert variant="destructive">

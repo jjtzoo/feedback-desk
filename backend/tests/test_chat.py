@@ -6,13 +6,15 @@ import httpx
 import pytest
 from sqlalchemy import func, select
 
-from agent.stub import ASK_EXPECTED, ASK_IMPACT, ASK_PROJECT, NOISE, SHOW_SUMMARY
+from agent.stub import ASK_EXPECTED, ASK_IMPACT, ASK_PROJECT, EXISTING, NOISE, SHOW_SUMMARY
 from app import agent_runtime
 from app.api.chat import _without_card_fields
 from app.config import get_settings
 from app.db import session_scope
 from app.models import Attachment, Feedback, FeedbackEvent, FeedbackMessage, Notification
-from tests.conftest import STAFF2, first, parse_sse, say, signed_in, start_chat, submit_via_chat, texts
+from app.services import auth
+from app.services import feedback as feedback_service
+from tests.conftest import STAFF, STAFF2, first, parse_sse, say, signed_in, start_chat, submit_via_chat, texts
 from tests.test_units import PNG, _docx
 
 
@@ -126,6 +128,31 @@ async def test_noise_and_off_topic_save_nothing(staff: httpx.AsyncClient) -> Non
     assert await count() == 0
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "I already raised this as FB-0001, can you add that it's still happening?",
+        "Any update on my ticket about the RAKE export?",
+        "Can you look up the status of FB-0042 for me?",
+        "I've already reported this, I just want to follow up on my existing report",
+    ],
+)
+async def test_a_request_about_existing_feedback_is_pointed_to_it_not_turned_into_a_new_report(
+    staff: httpx.AsyncClient, message: str
+) -> None:
+    sid = await start_chat(staff)
+    events = await say(staff, sid, message)
+    reply = texts(events)[-1]
+    assert reply == EXISTING
+    assert "My feedback" in reply and "Reply or add details" in reply
+    assert first(events, "draft") is None  # no card, no intake questions
+    assert await count() == 0
+
+    # Someone who then says it is a new problem is not stuck: the normal conversation carries on.
+    events = await say(staff, sid, "Actually, this is a different problem: Flipbook crashes when I open the brochure")
+    assert texts(events)[-1] in (ASK_IMPACT, ASK_EXPECTED, ASK_PROJECT)
+
+
 async def test_typing_yes_does_not_save(staff: httpx.AsyncClient) -> None:
     sid = await start_chat(staff, project="flipbook")
     events = await say(staff, sid, "Flipbook pages are blank, it's annoying, I expected pages but got white screens")
@@ -231,6 +258,44 @@ async def test_duplicate_is_offered_and_plus_one_adds_the_comment(staff: httpx.A
         fb = await db.scalar(select(Feedback))
         assert fb is not None and fb.impact == "team"
     await other.aclose()
+
+
+async def test_the_console_tallies_reporters_and_suggests_a_priority_review_without_changing_it(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient
+) -> None:
+    ref = (
+        await submit_via_chat(
+            staff,
+            "Flipbook pages are blank on the safety brochure, it's annoying",
+            ["I expected pages but got white screens"],
+            project="flipbook",
+        )
+    )["reference"]
+
+    async def plus_one(email: str, name: str) -> None:
+        async with session_scope() as db:
+            await feedback_service.plus_one(db, await auth.user_for_email(db, email, name), ref, "Same here")
+
+    async def card() -> dict[str, Any]:
+        return dict((await marc.get(f"/api/console/items/{ref}")).json())
+
+    assert (await card())["reporters"] == 1 and (await card())["priority_review"] is False
+    await plus_one(STAFF, "Sam Lee")  # the submitter adding to their own item is not a second report
+    await plus_one(STAFF2, "Priya Nair")
+    await plus_one(STAFF2, "Priya Nair")  # nor is the same colleague twice
+    assert (await card())["reporters"] == 2 and (await card())["priority_review"] is False
+
+    await plus_one("tom.nguyen@redadair.example", "Tom Nguyen")
+    detail = await card()
+    assert detail["reporters"] == 3 and detail["priority_review"] is True
+    assert detail["priority"] == "P2"  # a suggestion only: the priority is never raised by itself
+    board = (await marc.get("/api/console/board", params={"inbox": "all"})).json()
+    on_board = next(c for col in board["columns"] for c in col["items"] if c["reference"] == ref)
+    assert on_board["reporters"] == 3 and on_board["priority_review"] is True
+
+    # Staff never see the count, so asking colleagues to +1 has nothing to aim at.
+    tracker = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    assert "reporters" not in tracker and "priority_review" not in tracker
 
 
 async def test_backup_form_when_the_model_is_off(staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:

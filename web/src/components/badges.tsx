@@ -1,7 +1,7 @@
 import { CheckCircle2, CircleDot, Clock3, Hammer, Minus, OctagonAlert, ThumbsUp, TriangleAlert, XCircle } from "lucide-react";
 
-import type { Priority, Stage, Status } from "@/lib/api";
-import { PRIORITY_LABEL, PRIORITY_WORD, STAGE_LABEL, STATUS_LABEL } from "@/lib/format";
+import type { Priority, Stage, Status, WorkType } from "@/lib/api";
+import { PRIORITY_LABEL, PRIORITY_WORD, STAGE_LABEL, STATUS_LABEL, WORK_TYPE_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // Every badge pairs a word with an icon, so status never relies on colour (fire-services-ui).
@@ -76,4 +76,9 @@ export function StageBadge({ stage, className }: { stage: Stage; className?: str
       {STAGE_LABEL[stage]}
     </span>
   );
+}
+
+export function WorkTypeBadge({ workType, className }: { workType: WorkType | null; className?: string }) {
+  if (!workType) return null;
+  return <span className={cn(base, "bg-secondary text-secondary-foreground", className)}>{WORK_TYPE_LABEL[workType]}</span>;
 }

@@ -92,14 +92,14 @@ async function openToolMenu(page: Page) {
   await expect(page.getByRole("listbox")).toBeVisible();
 }
 
-test("S02.01 As Mario, / shows the red hero band 'Tell us what's not working, or what could work better', a 'Hi Mario' line above it and a Start a conversation button", async ({ page, signIn }) => {
+test("S02.01 As Mario, / shows the red hero band 'Spotted something not working? Let us know', a 'Hi Mario' line above it and a Give feedback button", async ({ page, signIn }) => {
   await signIn("Mario");
   await openLanding(page);
 
   const hero = page.locator("section.bg-primary");
   await expect(hero).toBeVisible();
   const heading = hero.getByRole("heading", { level: 1 });
-  await expect(heading).toHaveText("Tell us what's not working, or what could work better");
+  await expect(heading).toHaveText("Spotted something not working? Let us know");
 
   const hi = hero.getByText("Hi Mario", { exact: true });
   await expect(hi).toBeVisible();
@@ -107,7 +107,7 @@ test("S02.01 As Mario, / shows the red hero band 'Tell us what's not working, or
   const headingBox = await heading.boundingBox();
   expect(hiBox!.y + hiBox!.height).toBeLessThanOrEqual(headingBox!.y);
 
-  const start = hero.getByRole("link", { name: /Start a conversation/ });
+  const start = hero.getByRole("link", { name: /Give feedback/ });
   await expect(start).toBeVisible();
   await expect(start).toHaveAttribute("href", "/chat");
 });
@@ -163,7 +163,8 @@ test("S02.03 OK on 'Give feedback' shrinks the card to 'Click Give feedback', pu
   await expect(pulse(page)).toHaveCSS("animation-name", "pulse");
   const primary = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
   expect(await pulse(page).evaluate((el) => getComputedStyle(el).getPropertyValue("--tw-ring-color"))).toContain(primary);
-  await expect(spotlight(page)).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.55) 0px 0px 0px 9999px");
+  // A solid 4 px primary ring round the control, then the dimming over the rest of the page.
+  await expect(spotlight(page)).toHaveCSS("box-shadow", /^rgb\(\d+, \d+, \d+\) 0px 0px 0px 4px, rgba\(0, 0, 0, 0\.55\) 0px 0px 0px 9999px$/);
 
   // The spotlight is the control with 6 px around it; it animates into place.
   await expect(async () => {
@@ -384,12 +385,12 @@ test("S02.13 'Your recent feedback' shows your latest 3 items with their stage, 
   const mei = await team.as("Mei");
   await openLanding(mei);
   const none = mei.getByRole("region", { name: "Your recent feedback" });
-  await expect(none.getByText(/No feedback submitted yet/)).toBeVisible();
+  await expect(none.getByText(/Nothing here yet/)).toBeVisible();
   await expect(none.getByRole("listitem")).toHaveCount(0);
   await expect(none.getByRole("link", { name: /View all/ })).toBeVisible();
 });
 
-test("S02.14 'How it works' shows three steps, including 'Nothing is submitted until you select Confirm'", async ({ page, signIn }) => {
+test("S02.14 'How it works' shows three steps, including 'Nothing is sent until you select Confirm'", async ({ page, signIn }) => {
   await signIn("Mario");
   await openLanding(page);
 
@@ -397,7 +398,7 @@ test("S02.14 'How it works' shows three steps, including 'Nothing is submitted u
   await expect(how).toBeVisible();
   const steps = how.getByRole("listitem");
   await expect(steps).toHaveCount(3);
-  await expect(steps.nth(1)).toContainText("Nothing is submitted until you select Confirm.");
+  await expect(steps.nth(1)).toContainText("Nothing is sent until you select Confirm.");
 });
 
 test("S02.15 The footer says chats are processed by Gemini and passwords, card numbers and tax file numbers are removed before saving", async ({ page, signIn }) => {

@@ -227,7 +227,8 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
   const busy = boardCard(page, world.p1);
   await expect(busy.getByText(world.p1, { exact: true })).toBeVisible();
   await expect(busy.getByText(TEXT.p1, { exact: true })).toBeVisible();
-  await expect(busy.getByText("Fix · RAKE Agent · Liam Carter", { exact: true })).toBeVisible();
+  await expect(busy.getByText("Fix", { exact: true })).toHaveClass(/bg-secondary/); // the work type badge
+  await expect(busy.getByText("RAKE Agent · Liam Carter", { exact: true })).toBeVisible();
   await expect(busy.getByText("P1 · Blocking", { exact: true })).toHaveClass(/border-primary/);
   await expect(busy.locator("time")).toHaveText(/^(now|\d+ [mhd])$/);
   const overdue = busy.getByText(/^Overdue · .*15 Sept?$/);
@@ -246,7 +247,8 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
 
   // A plain card has none of the extras.
   const plain = boardCard(page, world.plain);
-  await expect(plain.getByText("Fix · RAKE Agent · Tom Nguyen", { exact: true })).toBeVisible();
+  await expect(plain.getByText("Fix", { exact: true })).toHaveClass(/bg-secondary/);
+  await expect(plain.getByText("RAKE Agent · Tom Nguyen", { exact: true })).toBeVisible();
   await expect(plain.getByText(/^P\d · /)).not.toHaveClass(/border-primary/);
   await expect(plain.getByText("Has files")).toHaveCount(0);
   await expect(plain.getByLabel("Unread reply from the submitter")).toHaveCount(0);
@@ -533,6 +535,22 @@ test("S12.13 The project, work type, category and priority filters and the searc
   await expect(page.getByText("Project: RAKE Agent", { exact: true })).toBeVisible();
   await expect(page.getByText("Priority: P2", { exact: true })).toBeVisible();
   await expectRefs(page, "Cards", refsOf(both));
+});
+
+// Outside the checklist (FINDINGS: the Work filters stayed empty with no message when the project list failed).
+test("The console says so, and loads the filters on Try again, when the project list does not load", async ({ page, signIn }) => {
+  await signIn("Marc");
+  let failing = true;
+  await page.route("**/api/projects", (route) => (failing ? route.fulfill({ status: 500, body: "{}" }) : route.continue()));
+  await page.goto("/console");
+  const alert = page.getByRole("alert").filter({ hasText: "did not load" });
+  await expect(alert).toBeVisible();
+
+  failing = false;
+  await alert.getByRole("button", { name: "Try again" }).click();
+  await expect(alert).toHaveCount(0);
+  await page.getByRole("combobox", { name: "Project", exact: true }).click();
+  await expect(page.getByRole("option", { name: "RAKE Agent" })).toBeVisible();
 });
 
 test("S12.14 List view has the columns Ref, Title, Project, Type, Priority, Stage, Assignee, Age and Expected by (red when overdue)", async ({ page, signIn }) => {

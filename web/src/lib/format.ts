@@ -66,6 +66,12 @@ export function age(iso: string, now: number = Date.now()): string {
   return `${Math.floor(hours / 24)} d`;
 }
 
+/** "5 m ago", or "just now" in the first minute (never "now ago"). */
+export function ago(iso: string, now: number = Date.now()): string {
+  const text = age(iso, now);
+  return text === "now" ? "just now" : `${text} ago`;
+}
+
 /** Exact time in the user's locale: "Tue 21 Oct, 2:30 pm". */
 export function when(iso: string): string {
   return new Date(iso).toLocaleString("en-AU", {

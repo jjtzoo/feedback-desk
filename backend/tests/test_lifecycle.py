@@ -87,6 +87,8 @@ async def test_full_lifecycle_end_to_end(
     assert (await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fix deployed"})).json()[
         "status"
     ] == "resolved"
+    resolved = (await staff.get(f"/api/feedback/{ref}/tracker")).json()["history"]
+    assert resolved[0]["text"] == "Resolved: Fix deployed" and resolved[1]["text"] == "Update: Fix deployed"
     # The Windows clock ticks every ~16 ms; the reply must land after the assignee last read it.
     await asyncio.sleep(0.05)
     t = (await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Still blank on my phone"})).json()

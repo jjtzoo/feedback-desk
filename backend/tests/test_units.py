@@ -182,6 +182,31 @@ def test_draft_validation_rejects_unknown_values() -> None:
     assert draft["brief"]["steps"] == ["Open RAKE", "Ask anything"] and draft["confidence"]["project"] == 0.9
 
 
+def test_a_tool_only_counts_as_named_when_the_person_said_it() -> None:
+    from types import SimpleNamespace
+
+    from agent.tools import _names
+
+    intranet = SimpleNamespace(
+        name="Intranet site itself", slug="intranet", aliases=["intranet"], keywords=["home page", "tile", "menu"]
+    )
+    assert not _names("page is slow to load", intranet)  # "page" alone names nothing
+    assert _names("The intranet home page is slow", intranet)
+    assert _names("the Flipbook tile on the home page goes to a 404", intranet)
+    rake = SimpleNamespace(name="RAKE Agent", slug="rake-agent", aliases=["rake"], keywords=["policy answer"])
+    assert _names("RAKE gives a blank answer", rake) and not _names("the drake is broken", rake)
+
+
+def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
+    praise = {k: v for k, v in COMPLETE.items() if k != "priority"} | {"category": "praise", "work_type": "no_change"}
+    draft, errors = apply_update({}, praise, {"rake-agent"})
+    assert not errors and draft["priority"] == "P4" and not missing(draft)
+    bug, _ = apply_update({}, {k: v for k, v in COMPLETE.items() if k != "priority"}, {"rake-agent"})
+    assert "priority" in missing(bug)  # anything else still waits for the impact question
+    kept, _ = apply_update({}, {**praise, "priority": "P2"}, {"rake-agent"})
+    assert kept["priority"] == "P2"  # a priority the model did set is left alone
+
+
 def test_draft_hash_changes_with_any_field() -> None:
     a, _ = apply_update({}, COMPLETE, {"rake-agent"})
     b, _ = apply_update(a, {"priority": "P1"}, {"rake-agent"})

@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorText, type MyItem } from "@/lib/api";
-import { age, when } from "@/lib/format";
+import { ago, when } from "@/lib/format";
 
 /** "My feedback" (brief §4.1.8): every item the person raised or followed, open ones first. */
 export default function MyFeedbackPage() {
@@ -91,7 +91,7 @@ export default function MyFeedbackPage() {
                         <span className="text-sm text-muted-foreground">
                           {i.project ?? "Tool to confirm"} · <span className="text-foreground">{i.status_text}</span> ·{" "}
                           <time dateTime={i.updated_at} title={when(i.updated_at)}>
-                            updated {age(i.updated_at)} ago
+                            updated {ago(i.updated_at)}
                           </time>
                         </span>
                       </span>

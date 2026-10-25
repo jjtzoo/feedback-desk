@@ -404,7 +404,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
               </div>
             )}
             <div className="flex items-end gap-2">
-              <input ref={fileInput} type="file" accept={ACCEPT} multiple className="sr-only" id="chat-files" onChange={(e) => void attach(e.target.files)} />
+              <input ref={fileInput} type="file" accept={ACCEPT} multiple className="sr-only" id="chat-files" tabIndex={-1} onChange={(e) => void attach(e.target.files)} />
               <Button
                 type="button"
                 variant="ghost"

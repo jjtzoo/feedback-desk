@@ -26,6 +26,11 @@ NOISE = (
     "I'm here for feedback on our intranet tools: something broken, slow or confusing, an idea, "
     "an access request, a question or a bit of praise. What's on your mind?"
 )
+EXISTING = (
+    "Sounds like that one's already in. I can't look up or change existing items from here, but you "
+    "can follow it up yourself: open My feedback, pick the item and use Reply or add details. "
+    "If it's a new problem, tell me about it and I'll start a fresh report."
+)
 OFF_TOPIC = (
     "That one's outside what I can help with. For policy questions, RAKE is your best bet. "
     "Got feedback on one of our tools?"
@@ -210,7 +215,9 @@ def _describe(contents: list[types.Content], projects: list[dict[str, Any]]) -> 
             return _say(PRESS_CONFIRM)
         return _call("update_draft", _correction(text, projects, draft))
 
-    # A new description.
+    # A new description, unless it is about an item that already exists.
+    if _about_existing(low):
+        return _say(EXISTING)
     category = _category(low)
     slug = _match_project(low, projects)
     if not category and not slug:
@@ -219,6 +226,28 @@ def _describe(contents: list[types.Content], projects: list[dict[str, Any]]) -> 
         if any(w in low for w in ("policy", "leave entitlement", "weather", "joke", "recipe")):
             return _say(OFF_TOPIC)
     return _call("update_draft", _classify(text, category or "bug", slug))
+
+
+REFERENCE_RE = re.compile(r"\bfb-?\d{3,6}\b")
+EXISTING_WORDS = (
+    "already raised",
+    "already reported",
+    "already logged",
+    "already submitted",
+    "my ticket",
+    "my report",
+    "existing report",
+    "existing ticket",
+    "existing feedback",
+    "follow up on",
+    "update on my",
+    "status of",
+)
+
+
+def _about_existing(low: str) -> bool:
+    """A follow-up on feedback that already exists: an FB reference, or words like "my ticket"."""
+    return bool(REFERENCE_RE.search(low)) or any(w in low for w in EXISTING_WORDS)
 
 
 def _next_step(contents: list[types.Content], data: dict[str, Any]) -> LlmResponse:

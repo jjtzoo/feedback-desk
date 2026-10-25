@@ -141,6 +141,13 @@ export function GuideButton({ area, tone = "light" }: { area: Area; tone?: "ligh
   const steps = STEPS[area].filter((s) => !s.roles || s.roles.includes(me.role));
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
+  const [run, setRun] = useState(0);
+
+  // Moving between the staff area and the console mid-tour unmounts this button: that counts as seen.
+  useEffect(() => {
+    if (!open) return;
+    return () => markSeen(area);
+  }, [open, area]);
 
   useEffect(() => {
     if (hasSeen(area)) return;
@@ -150,6 +157,7 @@ export function GuideButton({ area, tone = "light" }: { area: Area; tone?: "ligh
 
   function start() {
     setIndex(0);
+    setRun((n) => n + 1); // a fresh Tour, so a "Try it out" in progress does not carry over
     setOpen(true);
   }
 
@@ -169,7 +177,7 @@ export function GuideButton({ area, tone = "light" }: { area: Area; tone?: "ligh
         <HelpCircle className="size-5" aria-hidden="true" />
         <span className="sr-only sm:not-sr-only">Guide</span>
       </Button>
-      {open && createPortal(<Tour steps={steps} index={index} onIndex={setIndex} onEnd={end} />, document.body)}
+      {open && createPortal(<Tour key={run} steps={steps} index={index} onIndex={setIndex} onEnd={end} />, document.body)}
     </>
   );
 }
@@ -261,11 +269,21 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
         e.stopPropagation();
       } else if (at === "target" && e.detail === 0) setPhase("try"); // pressed with the keyboard
     };
+    // Keys too: Tab, Shift+Tab and Esc stay free, but Enter, Space and arrows only work on the control or the card.
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Tab" || e.key === "Escape") return;
+      if (where(e) === "outside") {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
     document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("click", onClick, true);
+    document.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("click", onClick, true);
+      document.removeEventListener("keydown", onKey, true);
     };
   }, [acting, step.target]);
 
@@ -290,19 +308,27 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
       <div className="pointer-events-none fixed inset-0 z-50">
         <div
           role="status"
-          className="pointer-events-auto absolute right-4 bottom-4 w-[min(22rem,calc(100vw-2rem))] rounded-2xl bg-popover p-4 text-popover-foreground shadow-card ring-1 ring-foreground/10"
+          className={cn(
+            "pointer-events-auto absolute right-4 flex w-[min(22rem,calc(100vw-2rem))] items-center gap-2 rounded-2xl bg-popover p-2 pl-4 text-popover-foreground shadow-card ring-1 ring-foreground/10",
+            // Out of the way of the control being tried: the bottom corner, unless that control sits low on the screen.
+            rect && rect.top > window.innerHeight / 2 ? "top-4" : "bottom-4",
+          )}
         >
-          <p className="text-base font-bold">Try it out</p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Step {index + 1} of {steps.length}. Have a look at {step.title}, then press {last ? "Done" : "Next"} to carry on.
+          {/* One row, so it covers as little of the page as possible while the person tries the feature. */}
+          <p className="min-w-0 flex-1 text-sm">
+            <span className="font-bold">Try it out</span>
+            <span className="sr-only">
+              Step {index + 1} of {steps.length}. Have a look at {step.title}, then press {last ? "Done" : "Next"} to carry on.
+            </span>
+            <span aria-hidden="true" className="text-muted-foreground"> · Step {index + 1} of {steps.length}</span>
           </p>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {!last && (
-              <Button variant="ghost" className="-ml-2 h-11 rounded-xl text-muted-foreground" onClick={onEnd}>
+              <Button variant="ghost" className="h-11 rounded-xl text-muted-foreground" onClick={onEnd}>
                 Skip tour
               </Button>
             )}
-            <Button className="ml-auto h-11 rounded-xl px-5" onClick={() => (last ? onEnd() : go(index + 1))}>
+            <Button className="h-11 rounded-xl px-5" onClick={() => (last ? onEnd() : go(index + 1))}>
               {last ? "Done" : "Next"}
             </Button>
           </div>
@@ -318,16 +344,14 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
       {rect ? (
         <div
           aria-hidden="true"
-          className={cn(
-            "absolute rounded-xl transition-all duration-200 ease-out",
-            acting ? "ring-4 ring-primary" : "ring-2 ring-white/80",
-          )}
+          className="absolute rounded-xl transition-all duration-200 ease-out"
           style={{
             left: rect.left - PAD,
             top: rect.top - PAD,
             width: rect.width + PAD * 2,
             height: rect.height + PAD * 2,
-            boxShadow: "0 0 0 9999px rgb(0 0 0 / 0.55)",
+            // A box-shadow ring (Tailwind's ring utilities are box-shadows too, and an inline one would replace them).
+            boxShadow: `0 0 0 ${acting ? "4px var(--primary)" : "2px rgb(255 255 255 / 0.8)"}, 0 0 0 9999px rgb(0 0 0 / 0.55)`,
           }}
         >
           {acting && <span className="absolute -inset-2 rounded-2xl ring-4 ring-primary/60 motion-safe:animate-pulse" />}
