@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T00:37:40.646Z",
-  "commit": "8858e8f",
-  "uncommitted": true,
+  "ran": "2026-10-26T04:15:11.652Z",
+  "commit": "c86307f",
+  "uncommitted": false,
   "spec": "13-item-panel.spec.ts",
-  "fingerprint": "cfbb17ea6d6e5e09",
+  "fingerprint": "3881f0eea5e982db",
   "caught": {
     "S13.01": true,
     "S13.02": true,
@@ -15,6 +15,11 @@
     "S13.08": true,
     "S13.09": true,
     "S13.10": true,
-    "S13.11": true
+    "S13.11": true,
+    "S13.12": true,
+    "S13.13": true,
+    "S13.14": true,
+    "S13.15": true,
+    "S13.16": false
   }
 }
