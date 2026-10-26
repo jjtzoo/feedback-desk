@@ -47,9 +47,9 @@ cases:
   - {name: very-short, expect: card, messages: ["rake slow", "It's slowing me down", "I expected an answer in a few seconds but it takes a minute"]}
   - {name: rambling, expect: card, messages: ["So I was trying to do my monthly expenses yesterday arvo and the Financial Platform, which honestly is usually fine, just sat there spinning on the submit button for ages and then logged me out and I lost everything I'd typed", "Slowing me down", "I expected it to submit"]}
   - {name: mixed-two-tools, expect: card, messages: ["Flipbook and the Training Portal both look broken on my phone, mostly Flipbook though", "Flipbook", "It's annoying", "I expected the pages but got a white screen"]}
-  - {name: praise, expect: card, messages: ["Just wanted to say the new RAKE answers are brilliant, saved me heaps of time"]}
+  - {name: praise, expect: card, messages: ["Just wanted to say the new RAKE answers are brilliant, saved me heaps of time", "Yes please"]}
   - {name: access, expect: card, messages: ["I need access to the AFSS Portal for the new job in Perth", "Blocking my work"]}
-  - {name: question, expect: card, messages: ["How do I export my CPD points from the CPD Tracker?", "It's a nice-to-have"]}
+  - {name: question, expect: card, messages: ["How do I export my CPD points from the CPD Tracker?", "Yes please, it's a nice-to-have"]}
   - {name: idea, expect: card, messages: ["It would be great if IT Asset could send me a reminder before my laptop warranty runs out", "It's a nice-to-have", "Nothing is broken, it would just save me checking by hand"]}
   - {name: aussie-slang, expect: card, messages: ["Workflow Atlas is chucking a wobbly, the hot works procedure is the old one", "It's annoying", "I expected the current hot works procedure but it shows last year's version"]}
   - {name: angry-not-abusive, expect: card, messages: ["This is ridiculous, the GoFormz Extension Portal has been stuck on pending ALL DAY and I've got inspections to send", "Blocking my work", "I expected the form to sync"]}
