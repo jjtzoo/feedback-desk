@@ -26,7 +26,7 @@ async function describeAgain(mike: Page, text: string) {
   await mike.goto("/chat");
   await expect(mike.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(mike, text);
-  await mike.getByRole("button", { name: "Slowing me down" }).click();
+  await mike.getByRole("button", { name: "Slower, but I get there" }).click();
   const box = mike.getByText(SOMEONE, { exact: true }).locator("xpath=ancestor::li[1]");
   await expect(box).toBeVisible();
   return box;

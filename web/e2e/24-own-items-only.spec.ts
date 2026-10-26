@@ -101,7 +101,7 @@ test("S24.03 the duplicate box and What's new show no other submitter's name", a
   await page.goto("/chat");
   await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(page, second);
-  await page.getByRole("button", { name: "Slowing me down", exact: true }).click();
+  await page.getByRole("button", { name: "Slower, but I get there", exact: true }).click();
   const box = page.getByText("Someone may have raised this already", { exact: true }).locator("xpath=ancestor::li[1]");
   await expect(box).toContainText(ref);
   await expect(box).toContainText(first);

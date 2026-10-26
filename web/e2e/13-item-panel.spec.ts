@@ -438,3 +438,21 @@ test("S13.11 Darlene opening an Awaiting approval item sees 'Waiting for an Admi
   await expect(panel.getByText("Waiting for an Admin to approve. Work starts once it's approved.")).toBeVisible();
   await expect(panel.getByRole("button", { name: "Start work" })).toHaveCount(0);
 });
+
+test("S13.17 An item saved with open gaps says 'Needs detail' on its card and panel until the person adds details", async ({ page, signIn, team }) => {
+  const liam = await team.as("Liam");
+  const ref = await raiseBug(liam, "rake-agent", "RAKE Agent loses my saved searches");
+  // Approved, so it is on Darlene's board (an item awaiting approval has no column there).
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+  await signIn("Darlene");
+  const panel = await openItem(page, ref);
+  await expect(panel.getByText("Needs detail: ask for info first")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("radiogroup", { name: "View" }).getByRole("radio", { name: "Board", exact: true }).click();
+  const card = page.locator('[aria-roledescription^="Draggable card"]').filter({ hasText: new RegExp(`${ref}(?!\\d)`) });
+  await expect(card).toContainText("Needs detail");
+
+  await postJson(liam, `/feedback/${ref}/replies`, { body: "It happens after I sign out and back in" });
+  await page.reload();
+  await expect(card).not.toContainText("Needs detail");
+});

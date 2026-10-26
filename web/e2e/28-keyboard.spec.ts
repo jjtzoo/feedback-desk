@@ -99,7 +99,7 @@ async function openChat(page: Page) {
 async function reachCard(page: Page, description: string) {
   await openChat(page);
   await chatSay(page, description);
-  await page.getByRole("button", { name: "Slowing me down", exact: true }).click();
+  await page.getByRole("button", { name: "Slower, but I get there", exact: true }).click();
   await expect(page.getByText("What did you expect to happen")).toBeVisible();
   await chatSay(page, EXPECTED);
   await expect(card(page)).toBeVisible();
@@ -185,7 +185,10 @@ test("S28.02 In the chat, focus moves to the 'Your feedback' heading when the ca
   await reachCard(page, "The Training Portal shows an error when I open the certificate for my course");
   await expect(page.getByRole("heading", { name: "Your feedback" })).toBeFocused();
 
-  // From the heading, Tab reaches Confirm and Enter presses it: the whole way needs no mouse.
+  // From the heading, Tab passes the box for what Sig couldn't find out (D63; its Add button is off
+  // while the box is empty), reaches Confirm, and Enter presses it: the whole way needs no mouse.
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Add what you know")).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Confirm" })).toBeFocused();
   await page.keyboard.press("Enter");

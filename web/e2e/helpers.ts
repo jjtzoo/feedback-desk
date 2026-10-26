@@ -184,7 +184,7 @@ export async function reachBackupForm(page: Page) {
 export async function answerUntilCard(page: Page) {
   for (let i = 0; i < 5; i++) {
     if (await page.getByRole("button", { name: "Confirm" }).isVisible()) return;
-    const impact = page.getByRole("button", { name: "Slowing me down" });
+    const impact = page.getByRole("button", { name: "Slower, but I get there" });
     if (await impact.isVisible()) await impact.click();
     else await chatSay(page, "I expected it to work but got a blank screen");
     await expect(page.getByText("Sig is writing…")).toHaveCount(0, { timeout: 20_000 });

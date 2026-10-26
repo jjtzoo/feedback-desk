@@ -24,7 +24,7 @@ async function openChat(page: Page) {
 }
 
 /** Describe it, choose how much it affects the person, say what was expected: the confirm card shows. */
-async function reachCard(page: Page, description: string, impact = "Slowing me down") {
+async function reachCard(page: Page, description: string, impact = "Slower, but I get there") {
   await openChat(page);
   await chatSay(page, description);
   await page.getByRole("button", { name: impact, exact: true }).click();
@@ -47,12 +47,12 @@ async function inboxCards(page: Page, inbox: string) {
   await page.getByRole("radio", { name: "Cards", exact: true }).click();
 }
 
-test("S04.01 The card is headed 'Your feedback' with Tool, Type, Title, Summary and a labelled Priority, and focus lands on it", async ({ page, signIn }) => {
+test("S04.01 The card is headed 'Your feedback' with Tool, Type, Title, Summary, What happened (for a fix) and a labelled Priority, and focus lands on it", async ({ page, signIn }) => {
   await signIn("Aisha");
   // The card leaves Summary out when it repeats the title, so the first sentence is longer than a title (80 characters).
   await reachCard(page, "The Training Portal shows an error and a blank page whenever I try to open the certificate for a course I finished last week");
   await expect(page.getByRole("heading", { name: "Your feedback" })).toBeFocused();
-  await expect(card(page).locator("dt")).toHaveText(["Tool", "Type", "Title", "Summary", "Priority"]);
+  await expect(card(page).locator("dt")).toHaveText(["Tool", "Type", "Title", "Summary", "What happened", "Priority"]);
   await expect(field(page, "Tool")).toHaveText("Training Portal");
   await expect(field(page, "Type")).toHaveText("Fix · Bug");
   await expect(field(page, "Title")).toHaveText(/^The Training Portal shows an error.+\.\.\.$/);
@@ -60,11 +60,11 @@ test("S04.01 The card is headed 'Your feedback' with Tool, Type, Title, Summary 
   await expect(field(page, "Priority")).toHaveText("Major");
 });
 
-test("S04.02 'Slowing me down' gives Major (P2), and 'annoying' appears nowhere in the chips, card or Sig's messages", async ({ page, signIn }) => {
+test("S04.02 'Slower, but I get there' gives Major (P2), and 'annoying' appears nowhere in the chips, card or Sig's messages", async ({ page, signIn }) => {
   await signIn("Tom");
   await openChat(page);
   await chatSay(page, BUG);
-  const slowing = page.getByRole("button", { name: "Slowing me down", exact: true });
+  const slowing = page.getByRole("button", { name: "Slower, but I get there", exact: true });
   await expect(slowing).toBeVisible();
   await expect(chat(page)).not.toContainText(/annoy/i);
   await slowing.click();
@@ -105,9 +105,9 @@ test("S04.04 Typing 'yes' instead of pressing Confirm asks for Confirm and saves
 
 test("S04.05 Change, then 'make it P2': Sig asks what to change and a new card shows Major (P2)", async ({ page, signIn }) => {
   await signIn("Mei");
-  // Start from Nice-to-have so the change to P2 is visible on the card.
-  await reachCard(page, "The Flipbook shows an error when I open a brochure", "Nice-to-have");
-  await expect(field(page, "Priority")).toHaveText("Nice-to-have");
+  // Start from Minor so the change to P2 is visible on the card.
+  await reachCard(page, "The Flipbook shows an error when I open a brochure", "Minor, I can live with it");
+  await expect(field(page, "Priority")).toHaveText("Minor");
   await page.getByRole("button", { name: "Change" }).click();
   await expect(page.getByText("No worries. What should I change?")).toBeVisible();
   await expect(card(page)).toHaveCount(0);
@@ -211,7 +211,7 @@ test("S04.12 'Not sure' to 'Which tool?' goes to the Digital team and sits in Ne
 
 test("S04.13 A P1 (blocking) tells every Admin, Chris, Marc and Mike, 'P1 needs approval'", async ({ page, signIn, team }) => {
   await signIn("Rafael");
-  await reachCard(page, "The Training Portal shows an error when I open a course", "Blocking my work");
+  await reachCard(page, "The Training Portal shows an error when I open a course", "Can't work at all");
   await expect(field(page, "Priority")).toHaveText("Blocking");
   const ref = await confirm(page);
 
@@ -221,4 +221,18 @@ test("S04.13 A P1 (blocking) tells every Admin, Chris, Marc and Mike, 'P1 needs 
     await adminPage.getByRole("button", { name: /^Notifications/ }).click();
     await expect(adminPage.getByRole("link", { name: new RegExp(`P1 needs approval: ${ref}`) }), `${admin} was told`).toBeVisible();
   }
+});
+
+test("S04.14 The card shows what happened and what Sig couldn't find out; what you add there is sent and the card comes back without that gap", async ({ page, signIn }) => {
+  await signIn("Aisha");
+  await reachCard(page, "The Training Portal shows an error when I open a course");
+  await expect(field(page, "What happened")).toHaveText("got a blank screen");
+  const unknown = card(page).getByRole("form", { name: "We don't know yet" });
+  await expect(unknown).toContainText("Steps to reproduce");
+
+  await unknown.getByLabel("Add what you know").fill("Open My courses, then press Start on any course");
+  await unknown.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(chat(page).getByText("You: Open My courses, then press Start on any course")).toBeVisible();
+  await expect(card(page)).toBeVisible();
+  await expect(card(page).getByRole("form", { name: "We don't know yet" })).toHaveCount(0);
 });
