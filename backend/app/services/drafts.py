@@ -41,6 +41,8 @@ TEXT_LIMITS = {
 BRIEF_TEXT = ("problem", "expected", "actual", "who_needs_it", "asking_for", "submitter_quote")
 BRIEF_LISTS = ("steps", "done_when", "open_gaps")
 CONFIDENCE = ("project", "work_type", "category", "priority")
+# A number, letter or bullet the model put in front of a list item: "1.", "2)", "Step 3:", "a.", "-", "•".
+LIST_MARKER = re.compile(r"^\s*(?:(?:step\s*)?\d{1,2}\s*[.):](?=\s)|[a-z][.)](?=\s)|[-*•](?=\s))\s*", re.IGNORECASE)
 
 WORK_TYPE_LABEL = {"fix": "Fix", "improvement": "Improvement", "new_feature": "New feature", "no_change": "No change"}
 CATEGORY_LABEL = {
@@ -93,7 +95,9 @@ def apply_update(draft: Draft, updates: dict[str, Any], valid_slugs: set[str]) -
             new["brief"][field] = str(value).strip()[:2000]
         elif field in BRIEF_LISTS:
             items = value if isinstance(value, list) else [value]
-            new["brief"][field] = [str(i).strip()[:500] for i in items if str(i).strip()][:10]
+            # Every page and email numbers or bullets these lists itself, so the model's own "1." goes.
+            cleaned = (LIST_MARKER.sub("", str(i)).strip() for i in items)
+            new["brief"][field] = [i[:500] for i in cleaned if i][:10]
         elif field.endswith("_confidence") and field.removesuffix("_confidence") in CONFIDENCE:
             try:
                 new["confidence"][field.removesuffix("_confidence")] = max(0.0, min(1.0, float(value)))
@@ -156,6 +160,9 @@ IMPACT_IDEA = [
     {"label": "Would save me time daily", "value": "It would save me time every day"},
     {"label": "Nice to have", "value": "It's a nice-to-have"},
 ]
+# After the impact answers, for a case they don't cover (review item 22): the page puts the cursor in
+# the message box and sends nothing.
+OWN_WORDS_CHIP = {"label": "Something else", "value": "Something else", "own_words": True}
 
 # What Sig's next message does, signalled through update_draft's next_step (review item 20): the page
 # shows the card and the chips for that step only, never because the draft happens to be complete.
@@ -169,9 +176,9 @@ CHECK_SEND_CHIPS = [
 ]
 
 
-def impact_chips(draft: Draft) -> list[dict[str, str]]:
+def impact_chips(draft: Draft) -> list[dict[str, Any]]:
     idea = draft.get("work_type") in ("improvement", "new_feature") or draft.get("category") == "feature_request"
-    return IMPACT_IDEA if idea else IMPACT_FAULT
+    return [*(IMPACT_IDEA if idea else IMPACT_FAULT), OWN_WORDS_CHIP]
 
 
 REPLIES_MAX = 3

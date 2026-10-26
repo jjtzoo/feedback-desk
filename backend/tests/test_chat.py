@@ -1,5 +1,6 @@
 """Sprint 2: the staff chat on the stub model (S2-1 to S2-8)."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -278,6 +279,72 @@ async def test_duplicate_is_offered_and_plus_one_adds_the_comment(staff: httpx.A
     await other.aclose()
 
 
+async def test_a_match_fixed_before_is_linked_as_a_possible_regression_not_offered_for_plus_one(
+    marc: httpx.AsyncClient, staff: httpx.AsyncClient
+) -> None:
+    """Review item 37: the duplicate check also looks at items fixed in the last months (D73)."""
+    old = (
+        await submit_via_chat(
+            staff,
+            "Flipbook pages are blank on the safety brochure, it's annoying",
+            ["I expected pages but got white screens"],
+            project="flipbook",
+        )
+    )["reference"]
+    async with session_scope() as db:
+        fb = await db.scalar(select(Feedback).where(Feedback.ref_no == old))
+        assert fb is not None
+        fb.status, fb.ending, fb.resolved_at = "closed", "fixed", datetime.now(UTC) - timedelta(days=30)
+    other = await signed_in(STAFF2)
+    sid = await start_chat(other, project="flipbook")
+    events = await say(
+        other, sid, "Flipbook pages are blank on the brochure, it's annoying, I expected pages but got white"
+    )
+    assert first(events, "duplicates") is None  # nothing to "+1": that one is closed
+    assert f"({old})" in texts(events)[-1] and "fixed on" in texts(events)[-1]
+    assert (await other.post(f"/api/chat/sessions/{sid}/plus-one", json={"reference": old})).status_code == 409
+    card = first(events, "draft")
+    assert card is not None
+    r = await other.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    new = first(parse_sse(r.text), "done")
+    assert new is not None and new["reference"] != old
+    item = (await marc.get(f"/api/console/items/{new['reference']}")).json()
+    linked = [e for e in item["events"] if e["event_type"] == "linked"]
+    assert linked and linked[0]["after"]["regression_of"]["reference"] == old
+    assert linked[0]["public_text"] is None  # for the owner, not the tracker
+    await other.aclose()
+
+
+async def test_a_fix_older_than_the_window_is_not_matched(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old = (
+        await submit_via_chat(
+            staff,
+            "Flipbook pages are blank on the safety brochure, it's annoying",
+            ["I expected pages but got white screens"],
+            project="flipbook",
+        )
+    )["reference"]
+    async with session_scope() as db:
+        fb = await db.scalar(select(Feedback).where(Feedback.ref_no == old))
+        assert fb is not None
+        fb.status, fb.ending, fb.resolved_at = "closed", "fixed", datetime.now(UTC) - timedelta(days=200)
+    other = await signed_in(STAFF2)
+    sid = await start_chat(other, project="flipbook")
+    events = await say(
+        other, sid, "Flipbook pages are blank on the brochure, it's annoying, I expected pages but got white"
+    )
+    assert old not in texts(events)[-1]
+    monkeypatch.setattr(get_settings(), "duplicate_fixed_days", 365)
+    sid = await start_chat(other, project="flipbook")
+    events = await say(
+        other, sid, "Flipbook pages are blank on the brochure, it's annoying, I expected pages but got white"
+    )
+    assert f"({old})" in texts(events)[-1]
+    await other.aclose()
+
+
 async def test_the_console_tallies_reporters_and_suggests_a_priority_review_without_changing_it(
     staff: httpx.AsyncClient, marc: httpx.AsyncClient
 ) -> None:
@@ -386,7 +453,10 @@ async def test_impact_chips_only_follow_an_impact_question(staff: httpx.AsyncCli
         "Can't work at all",
         "Slower, but I get there",
         "Minor, I can live with it",
+        "Something else",
     ]
+    # Review item 22: the last chip only puts the cursor in the message box; the page sends nothing.
+    assert [o.get("own_words", False) for o in chips["options"]] == [False, False, False, True]
     events = await say(staff, sid, "I can't work at all")
     assert texts(events)[-1] == ASK_EXPECTED and first(events, "chips") is None  # an open question: no chips
 

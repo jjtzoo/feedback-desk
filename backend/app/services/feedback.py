@@ -107,6 +107,8 @@ class Submission:
     session_id: str | None = None
     chat_turns: list[tuple[str, str, datetime]] = field(default_factory=list)
     original_text: str = ""
+    # A fixed item the duplicate check matched in the chat: linked as a possible regression (D73).
+    regression_of: dict[str, str] | None = None
 
 
 @dataclass
@@ -221,6 +223,9 @@ async def submit(db: AsyncSession, sub: Submission) -> Created:
         )
     if fb.status == "acknowledged":
         events.log(db, fb.id, SYSTEM, "acknowledged", public_text="Acknowledged: passed on to the team as thanks")
+    if sub.regression_of:
+        # For the owner only: staff were told in the chat that it was fixed before.
+        events.log(db, fb.id, AGENT, "linked", after={"regression_of": sub.regression_of})
 
     await embeddings.store(db, fb.id, f"{fb.title}. {fb.summary}")
     await _notify_new(db, fb, routing)

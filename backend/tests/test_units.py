@@ -207,6 +207,23 @@ def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
     assert kept["priority"] == "P2"  # a priority the model did set is left alone
 
 
+def test_brief_lists_lose_the_models_own_numbers_and_bullets() -> None:
+    """Review item 26: the pages number the steps, so "1. 1. Fill out a form" never shows again."""
+    draft, errors = apply_update(
+        {},
+        {
+            "steps": ["1. Fill out a form", "2) Press Submit", "Step 3: it resets", "- watch the spinner"],
+            "open_gaps": ["• Which form", "a. Any error message"],
+            "done_when": ["1.5 seconds is fine", "10:30 runs work"],
+        },
+        {"rake-agent"},
+    )
+    assert not errors
+    assert draft["brief"]["steps"] == ["Fill out a form", "Press Submit", "it resets", "watch the spinner"]
+    assert draft["brief"]["open_gaps"] == ["Which form", "Any error message"]
+    assert draft["brief"]["done_when"] == ["1.5 seconds is fine", "10:30 runs work"]  # numbers in the text stay
+
+
 def test_praise_card_shows_praise_alone_without_a_priority() -> None:
     praise, _ = apply_update({}, COMPLETE | {"category": "praise", "work_type": "no_change"}, {"rake-agent"})
     shown = card(praise, "RAKE Agent")

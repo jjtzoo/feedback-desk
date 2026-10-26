@@ -102,6 +102,8 @@ export interface Chip {
   value: string;
   /** One of the person's likely tools (D60): shown first. */
   usual?: boolean;
+  /** "Something else" (review item 22): puts the cursor in the message box, sends nothing. */
+  own_words?: boolean;
 }
 
 export interface Duplicate {

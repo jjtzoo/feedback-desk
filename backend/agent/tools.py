@@ -170,10 +170,12 @@ async def update_draft(
 
 
 async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str, Any]:
-    """Look for open items in the same project that may be the same issue.
+    """Look for items in the same project that may be the same issue: open ones, and ones fixed in
+    the last few months.
 
     Returns:
-        candidates: reference, title and date of each likely duplicate (never who raised it).
+        candidates: reference, title and date of each likely duplicate (never who raised it), and
+        fixed_on (the day it was fixed) for one that was fixed before and may be happening again.
     """
     draft = dict(tool_context.state.get("draft") or {})
     slug = draft.get("project_slug")
@@ -182,9 +184,25 @@ async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str
         return {"candidates": [], "note": "Set the project and summary first."}
     async with session_scope() as db:
         project = await catalog.project_by_slug(db, slug)
-        found = await embeddings.find_similar(db, project.id, text, limit=max(1, min(limit, 3))) if project else []
-    candidates = [{"reference": s.ref_no, "title": s.title, "date": s.created_at_iso[:10]} for s in found]
-    tool_context.state["duplicates"] = candidates
+        found = (
+            await embeddings.find_similar(
+                db, project.id, text, limit=max(1, min(limit, 3)), fixed_days=get_settings().duplicate_fixed_days
+            )
+            if project
+            else []
+        )
+    candidates = [
+        {"reference": s.ref_no, "title": s.title, "date": s.created_at_iso[:10]}
+        | ({"fixed_on": s.fixed_at_iso[:10]} if s.fixed_at_iso else {})
+        for s in found
+    ]
+    # Open matches get "+1 and comment" on the page; a fixed one is a possible regression instead (D73):
+    # the new item goes in, linked to it for the owner.
+    tool_context.state["duplicates"] = [c for c in candidates if "fixed_on" not in c]
+    fixed = next((c for c in candidates if "fixed_on" in c), None)
+    tool_context.state["regression_of"] = (
+        {"reference": fixed["reference"], "title": fixed["title"], "fixed_on": fixed["fixed_on"]} if fixed else None
+    )
     return {"candidates": candidates}
 
 
@@ -228,6 +246,7 @@ async def submit_feedback(tool_context: ToolContext) -> dict[str, Any]:
                 session_id=tool_context.session.id,
                 chat_turns=turns,
                 original_text=first_user,
+                regression_of=state.get("regression_of"),
             ),
         )
         fb = created.feedback

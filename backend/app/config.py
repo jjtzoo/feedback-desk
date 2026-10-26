@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     google_cloud_location: str = "australia-southeast1"
     google_application_credentials: str = ""
     duplicate_threshold: float = 0.85
+    # The chat's duplicate check also looks at items fixed this many days back, so Sig can say a bug was
+    # fixed before and the new item is linked to it as a possible regression (D73). 0 switches it off.
+    duplicate_fixed_days: int = 183
     # Different people reporting the same open item before the console suggests a priority review (D38).
     priority_review_reporters: int = 3
     # For the cost log (brief §8: under AUD 0.05 per item). AUD per million tokens for model_name;
