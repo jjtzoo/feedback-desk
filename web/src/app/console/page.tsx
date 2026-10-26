@@ -13,6 +13,7 @@ import { FilterMenu, type FilterField } from "@/components/console/filter-menu";
 import { ItemPanel } from "@/components/console/item-panel";
 import { useMe } from "@/components/me";
 import { RowActions } from "@/components/console/row-actions";
+import { AutoMarker } from "@/components/console/routing-line";
 import { WorkCard } from "@/components/console/work-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -176,8 +177,9 @@ function Work() {
 
   async function assign(ref: string, assigneeId: string | null) {
     try {
-      await api.patch(`/console/items/${ref}`, { assignee_id: assigneeId });
-      toast.success(assigneeId ? `${ref} assigned` : `${ref} unassigned`);
+      if (assigneeId) await api.post(`/console/items/${ref}/hand-over`, { to: assigneeId });
+      else await api.post(`/console/items/${ref}/assign-to-me`);
+      toast.success(assigneeId ? `${ref} handed over` : `${ref} is yours`);
     } catch (e) {
       toast.error(errorText(e));
     }
@@ -234,7 +236,8 @@ function Work() {
       staff={staff}
       onOpen={() => setParam("item", c.reference)}
       onUpdate={() => setPending({ ref: c.reference, kind: "update" })}
-      onAssign={(id) => void assign(c.reference, id)}
+      onAssignToMe={() => void assign(c.reference, null)}
+      onHandOver={(id) => void assign(c.reference, id)}
       onMove={(column) => void move(c.reference, column)}
     />
   );
@@ -390,7 +393,11 @@ function Work() {
                           <TableCell>
                             <StatusBadge status={c.status} ending={c.ending} />
                           </TableCell>
-                          <TableCell>{c.assignee?.name ?? "Unassigned"}</TableCell>
+                          <TableCell>
+                            <span className="flex items-center gap-1.5">
+                              {c.assignee?.name ?? "Unassigned"} <AutoMarker card={c} />
+                            </span>
+                          </TableCell>
                           <TableCell className="font-mono text-xs tabular">{age(c.created_at)}</TableCell>
                           <TableCell className={cn(c.overdue && "font-semibold text-destructive")}>{c.expected_by ? day(c.expected_by) : "–"}</TableCell>
                           <TableCell className="sticky right-0 w-12 bg-card">{rowActions(c)}</TableCell>

@@ -199,6 +199,8 @@ export interface Card {
   reporters: number;
   /** Enough people reported it that a priority review is suggested (never applied by itself). */
   priority_review: boolean;
+  /** Routing's reason ("project owner", "routing rule", "project unclear", ...) while its choice still stands (D56). */
+  routed: string | null;
 }
 
 export interface Column {
@@ -277,6 +279,9 @@ export interface Detail extends Card {
   followers: string[];
   duplicates: { reference: string; title: string; status: string; similarity: number }[];
   linked: string[];
+  /** For the Take over dialog (D53): whether the holder is away, and their latest step on the item. */
+  assignee_away: boolean;
+  holder_activity: { text: string; at: string } | null;
 }
 
 export interface Notification {
@@ -287,6 +292,11 @@ export interface Notification {
   link: string;
   read_at: string | null;
   created_at: string;
+  /** What happened once anyone acted on it ("FB-0003 approved by Chris"), and the item as it is now (D54). */
+  outcome: string | null;
+  item_status: Status | null;
+  item_stage: Stage | null;
+  item_ending: Ending | null;
 }
 
 export interface ChannelMessage {

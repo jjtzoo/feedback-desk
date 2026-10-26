@@ -448,6 +448,7 @@ class NotificationOut(Out):
     # What happened once anyone acted on it, and the item's stage as it is now (D54).
     outcome: str | None
     item_status: Status | None = None
+    item_stage: str | None = None  # the staff stage, for a staff member's bell
     item_ending: Ending | None = None
 
 

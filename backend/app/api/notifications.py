@@ -12,6 +12,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import STREAM_HEADERS, CurrentUser, Db, StreamUser
 from app.db import session_scope
+from app.models.enums import STAGE_OF
 from app.schemas import NotificationOut, NotificationsOut, ReadIn
 from app.services import auth, notifications
 
@@ -24,7 +25,13 @@ async def list_notifications(db: Db, user: CurrentUser) -> NotificationsOut:
     rows, unread = await notifications.list_for(db, user.email)
     items = [
         NotificationOut.model_validate(n).model_copy(
-            update={"item_status": n.feedback.status, "item_ending": n.feedback.ending} if n.feedback else {}
+            update={
+                "item_status": n.feedback.status,
+                "item_stage": STAGE_OF[n.feedback.status],
+                "item_ending": n.feedback.ending,
+            }
+            if n.feedback
+            else {}
         )
         for n in rows
     ]

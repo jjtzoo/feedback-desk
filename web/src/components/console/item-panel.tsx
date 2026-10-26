@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { PriorityBadge, StatusBadge } from "@/components/badges";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
+import { RoutingLine } from "@/components/console/routing-line";
 import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +17,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, errorText, type Detail, type Project, type Staff } from "@/lib/api";
 import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, ago, day, fileSize, when } from "@/lib/format";
+import { actorName, historyLine } from "@/lib/history";
+import { ownership } from "@/lib/ownership";
 import { cn } from "@/lib/utils";
 
 const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
@@ -91,19 +94,19 @@ export function ItemPanel({
   }
 
   async function onDialog(kind: ActionKind, r: ActionResult): Promise<boolean> {
-    const ok = await (kind === "update"
-      ? act("update", { body: r.text, expected_by: r.expectedBy ?? null })
-      : kind === "resolve"
-        ? act("resolve", { body: r.text })
-        : kind === "fix"
-          ? act("close", { ending: "fixed" })
-          : kind === "close"
-            ? act("close", { reason: r.text, ending: r.ending })
-            : kind === "decline"
-              ? act("decline", { reason: r.text })
-              : kind === "ask"
-                ? act("ask-info", { question: r.text, ask: r.ask })
-                : act("merge", { into: r.text }));
+    const call: Record<ActionKind, [string, unknown]> = {
+      update: ["update", { body: r.text, expected_by: r.expectedBy ?? null }],
+      resolve: ["resolve", { body: r.text }],
+      fix: ["close", { ending: "fixed" }],
+      close: ["close", { reason: r.text, ending: r.ending }],
+      decline: ["decline", { reason: r.text }],
+      ask: ["ask-info", { question: r.text, ask: r.ask }],
+      merge: ["merge", { into: r.text }],
+      // Sends who had it when the dialog opened, so a second person taking it at once is told (D53).
+      take_over: ["take-over", { holder_id: item?.assignee?.id, reason: r.text }],
+      hand_over: ["hand-over", { to: r.to, reason: r.text }],
+    };
+    const ok = await act(...call[kind]);
     if (ok) toast.success("Saved");
     return ok;
   }
@@ -132,6 +135,16 @@ export function ItemPanel({
   const awaiting = item && (item.status === "awaiting_approval" || item.status === "needs_review");
   const open = item && !["declined", "closed", "acknowledged"].includes(item.status);
   const changeField = (field: string, value: string | null) => void act("", { [field]: value }, "patch");
+  const can = item ? ownership(item, me, staff) : null;
+  // The Take over dialog says whose it is and what they last did, so nobody grabs work that is moving (D53).
+  const holder = item?.assignee?.name;
+  const takeOverText = !item
+    ? undefined
+    : item.assignee_away
+      ? `${holder} is marked away.`
+      : item.holder_activity
+        ? `${holder} ${item.holder_activity.text} ${ago(item.holder_activity.at)}.`
+        : `${holder} hasn't done anything on it yet.`;
 
   return (
     <Sheet open={reference !== null} onOpenChange={(o) => !o && onClose()}>
@@ -203,19 +216,34 @@ export function ItemPanel({
                     </Button>
                   </>
                 )}
-                {item.status === "approved" && (
+                {item.status === "approved" && (can?.holder || can?.canAssignToMe) && (
                   <Button className="h-10 rounded-xl" disabled={busy} onClick={() => void act("start")}>
                     Start work
                   </Button>
                 )}
-                {item.status === "in_progress" && (
+                {item.status === "in_progress" && can?.holder && (
                   <Button className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "resolve" })}>
                     Resolve
                   </Button>
                 )}
-                {open && !awaiting && (
+                {open && !awaiting && can?.holder && (
                   <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "update" })}>
                     Post update
+                  </Button>
+                )}
+                {open && can?.canAssignToMe && item.status !== "approved" && (
+                  <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => void act("assign-to-me").then((ok) => ok && toast.success(`${item.reference} is yours`))}>
+                    Assign to me
+                  </Button>
+                )}
+                {open && can?.canTakeOver && (
+                  <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "take_over" })}>
+                    Take over
+                  </Button>
+                )}
+                {open && can?.canHandOver && (
+                  <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "hand_over" })}>
+                    Hand over to…
                   </Button>
                 )}
                 {open && (
@@ -235,13 +263,11 @@ export function ItemPanel({
                   <FieldSelect label={`Work type (${percent(item.ai_confidence.work_type)})`} value={item.work_type ?? ""} options={WORK_TYPES.map((w) => [w, WORK_TYPE_LABEL[w]])} onChange={(v) => changeField("work_type", v)} />
                   <FieldSelect label={`Category (${percent(item.ai_confidence.category)})`} value={item.category ?? ""} options={CATEGORIES.map((c) => [c, CATEGORY_LABEL[c]])} onChange={(v) => changeField("category", v)} />
                   <FieldSelect label={`Priority (${percent(item.ai_confidence.priority)})`} value={item.priority ?? ""} options={PRIORITIES.map((p) => [p, PRIORITY_LABEL[p]])} onChange={(v) => changeField("priority", v)} />
-                  <FieldSelect
-                    label="Assignee"
-                    value={item.assignee?.id ?? "none"}
-                    options={[["none", "Unassigned"], ...staff.filter((s) => s.active).map((s): [string, string] => [s.id, `${s.name}${s.is_away ? " (away)" : ""}`])]}
-                    onChange={(v) => changeField("assignee_id", v === "none" ? null : v)}
-                  />
                 </div>
+                <section aria-label="Who has it" className="grid gap-1">
+                  <p className="text-xs font-medium text-muted-foreground">Who has it</p>
+                  <RoutingLine item={item} />
+                </section>
                 <div className="grid gap-1 text-sm">
                   <p className="flex justify-between gap-2">
                     <span className="text-muted-foreground">Expected by</span>
@@ -389,7 +415,7 @@ export function ItemPanel({
                               )}
                             >
                               <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <span className="font-semibold text-foreground">{m.author_name ?? "Feedback"}</span>
+                                <span className="font-semibold text-foreground">{m.author_type === "system" ? "System" : (m.author_name ?? "Someone")}</span>
                                 {m.is_internal && <Lock className="size-3" aria-hidden="true" />}
                                 {MESSAGE_LABEL[m.message_type]} · {when(m.created_at)}
                                 {justSent && i === talk.length - 1 && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">Sent just now</span>}
@@ -438,7 +464,7 @@ export function ItemPanel({
                           .map((e, i) => (
                             <li key={`${e.created_at}-${i}`} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
                               <span>
-                                <span className="font-medium">{e.actor_name ?? e.actor_type}</span> · {e.public_text ?? describe(e.event_type, e.before, e.after)}
+                                <span className="font-medium">{actorName(e)}</span> · {historyLine(e, projects)}
                                 {!e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
                               </span>
                               <time className="font-mono text-xs text-muted-foreground" dateTime={e.created_at}>
@@ -467,23 +493,21 @@ export function ItemPanel({
                 </TabsContent>
               </Tabs>
             </div>
-            <ActionDialog key={`${dialog?.kind}-${dialog?.text}`} kind={dialog?.kind ?? null} initialText={dialog?.text} onClose={() => setDialog(null)} onSubmit={onDialog} />
+            <ActionDialog
+              key={`${dialog?.kind}-${dialog?.text}`}
+              kind={dialog?.kind ?? null}
+              initialText={dialog?.text}
+              title={dialog?.kind === "take_over" ? `Take ${item.reference} over from ${holder}?` : undefined}
+              description={dialog?.kind === "take_over" ? `${takeOverText} They are told in the app and by email; the stage, Expected by date and updates stay as they are.` : undefined}
+              people={staff.filter((s) => s.active && s.id !== item.assignee?.id)}
+              onClose={() => setDialog(null)}
+              onSubmit={onDialog}
+            />
           </>
         )}
       </SheetContent>
     </Sheet>
   );
-}
-
-function describe(type: string, before: Record<string, unknown>, after: Record<string, unknown>): string {
-  const pair = (o: Record<string, unknown>) =>
-    Object.entries(o)
-      .filter(([k]) => !["reason", "confidence", "correction"].includes(k))
-      .map(([k, v]) => `${k} ${String(v ?? "none")}`)
-      .join(", ");
-  if (type === "correction") return `corrected ${pair(before)} → ${pair(after)}`;
-  if (type === "status") return `status ${String(before.status ?? "")} → ${String(after.status ?? "")}`;
-  return type.replace(/_/g, " ");
 }
 
 function FieldSelect({ label, value, options, onChange }: { label: string; value: string; options: [string, string][]; onChange: (v: string) => void }) {
