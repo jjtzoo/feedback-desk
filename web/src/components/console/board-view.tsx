@@ -7,14 +7,13 @@ import { WorkCard } from "@/components/console/work-card";
 import type { Card, Column } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const DROPPABLE = new Set(["approved", "in_progress", "resolved", "fixed"]);
+const DROPPABLE = new Set(["approved", "in_progress", "resolved"]);
 const EMPTY: Record<string, string> = {
   needs_review: "New items nobody has looked at yet appear here.",
   awaiting_approval: "Items waiting for an Admin appear here.",
   approved: "Approved items appear here.",
   in_progress: "Items someone is working on appear here.",
   resolved: "Resolved items appear here.",
-  fixed: "Items fixed in the last 7 days appear here.",
 };
 
 function DraggableCard({ card, onOpen }: { card: Card; onOpen: () => void }) {

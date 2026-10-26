@@ -1,14 +1,14 @@
 {
-  "ran": "2026-10-26T00:49:14.692Z",
-  "commit": "568901f",
+  "ran": "2026-10-26T04:32:03.209Z",
+  "commit": "b8c10a7",
   "uncommitted": false,
   "spec": "21-dashboard.spec.ts",
-  "fingerprint": "301c1d07d6b2ad06",
+  "fingerprint": "314be736c0d38b53",
   "caught": {
-    "S21.01": false,
-    "S21.02": false,
-    "S21.03": false,
-    "S21.04": false,
-    "S21.05": false
+    "S21.01": true,
+    "S21.02": true,
+    "S21.03": true,
+    "S21.04": true,
+    "S21.05": true
   }
 }

@@ -4,6 +4,7 @@ import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { StageBadge, StatusBadge } from "@/components/badges";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { api, type Notification } from "@/lib/api";
@@ -18,6 +19,8 @@ const RETRY_MAX_MS = 60_000;
  * The bell (brief §4.6): unread count live over server-sent events. While the stream is down it
  * polls every 30 seconds and keeps reconnecting (an API restart, a deploy, Cloud Run's request
  * timeout); once the stream is back, polling stops. Clicking a notification opens its item.
+ * A request someone has already acted on shows what happened instead ("FB-0003 approved by Chris"),
+ * and each item's badge is its stage now, so an old message never contradicts the item (D54).
  */
 export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }) {
   const [items, setItems] = useState<Notification[]>([]);
@@ -115,11 +118,14 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
               <Link href={n.link} onClick={() => readOne(n)} className="flex gap-3 px-4 py-3 hover:bg-muted">
                 <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", n.read_at ? "bg-transparent" : "bg-foreground")} aria-hidden="true" />
                 <span className="min-w-0 flex-1">
-                  <span className={cn("block text-sm", !n.read_at && "font-semibold")}>{n.title}</span>
-                  {n.body && <span className="line-clamp-2 block text-sm text-muted-foreground">{n.body}</span>}
-                  <time dateTime={n.created_at} title={when(n.created_at)} className="font-mono text-xs text-muted-foreground tabular">
-                    {age(n.created_at)}
-                  </time>
+                  <span className={cn("block text-sm", !n.read_at && "font-semibold")}>{n.outcome ?? n.title}</span>
+                  {n.body && !n.outcome && <span className="line-clamp-2 block text-sm text-muted-foreground">{n.body}</span>}
+                  <span className="mt-1 flex flex-wrap items-center gap-2">
+                    <ItemBadge n={n} />
+                    <time dateTime={n.created_at} title={when(n.created_at)} className="font-mono text-xs text-muted-foreground tabular">
+                      {age(n.created_at)}
+                    </time>
+                  </span>
                 </span>
                 {!n.read_at && <span className="sr-only">Unread</span>}
               </Link>
@@ -129,4 +135,12 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
       </PopoverContent>
     </Popover>
   );
+}
+
+/** The item's stage now: console words for the Digital team, the staff stage on a staff tracker link; an ended item shows its ending. */
+function ItemBadge({ n }: { n: Notification }) {
+  const small = "h-5 px-2 text-[11px]";
+  if (!n.item_status) return null;
+  if (n.link.startsWith("/console") || n.item_ending) return <StatusBadge status={n.item_status} ending={n.item_ending} className={small} />;
+  return n.item_stage ? <StageBadge stage={n.item_stage} className={small} /> : null;
 }

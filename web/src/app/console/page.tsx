@@ -13,6 +13,7 @@ import { FilterMenu, type FilterField } from "@/components/console/filter-menu";
 import { ItemPanel } from "@/components/console/item-panel";
 import { useMe } from "@/components/me";
 import { RowActions } from "@/components/console/row-actions";
+import { AutoMarker } from "@/components/console/routing-line";
 import { WorkCard } from "@/components/console/work-card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ import { cn } from "@/lib/utils";
 
 const INBOXES = [
   { key: "mine", label: "Assigned to me" },
-  { key: "needs_review", label: "Unassigned / needs review" },
+  { key: "needs_review", label: "Triage" },
   { key: "open", label: "All open" },
   { key: "overdue", label: "Overdue" },
   { key: "archive", label: "Archive" },
@@ -61,7 +62,6 @@ const GROUPS: Group[] = [
   { title: "Approved", match: (c) => c.status === "approved" },
   { title: "In progress", match: (c) => c.status === "in_progress" },
   { title: "Resolved", match: (c) => c.status === "resolved" },
-  { title: "Fixed", match: (c) => c.status === "closed" },
 ];
 
 /** The Archive groups by how each item ended. */
@@ -70,7 +70,7 @@ const ARCHIVE_GROUPS: Group[] = [
   { title: "Praise", match: (c) => c.status === "acknowledged" },
 ];
 
-type Pending = { ref: string; kind: "resolve" | "fix" | "update"; column?: "resolved" | "fixed" };
+type Pending = { ref: string; kind: "resolve" | "update" };
 
 function Work() {
   const router = useRouter();
@@ -154,15 +154,8 @@ function Work() {
   }
 
   async function move(ref: string, column: string) {
-    if (column === "fixed") {
-      const status = [...(board?.columns.flatMap((c) => c.items) ?? []), ...(list?.items ?? [])].find((c) => c.reference === ref)?.status;
-      if (status !== "resolved") {
-        toast.error("Only resolved items can move to Fixed. Use Close on the item to say why it ends.");
-        return;
-      }
-    }
-    if (column === "resolved" || column === "fixed") {
-      setPending({ ref, kind: column === "resolved" ? "resolve" : "fix", column });
+    if (column === "resolved") {
+      setPending({ ref, kind: "resolve" });
       return;
     }
     try {
@@ -176,8 +169,9 @@ function Work() {
 
   async function assign(ref: string, assigneeId: string | null) {
     try {
-      await api.patch(`/console/items/${ref}`, { assignee_id: assigneeId });
-      toast.success(assigneeId ? `${ref} assigned` : `${ref} unassigned`);
+      if (assigneeId) await api.post(`/console/items/${ref}/hand-over`, { to: assigneeId });
+      else await api.post(`/console/items/${ref}/assign-to-me`);
+      toast.success(assigneeId ? `${ref} handed over` : `${ref} is yours`);
     } catch (e) {
       toast.error(errorText(e));
     }
@@ -191,8 +185,8 @@ function Work() {
         await api.post(`/console/items/${pending.ref}/update`, { body: r.text, expected_by: r.expectedBy ?? null });
         toast.success("Saved");
       } else {
-        await api.post(`/console/items/${pending.ref}/move`, { column: pending.column, note: r.text });
-        toast.success(pending.column === "fixed" ? `${pending.ref} closed as fixed` : `${pending.ref} resolved`);
+        await api.post(`/console/items/${pending.ref}/move`, { column: "resolved", note: r.text });
+        toast.success(`${pending.ref} resolved`);
       }
       reload();
       return true;
@@ -234,7 +228,8 @@ function Work() {
       staff={staff}
       onOpen={() => setParam("item", c.reference)}
       onUpdate={() => setPending({ ref: c.reference, kind: "update" })}
-      onAssign={(id) => void assign(c.reference, id)}
+      onAssignToMe={() => void assign(c.reference, null)}
+      onHandOver={(id) => void assign(c.reference, id)}
       onMove={(column) => void move(c.reference, column)}
     />
   );
@@ -390,7 +385,11 @@ function Work() {
                           <TableCell>
                             <StatusBadge status={c.status} ending={c.ending} />
                           </TableCell>
-                          <TableCell>{c.assignee?.name ?? "Unassigned"}</TableCell>
+                          <TableCell>
+                            <span className="flex items-center gap-1.5">
+                              {c.assignee?.name ?? "Unassigned"} <AutoMarker card={c} />
+                            </span>
+                          </TableCell>
                           <TableCell className="font-mono text-xs tabular">{age(c.created_at)}</TableCell>
                           <TableCell className={cn(c.overdue && "font-semibold text-destructive")}>{c.expected_by ? day(c.expected_by) : "–"}</TableCell>
                           <TableCell className="sticky right-0 w-12 bg-card">{rowActions(c)}</TableCell>

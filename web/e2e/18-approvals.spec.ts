@@ -93,7 +93,9 @@ test("S18.01 Approvals lists waiting items P1 first with a red outline, each wit
   await expect(card.getByRole("link", { name: urgent, exact: true })).toHaveAttribute("href", new RegExp(`item=${urgent}$`));
   await expect(card).toContainText("Awaiting approval");
   await expect(card.getByRole("heading", { level: 2 })).toContainText(title);
-  await expect(card).toContainText(/Fix · Training Portal · .+ · from Aisha Rahman · owner Marc/);
+  await expect(card).toContainText(/Fix · Training Portal · .+ · from Aisha Rahman/);
+  // Who has it, and why routing chose them (D56).
+  await expect(card).toContainText("Auto-assigned to Marc · owner of Training Portal");
   await expect(card.locator("p").filter({ hasText: title }).first()).toBeVisible();
   await expect(card).toContainText("implement: Raised by staff; see the brief. Effort S, impact one person.");
   for (const name of ["Approve", "Decline", "Ask for info"]) await expect(card.getByRole("button", { name, exact: true })).toBeVisible();
@@ -285,7 +287,7 @@ test("S18.09 The History tab of an approved and a declined item shows who, when 
 
   await signIn("Chris");
   for (const [ref, text] of [
-    [approved, "Planned (Chris accepted it)"],
+    [approved, "Approved"],
     [declined, `Declined: ${reason}`],
   ]) {
     await page.goto(`/console?inbox=open&item=${ref}`);
@@ -316,7 +318,7 @@ test("S18.11 A plain bug waits in Approvals, and its owner can't start it until 
   await openApprovals(page);
   await expect(approval(page, ref)).toBeVisible();
   await expect(approval(page, ref)).toContainText("Awaiting approval");
-  await expect(approval(page, ref)).toContainText("owner Marc");
+  await expect(approval(page, ref)).toContainText("Auto-assigned to Marc · owner of Training Portal");
 
   // Marc owns the Training Portal: the API refuses to start it, and the panel offers no Start work.
   const marc = await team.as("Marc");
@@ -341,8 +343,8 @@ test("S18.12 The abuse phrase is not assigned to Darlene, sits in Needs review a
   await signIn("Chris");
   await openApprovals(page);
   await expect(approval(page, ref)).toContainText("Needs review");
-  await expect(approval(page, ref)).toContainText("owner not set");
-  await expect(approval(page, ref)).not.toContainText("owner Darlene");
+  await expect(approval(page, ref)).toContainText("Nobody has it yet · flagged for the Admins");
+  await expect(approval(page, ref)).not.toContainText("Auto-assigned to Darlene");
 
   await openBoard(page, "?inbox=needs_review");
   const flagged = boardCard(column(page, "Needs review"), ref);
