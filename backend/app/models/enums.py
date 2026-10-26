@@ -36,6 +36,8 @@ STATUSES = (
 )
 OPEN_STATUSES = ("new", "needs_review", "awaiting_approval", "approved", "in_progress", "resolved")
 CLOSED_STATUSES = ("acknowledged", "declined", "closed")
+# Work not yet done: only these can be overdue. A Resolved item has met its Expected by date.
+DUE_STATUSES = ("new", "needs_review", "awaiting_approval", "approved", "in_progress")
 # How a closed or declined item ended (D44). Praise (acknowledged) has none.
 ENDINGS = ("fixed", "wont_fix", "duplicate", "declined", "no_longer_needed")
 ENDED_STATUSES = ("closed", "declined")

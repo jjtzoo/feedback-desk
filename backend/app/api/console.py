@@ -8,7 +8,7 @@ from fastapi.responses import Response
 
 from app.api.deps import AdminUser, Db, DigitalUser
 from app.models import Feedback
-from app.models.enums import OPEN_STATUSES, STAGE_OF
+from app.models.enums import DUE_STATUSES, STAGE_OF
 from app.schemas import (
     AskInfoIn,
     AttachmentOut,
@@ -59,7 +59,7 @@ def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) 
         assignee=PersonOut(id=fb.assignee.id, name=fb.assignee.name) if fb.assignee else None,
         created_at=fb.created_at,
         expected_by=fb.expected_by,
-        overdue=bool(fb.expected_by and fb.expected_by < today and fb.status in OPEN_STATUSES),
+        overdue=bool(fb.expected_by and fb.expected_by < today and fb.status in DUE_STATUSES),
         has_files=fb.id in files,
         unread_reply=bool(
             fb.submitter_replied_at and (fb.assignee_read_at is None or fb.submitter_replied_at > fb.assignee_read_at)

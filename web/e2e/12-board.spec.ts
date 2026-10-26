@@ -179,10 +179,10 @@ test("S12.01 As Darlene, /console opens the Work page on 'Assigned to me' in Boa
   await expect(page.getByRole("columnheader")).toHaveCount(0);
 });
 
-test("S12.02 Darlene's board has Approved, In progress, Resolved and Fixed; Marc's also has Needs review and Awaiting approval", async ({ page, signIn, team }) => {
+test("S12.02 Darlene's board has Approved, In progress and Resolved; Marc's also has Needs review and Awaiting approval", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   await openWork(page, "Board");
-  await expect(page.locator(`${COLUMN} h2`)).toHaveText([/^Approved \d+$/, /^In progress \d+$/, /^Resolved \d+$/, /^Fixed \d+$/]);
+  await expect(page.locator(`${COLUMN} h2`)).toHaveText([/^Approved \d+$/, /^In progress \d+$/, /^Resolved \d+$/]);
 
   const marc = await team.as("Marc");
   await openWork(marc, "Board");
@@ -192,7 +192,6 @@ test("S12.02 Darlene's board has Approved, In progress, Resolved and Fixed; Marc
     /^Approved \d+$/,
     /^In progress \d+$/,
     /^Resolved \d+$/,
-    /^Fixed \d+$/,
   ]);
 });
 
@@ -200,7 +199,7 @@ test("S12.03 A column header shows the item count, and 'N overdue' when a card i
   await signIn("Darlene");
   await openWork(page, "Board");
 
-  // Approved holds four of Darlene's items, two of them overdue; In progress one, overdue; Resolved and Fixed one each, none overdue.
+  // Approved holds four of Darlene's items, two of them overdue; In progress one, overdue; Resolved one, not overdue (it is done).
   const approved = column(page, "Approved");
   await expect(approved.getByRole("heading", { level: 2 })).toHaveText("Approved 4");
   await expect(approved.locator(CARD)).toHaveCount(4);
@@ -210,11 +209,9 @@ test("S12.03 A column header shows the item count, and 'N overdue' when a card i
   await expect(inProgress.getByRole("heading", { level: 2 })).toHaveText("In progress 1");
   await expect(inProgress.getByText("1 overdue")).toBeVisible();
 
-  for (const title of ["Resolved", "Fixed"]) {
-    const done = column(page, title);
-    await expect(done.getByRole("heading", { level: 2 })).toHaveText(`${title} 1`);
-    await expect(done.getByText(/\d+ overdue/)).toHaveCount(0);
-  }
+  const resolved = column(page, "Resolved");
+  await expect(resolved.getByRole("heading", { level: 2 })).toHaveText("Resolved 1");
+  await expect(resolved.getByText(/\d+ overdue/)).toHaveCount(0);
 });
 
 test("S12.04 A card shows its reference, work type, priority badge (P1 outlined), title, tool, submitter, age, Due or Overdue date, and the file, unread and Flagged marks", async ({
@@ -269,7 +266,7 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
 });
 
 // Moving cards. Each test raises its own items, so the world above (and the counts S12.03 checks) is left alone.
-// Marc's six columns, and Darlene's Fixed column, run past the right edge of a 1280 px window, so these
+// Marc's five columns run past the right edge of a 1280 px window, so these
 // tests use a 1920 px screen and every drag stays inside the window.
 test.describe("moving cards", () => {
   test.use({ viewport: { width: 1920, height: 1080 } });
@@ -343,31 +340,32 @@ test.describe("moving cards", () => {
     await expect(cardIn(page, "In progress", ref)).toHaveCount(0);
   });
 
-  test("S12.07 Dragging a Resolved card to Fixed opens the Close as fixed dialog and one confirm closes it; an In progress card is refused", async ({ page, signIn, team }) => {
+  test("S12.07 A Resolved card has no Fixed column to drag to; Close as fixed on its panel takes it off the board into the Archive's Fixed column", async ({ page, signIn, team }) => {
     const darlene = await team.as("Darlene");
     const ref = await item(team, "Tom", "RAKE Agent spell checker underlines Australian spelling", "rake-agent");
     await postJson(darlene, `/console/items/${ref}/start`);
     await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Added the Australian dictionary" });
-    const working = await item(team, "Mei", "RAKE Agent grammar hints repeat the same advice", "rake-agent");
-    await postJson(darlene, `/console/items/${working}/start`);
     await signIn("Darlene");
     await gotoWork(page);
 
-    // Only a resolved item can be fixed: an In progress card is refused and stays.
-    await drag(page, working, "Fixed");
-    await expect(page.getByText("Only resolved items can move to Fixed. Use Close on the item to say why it ends.", { exact: true })).toBeVisible();
-    await expect(cardIn(page, "In progress", working)).toBeVisible();
+    // The board ends at Resolved.
+    await expect(cardIn(page, "Resolved", ref)).toBeVisible();
+    await expect(page.locator(`${COLUMN} h2`)).toHaveText([/^Approved \d+$/, /^In progress \d+$/, /^Resolved \d+$/]);
 
-    await drag(page, ref, "Fixed");
+    await page.goto(`/console?item=${ref}`);
+    const panel = page.getByRole("dialog").filter({ hasText: ref });
+    await panel.locator("header").getByRole("button", { name: "Close as fixed", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Close as fixed", exact: true });
-    await expect(dialog).toBeVisible();
     await expect(dialog.getByText("The work is done. The item ends as Fixed for everyone following it.")).toBeVisible();
     await expect(dialog.getByRole("textbox")).toHaveCount(0);
-
-    // The form's own button, not the dialog's corner X.
     await dialog.locator('button[type="submit"]').click();
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByText(`${ref} closed as fixed`, { exact: true })).toBeVisible();
+
+    // Gone from the board; the Archive's board has it under Fixed.
+    await gotoWork(page);
+    await expect(page.locator(CARD).filter({ hasText: new RegExp(`${ref}(?!\d)`) })).toHaveCount(0);
+    await inboxTab(page, "Archive").click();
+    await expect(inboxTab(page, "Archive")).toHaveAttribute("aria-selected", "true");
     await expect(cardIn(page, "Fixed", ref)).toBeVisible();
   });
 
@@ -449,13 +447,13 @@ test("S12.11 The chosen view (List) survives a reload and signing out and in; Ma
   await expect(page.getByRole("columnheader")).toHaveCount(0);
 });
 
-test("S12.12 Each inbox tab (Assigned to me, Unassigned / needs review, All open, Overdue, Archive) filters Board, List and Cards", async ({ page, signIn }) => {
+test("S12.12 Each inbox tab (Assigned to me, Triage, All open, Overdue, Archive) filters Board, List and Cards", async ({ page, signIn }) => {
   await signIn("Marc");
   const cards = await allCards(page);
   const inboxes = [
     { label: "Assigned to me", refs: refsOf(cards.filter((c) => c.assignee?.name === "Marc")) },
     {
-      label: "Unassigned / needs review",
+      label: "Triage",
       refs: refsOf(cards.filter((c) => ["needs_review", "new"].includes(c.status) || (!c.assignee && OPEN.includes(c.status)))),
     },
     { label: "All open", refs: refsOf(cards.filter((c) => OPEN.includes(c.status))) },
