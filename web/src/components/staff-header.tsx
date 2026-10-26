@@ -94,13 +94,14 @@ export function StaffHeader() {
   );
 }
 
+/** Who reads it, that Sig is AI, and what is removed (rule 3). The chat shows it under the box instead of the footer. */
+export const DISCLOSURE =
+  "Feedback goes to the REDADAIR Digital team. Sig is an AI assistant, and chats are processed by Google's Gemini model. Passwords, card numbers and tax file numbers are removed before anything is saved.";
+
 export function StaffFooter() {
   return (
-    <footer className="mt-auto border-t bg-card">
-      <p className="mx-auto max-w-6xl px-4 py-5 text-sm text-muted-foreground sm:px-6">
-        Feedback goes to the REDADAIR Digital team. Sig is an AI assistant, and chats are processed by Google&apos;s Gemini model. Passwords, card numbers and tax file
-        numbers are removed before anything is saved.
-      </p>
+    <footer className="mt-auto border-t bg-card group-has-data-[page=fill]/staff:hidden">
+      <p className="mx-auto max-w-6xl px-4 py-5 text-sm text-muted-foreground sm:px-6">{DISCLOSURE}</p>
     </footer>
   );
 }

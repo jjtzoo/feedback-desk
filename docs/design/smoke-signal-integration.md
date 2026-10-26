@@ -37,14 +37,16 @@ The 3D art is a vector stand-in. Once D37 is approved, commission a proper rende
 
 1. **Flat in the product, 3D for large moments.** Use the flat `SigAvatar` in the chat header, messages and notifications. Use the 3D Sig on the landing page, empty states, onboarding and internal comms, and never below 96 px tall.
 2. **Colours come from tokens.** Components never contain hex values (globals.css says so). The snippets below use `currentColor` and Tailwind theme classes (`fill-primary`, `fill-band`, `fill-muted-foreground`, `fill-primary-foreground`).
-3. **Always say it's AI.** Wherever Sig speaks, its name has an `AI` tag beside it, and the staff footer says chats are processed by Google's Gemini model.
+3. **Always say it's AI.** Wherever Sig speaks, its name has an `AI` tag beside it, and the staff footer (in the chat, the line under the message box) says chats are processed by Google's Gemini model.
 4. **Puff is the logo; Sig is never the logo.** The favicon, `BrandMark` and the tile all use Puff.
-5. **Motion.** Sig moves only in the chat, and only in answer to something the person does (`docs/research/sig-motion-interactions.md`, part 3). When Sig turns Ready it swells once (one 5 s cycle, scale 1 to 1.04) and then rests: nothing loops (WCAG 2.2.2). The pilot reactions (`reaction` on `SigAvatar`, set from `chat-panel.tsx`: pop, look-down, nod, wow, tilt, lean, hop-puff, double-hop, glitch, slump, wink) are CSS keyframes that play once, 1.2 s at most, never hold up the next step and never flash. Sending is Sig sending up a Puff, never a hose gag. No Sig motion in the console, toasts or notifications. With reduced motion on, there is no swell and a reaction is a face swap only; the Puff fades without rising.
+5. **Motion.** Sig is a functional mark, not a performer (D49): it moves only while it is working. While Sig writes a reply, a small mark with the writing face pulses beside "Sig is writing…"; otherwise it holds still. The face shows the state that matters: ready, writing, sent, offline, and error after a reply fails. No idle swell, no decorative reactions (the pilot set in `docs/research/sig-motion-interactions.md` was built and removed on 2026-10-26), no Sig motion in the console, toasts or notifications. With reduced motion on, the mark doesn't pulse; the face still changes.
 6. **Status is never shown by the face alone.** Every state also has words, such as "Sig is writing…" or "Sig isn't available right now".
 7. **Words.** Sig puts out *problems*, never people's comments. Don't write copy that "puts out", "extinguishes" or "hoses down" feedback. Praise gets passed on to the team.
-8. **Accessibility.** The avatar is decorative (`aria-hidden`) wherever the name "Sig" is in the text beside it. 3D illustrations use `alt=""` unless they carry meaning. Sig's face must read at 32 px on `bg-muted` in both themes.
+8. **Accessibility.** The avatar is decorative (`aria-hidden`) wherever the name "Sig" is in the text beside it. 3D illustrations use `alt=""` unless they carry meaning. Sig's face must read at 28 px on `bg-muted` (light theme only, D48).
 
 ## Changes, file by file
+
+> These are the steps of the first build (2026-10-21). Since then the idle swell is gone and Sig is a functional mark (D49), and the app is light only (D48); the code is the source of truth.
 
 ### 1. `web/src/app/globals.css`: the idle swell
 
@@ -251,7 +253,7 @@ Then search for any test that asserts the old strings and update it, for example
 - `cd web && npm run lint && npm run typecheck && npm run build`
 - `cd backend && uv run ruff check . && uv run mypy && uv run pytest`
 - The agent instruction changed, so run `uv run python -m evals.run_routing`. The gate is 85 % project, 85 % work type and 80 % assignee on Gemini.
-- In a browser, at 375 px and on desktop, in light and dark:
+- In a browser, at 375 px and on desktop:
   - the header mark in all three headers
   - the chat header in all four states: ready; writing while a reply streams; offline through the backup form; sent after Confirm
   - the landing preview
@@ -264,7 +266,7 @@ Then search for any test that asserts the old strings and update it, for example
 - [ ] `BrandMark` shows Puff in the staff header, console header and sign-in page; the wordmark reads Smoke Signal.
 - [ ] The favicon and apple-touch icon are the Puff icon.
 - [ ] The chat header shows `SigAvatar` in the right state (ready, writing, sent, offline), with the name "Sig" and an AI tag.
-- [ ] Nothing loops: the Ready swell plays one 5 s cycle, and there is none under reduced motion.
+- [ ] Nothing loops; Sig's mark moves only while Sig is writing, and not under reduced motion.
 - [ ] The 3D Sig appears only at 96 px tall or larger.
 - [ ] No hex values in components; no "Feedback assistant" strings left; `assistant-avatar.tsx` is gone and has no leftover imports.
 - [ ] Lint, typecheck, build, backend tests and the routing gate all pass.

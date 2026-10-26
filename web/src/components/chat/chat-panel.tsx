@@ -7,8 +7,9 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { BackupForm } from "@/components/chat/backup-form";
 import { ConfirmCard } from "@/components/chat/confirm-card";
 import { DoneView } from "@/components/chat/done-view";
-import { SigAvatar, type SigReaction, type SigState } from "@/components/chat/sig-avatar";
+import { SigAvatar, type SigState } from "@/components/chat/sig-avatar";
 import { UsageMeter } from "@/components/chat/usage-meter";
+import { DISCLOSURE } from "@/components/staff-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,13 +50,6 @@ function captureContext(): Record<string, string> {
   };
 }
 
-/** Sig's one-off reaction, played over any held pose and cleared when its animation ends. */
-function useSigReaction(held: SigReaction | null) {
-  const [once, setOnce] = useState<SigReaction | null>(null);
-  const end = useCallback(() => setOnce(null), []);
-  return { reaction: once ?? held, play: setOnce, end };
-}
-
 export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | null; starterText?: string }) {
   const [mode, setMode] = useState<Mode>("starting");
   const [start, setStart] = useState<ChatStart | null>(null);
@@ -76,14 +70,11 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const [allowance, setAllowance] = useState<Allowance | null>(null);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [typing, setTyping] = useState(false);
+  const [failed, setFailed] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
-  const list = useRef<HTMLOListElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const started = useRef<string | null>(null);
-
-  const held: SigReaction | null = mode === "fallback" ? "slump" : dragging ? "wow" : card ? "lean" : typing ? "look-down" : null;
-  const { reaction, play, end } = useSigReaction(held);
 
   const refreshAllowance = useCallback(() => {
     api.get<Allowance>("/usage/me").then(setAllowance).catch(() => undefined);
@@ -114,13 +105,12 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         }
         setTurns([{ role: "agent", text: s.greeting ?? "What's on your mind?" }]);
         setMode("chat");
-        play("pop");
       })
       .catch((e: unknown) => {
         if (e instanceof ApiError && e.status === 429) setError(e.message);
         setMode("fallback");
       });
-  }, [project, round, refreshAllowance, play]);
+  }, [project, round, refreshAllowance]);
 
   useEffect(() => {
     // Scroll the message list only, never the page.
@@ -133,13 +123,6 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     if (mode === "chat" && starterText) input.current?.focus();
   }, [mode, starterText]);
 
-  // Sig looks down at the box while the person types, and back up a second after they stop.
-  useEffect(() => {
-    if (!typing) return;
-    const t = setTimeout(() => setTyping(false), 1000);
-    return () => clearTimeout(t);
-  }, [text, typing]);
-
   // When the confirm card appears, move focus to it so keyboard and screen-reader users land on it.
   useEffect(() => {
     if (card) document.getElementById("confirm-title")?.focus();
@@ -148,19 +131,16 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const sid = start?.session_id ?? null;
   const userTyped = turns.filter((t) => t.role === "user").map((t) => t.text).join("\n\n");
 
-  const finish = useCallback(
-    (s: Saved, plusOne: boolean) => {
-      setSaved({ saved: s, plusOne });
-      setMode("done");
-      play(plusOne ? "double-hop" : "hop-puff");
-    },
-    [play],
-  );
+  const finish = useCallback((s: Saved, plusOne: boolean) => {
+    setSaved({ saved: s, plusOne });
+    setMode("done");
+  }, []);
 
   const run = useCallback(
     async (path: string, body: unknown) => {
       setBusy(true);
       setError(null);
+      setFailed(false);
       setChips([]);
       let done: Saved | null = null;
       let fallback = false;
@@ -169,10 +149,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         await streamChat(path, body, (e) => {
           if (e.type === "message") setTurns((t) => [...t, { role: "agent", text: e.text }]);
           else if (e.type === "chips") setChips(e.options);
-          else if (e.type === "duplicates") {
-            setDuplicates(e.candidates);
-            if (e.candidates.length > 0) play("tilt");
-          }
+          else if (e.type === "duplicates") setDuplicates(e.candidates);
           else if (e.type === "draft") {
             drafted = true;
             setCard({ card: e.card, hash: e.hash });
@@ -185,7 +162,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         });
       } catch (e) {
         setError(errorText(e));
-        play("glitch");
+        setFailed(true);
       } finally {
         setBusy(false);
         refreshAllowance();
@@ -198,19 +175,17 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         input.current?.focus();
       }
     },
-    [refreshAllowance, play, finish],
+    [refreshAllowance, finish],
   );
 
   async function send(message: string) {
     const clean = message.trim();
     if (!clean || busy || !sid) return;
     setText("");
-    setTyping(false);
     setCard(null);
     const attached = files;
     setFiles([]);
     setTurns((t) => [...t, { role: "user", text: clean, files: attached.map((f) => f.file_name) }]);
-    play("nod");
     await run(`/chat/sessions/${sid}/messages`, { text: clean, attachment_ids: attached.map((f) => f.id) });
   }
 
@@ -237,6 +212,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
       finish(s, true);
     } catch (e) {
       setError(errorText(e));
+      setFailed(true);
     } finally {
       setBusy(false);
     }
@@ -283,18 +259,12 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const projects: Project[] = start?.projects ?? [];
   const firstMessage = turns.filter((t) => t.role === "user").length === 0;
   const selected = projects.find((p) => p.slug === project);
-  const sig: SigState = mode === "fallback" ? "offline" : mode === "done" ? "sent" : busy ? "writing" : "ready";
+  const sig: SigState = mode === "fallback" ? "offline" : mode === "done" ? "sent" : failed ? "error" : "ready";
 
   return (
-    <section aria-label="Chat with Sig, the feedback assistant" className="min-w-0 overflow-hidden rounded-3xl border bg-card shadow-card">
-      <header className="flex items-center gap-3 border-b px-5 py-4">
-        <SigAvatar
-          state={sig}
-          reaction={reaction}
-          onReactionEnd={end}
-          onClick={sig === "offline" ? undefined : () => play("wink")}
-          className="size-12"
-        />
+    <section aria-label="Chat with Sig, the feedback assistant" className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 pt-5 pb-1 sm:px-6">
+        <SigAvatar state={sig} className="size-10" />
         <div>
           <p className="flex items-center gap-2 font-bold">
             Sig <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">AI</span>
@@ -304,33 +274,41 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
       </header>
 
       {mode === "starting" && (
-        <div className="grid gap-3 p-5" aria-busy="true">
+        <div className="mx-auto grid w-full max-w-3xl gap-3 px-4 py-5 sm:px-6" aria-busy="true">
           <Skeleton className="h-10 w-2/3 rounded-2xl" />
           <Skeleton className="h-10 w-1/2 rounded-2xl" />
         </div>
       )}
 
       {mode === "fallback" && (
-        <>
-          {error && <p className="px-5 pt-4 text-sm text-destructive" role="alert">{error}</p>}
-          <BackupForm
-            projects={projects}
-            initialProject={project}
-            initialDetails={userTyped}
-            limit={limit}
-            reason={fallbackReason}
-            sessionId={sid}
-            context={context}
-            onSaved={(s) => finish(s, false)}
-          />
-        </>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl">
+            {error && <p className="px-5 pt-4 text-sm text-destructive" role="alert">{error}</p>}
+            <BackupForm
+              projects={projects}
+              initialProject={project}
+              initialDetails={userTyped}
+              limit={limit}
+              reason={fallbackReason}
+              sessionId={sid}
+              context={context}
+              onSaved={(s) => finish(s, false)}
+            />
+          </div>
+        </div>
       )}
 
-      {mode === "done" && saved && <DoneView saved={saved.saved} plusOne={saved.plusOne} onAgain={again} />}
+      {mode === "done" && saved && (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl">
+            <DoneView saved={saved.saved} plusOne={saved.plusOne} onAgain={again} />
+          </div>
+        </div>
+      )}
 
       {mode === "chat" && (
         <div
-          className="relative"
+          className="relative flex min-h-0 flex-1 flex-col"
           onDragOver={(e) => {
             if (!e.dataTransfer.types.includes("Files")) return;
             e.preventDefault();
@@ -351,149 +329,153 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
               Drop files to attach (up to {maxFiles}, {maxMb} MB each)
             </div>
           )}
-          <ol ref={list} className="grid max-h-[60dvh] min-h-56 content-start gap-3 overflow-y-auto p-5" aria-live="polite">
-            {turns.map((t, i) => (
-              <li key={i} className={cn("flex animate-fade-up", t.role === "user" ? "justify-end" : "justify-start")}>
-                <div
-                  className={cn(
-                    "max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap",
-                    t.role === "user" ? "rounded-br-md bg-band text-band-foreground" : "rounded-bl-md bg-muted",
-                  )}
-                >
-                  <span className="sr-only">{t.role === "user" ? "You: " : "Sig: "}</span>
-                  {t.text}
-                  {t.files && t.files.length > 0 && (
-                    <span className="mt-1.5 flex flex-wrap gap-1.5">
-                      {t.files.map((f) => (
-                        <span key={f} className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">
-                          <FileText className="size-3" aria-hidden="true" /> {f}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </div>
-              </li>
-            ))}
-            {busy && (
-              <li className="text-sm text-muted-foreground">Sig is writing…</li>
-            )}
-            {chips.length > 0 && !busy && (
-              <li className="flex flex-wrap gap-1.5" aria-label="Quick answers">
-                {chips.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => void send(c.value)}
-                    className="min-h-11 rounded-full border px-4 text-sm font-medium hover:bg-muted"
+          <div ref={list} className="min-h-0 flex-1 overflow-y-auto">
+            <ol className="mx-auto grid w-full max-w-3xl content-start gap-3 px-4 py-5 sm:px-6" aria-live="polite">
+              {turns.map((t, i) => (
+                <li key={i} className={cn("flex animate-fade-up", t.role === "user" ? "justify-end" : "justify-start")}>
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed whitespace-pre-wrap",
+                      t.role === "user" ? "rounded-br-md bg-band text-band-foreground" : "rounded-bl-md bg-muted",
+                    )}
                   >
-                    {c.label}
-                  </button>
-                ))}
-              </li>
-            )}
-            {duplicates.length > 0 && !busy && (
-              <li className="rounded-2xl border border-dashed p-4">
-                <p className="text-sm font-semibold">Someone may have raised this already</p>
-                <ul className="mt-2 grid gap-2">
-                  {duplicates.map((d) => (
-                    <li key={d.reference} className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm">
-                        <span className="font-mono font-semibold">{d.reference}</span> · {d.title}
+                    <span className="sr-only">{t.role === "user" ? "You: " : "Sig: "}</span>
+                    {t.text}
+                    {t.files && t.files.length > 0 && (
+                      <span className="mt-1.5 flex flex-wrap gap-1.5">
+                        {t.files.map((f) => (
+                          <span key={f} className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-xs">
+                            <FileText className="size-3" aria-hidden="true" /> {f}
+                          </span>
+                        ))}
                       </span>
-                      <Button variant="outline" size="lg" className="h-11 rounded-xl" onClick={() => void plusOne(d.reference)}>
-                        Add my comment there instead
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            )}
-            {card && (
-              <li>
-                <ConfirmCard card={card.card} busy={busy} onConfirm={() => void confirm()} onChange={change} />
-              </li>
-            )}
-          </ol>
-
-          {error && <p className="px-5 text-sm text-destructive" role="alert">{error}</p>}
-
-          <form onSubmit={onSubmit} className="border-t bg-muted/40 p-3 sm:p-4">
-            {(files.length > 0 || selected) && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {selected && (
-                  <span className="inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs font-medium">About {selected.name}</span>
-                )}
-                {files.map((f) => (
-                  <span key={f.id} className="inline-flex items-center gap-1.5 rounded-full border bg-card py-1 pr-1 pl-3 text-xs">
-                    <FileText className="size-3.5" aria-hidden="true" /> {f.file_name} · {fileSize(f.size_bytes)}
+                    )}
+                  </div>
+                </li>
+              ))}
+              {busy && (
+                <li className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <SigAvatar state="writing" className="size-7 animate-pulse" />
+                  Sig is writing…
+                </li>
+              )}
+              {chips.length > 0 && !busy && (
+                <li className="flex flex-wrap gap-1.5" aria-label="Quick answers">
+                  {chips.map((c) => (
                     <button
+                      key={c.value}
                       type="button"
-                      onClick={() => setFiles((all) => all.filter((x) => x.id !== f.id))}
-                      className="grid size-6 place-items-center rounded-full hover:bg-muted"
-                      aria-label={`Don't send ${f.file_name}`}
+                      onClick={() => void send(c.value)}
+                      className="min-h-11 rounded-full border px-4 text-sm font-medium hover:bg-muted"
                     >
-                      <X className="size-3.5" />
+                      {c.label}
                     </button>
-                  </span>
-                ))}
+                  ))}
+                </li>
+              )}
+              {duplicates.length > 0 && !busy && (
+                <li className="rounded-2xl border border-dashed p-4">
+                  <p className="text-sm font-semibold">Someone may have raised this already</p>
+                  <ul className="mt-2 grid gap-2">
+                    {duplicates.map((d) => (
+                      <li key={d.reference} className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-sm">
+                          <span className="font-mono font-semibold">{d.reference}</span> · {d.title}
+                        </span>
+                        <Button variant="outline" size="lg" className="h-11 rounded-xl" onClick={() => void plusOne(d.reference)}>
+                          Add my comment there instead
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )}
+              {card && (
+                <li>
+                  <ConfirmCard card={card.card} busy={busy} onConfirm={() => void confirm()} onChange={change} />
+                </li>
+              )}
+            </ol>
+          </div>
+
+          <form onSubmit={onSubmit} className="mx-auto w-full max-w-3xl px-3 pb-3 sm:px-6 sm:pb-5">
+            {error && <p className="px-2 pb-2 text-sm text-destructive" role="alert">{error}</p>}
+            <div className="rounded-3xl border bg-card p-2 shadow-card has-[textarea:focus]:outline-3 has-[textarea:focus]:outline-offset-2 has-[textarea:focus]:outline-ring">
+              {(files.length > 0 || selected) && (
+                <div className="flex flex-wrap gap-1.5 px-2 pt-1 pb-2">
+                  {selected && (
+                    <span className="inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs font-medium">About {selected.name}</span>
+                  )}
+                  {files.map((f) => (
+                    <span key={f.id} className="inline-flex items-center gap-1.5 rounded-full border bg-card py-1 pr-1 pl-3 text-xs">
+                      <FileText className="size-3.5" aria-hidden="true" /> {f.file_name} · {fileSize(f.size_bytes)}
+                      <button
+                        type="button"
+                        onClick={() => setFiles((all) => all.filter((x) => x.id !== f.id))}
+                        className="grid size-6 place-items-center rounded-full hover:bg-muted"
+                        aria-label={`Don't send ${f.file_name}`}
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-end gap-2">
+                <input ref={fileInput} type="file" accept={ACCEPT} multiple className="sr-only" id="chat-files" tabIndex={-1} onChange={(e) => void attach(e.target.files)} />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-lg"
+                  className="size-12 shrink-0 rounded-2xl"
+                  onClick={() => fileInput.current?.click()}
+                  disabled={busy || uploading || files.length >= maxFiles}
+                  aria-label={`Attach a file (PDF, Word, Excel or image, up to ${maxMb} MB), or drop files on the chat`}
+                >
+                  {uploading ? <Loader2 className="animate-spin" /> : <Paperclip className="size-5" />}
+                </Button>
+                <label htmlFor="chat-message" className="sr-only">
+                  Your message
+                </label>
+                <Textarea
+                  id="chat-message"
+                  ref={input}
+                  rows={1}
+                  maxLength={2000}
+                  value={text}
+                  readOnly={busy}
+                  aria-busy={busy}
+                  placeholder={firstMessage ? "Describe it in your own words" : "Type your reply"}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }}
+                  className="max-h-48 min-h-12 flex-1 resize-none border-0 bg-transparent py-3 text-base shadow-none focus-visible:ring-0 focus-visible:outline-none"
+                />
+                <Button
+                  type="submit"
+                  variant={card ? "outline" : "default"}
+                  className="h-12 shrink-0 rounded-2xl px-5 text-base"
+                  disabled={busy || !text.trim()}
+                >
+                  <Send /> <span className="sr-only sm:not-sr-only">Send</span>
+                </Button>
               </div>
-            )}
-            <div className="flex items-end gap-2">
-              <input ref={fileInput} type="file" accept={ACCEPT} multiple className="sr-only" id="chat-files" tabIndex={-1} onChange={(e) => void attach(e.target.files)} />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-lg"
-                className="size-12 shrink-0 rounded-xl"
-                onClick={() => fileInput.current?.click()}
-                disabled={busy || uploading || files.length >= maxFiles}
-                aria-label={`Attach a file (PDF, Word, Excel or image, up to ${maxMb} MB), or drop files on the chat`}
-              >
-                {uploading ? <Loader2 className="animate-spin" /> : <Paperclip className="size-5" />}
-              </Button>
-              <label htmlFor="chat-message" className="sr-only">
-                Your message
-              </label>
-              <Textarea
-                id="chat-message"
-                ref={input}
-                rows={1}
-                maxLength={2000}
-                value={text}
-                readOnly={busy}
-                aria-busy={busy}
-                placeholder={firstMessage ? "Describe it in your own words" : "Type your reply"}
-                onChange={(e) => {
-                  setText(e.target.value);
-                  setTyping(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    e.currentTarget.form?.requestSubmit();
-                  }
-                }}
-                className="max-h-40 min-h-12 flex-1 resize-none rounded-xl bg-card py-3 text-base"
-              />
-              <Button
-                type="submit"
-                variant={card ? "outline" : "default"}
-                className="h-12 shrink-0 rounded-xl px-5 text-base"
-                disabled={busy || !text.trim()}
-              >
-                <Send /> <span className="sr-only sm:not-sr-only">Send</span>
-              </Button>
             </div>
             {firstMessage && (
-              <p className="mt-2 px-1 text-xs text-muted-foreground">Enter to send, Shift+Enter for a new line. Drop files here to attach them.</p>
+              <p className="mt-2 px-2 text-xs text-muted-foreground">Enter to send, Shift+Enter for a new line. Drop files here to attach them.</p>
             )}
             {allowance && <UsageMeter allowance={allowance} />}
-            <p className="mt-2 px-1 text-xs text-muted-foreground">
+            <p className="mt-2 px-2 text-xs text-muted-foreground">
               Looking for an update on something you already sent?{" "}
               <Link href="/my" className="font-semibold text-foreground underline underline-offset-4">
                 Open My feedback
               </Link>
             </p>
+            <p className="mt-1 px-2 text-xs text-muted-foreground">{DISCLOSURE}</p>
           </form>
         </div>
       )}

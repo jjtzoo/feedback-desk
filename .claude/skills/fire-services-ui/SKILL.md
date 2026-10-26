@@ -18,7 +18,7 @@ The palette is drawn from redmen.com.au (a Sydney fire protection company): brig
 | Dial | Value | Meaning here |
 | --- | --- | --- |
 | DESIGN_VARIANCE | 3 | Predictable grids. People scan these screens under time pressure; layouts stay where they expect them. Marketing or landing pages may go to 5. |
-| MOTION_INTENSITY | 4 | Apple-style: springy entrances, press and lift feedback, staggered lists. No idle loops, with one exception: the assistant avatar, Sig (D37), swells once (one 5 s cycle, scale 1 to 1.04) when it turns Ready, never in a loop, and not at all under reduced motion. In the chat only, Sig plays short one-off reactions to what the person does (`reaction` on `SigAvatar`, see `docs/design/smoke-signal-integration.md` rule 5); under reduced motion they are face swaps. Sig is flat in the product (`SigAvatar`) and 3D (at least 96 px tall) only for large moments such as empty states, the landing page and internal comms; Puff, not Sig, is the logo. Raised from 2 at the user's request, 2026-10-20. |
+| MOTION_INTENSITY | 4 | Apple-style: springy entrances, press and lift feedback, staggered lists. No idle loops, with one exception: the assistant avatar, Sig (D37, D49), is a functional mark: its face shows the state, and it moves only while it writes (a gentle pulse beside "Sig is writing…"). No idle swell, no decorative reactions. Feedback is light only (D48). Sig is flat in the product (`SigAvatar`) and 3D (at least 96 px tall) only for large moments such as empty states, the landing page and internal comms; Puff, not Sig, is the logo. Raised from 2 at the user's request, 2026-10-20. |
 | VISUAL_DENSITY | 4 public screens, 7 staff screens | Forms and status pages breathe; queues and lists are compact, separated by lines instead of cards. |
 
 Follow these unless the user asks for something else in chat. Do not ask the user to edit this file.
@@ -133,7 +133,7 @@ Build every state, not only the happy path (taste-skill rule 5):
 - Animate `opacity` and `transform` only. Entrances use the spring curve `--ease-spring` (about 400 ms, one soft overshoot); hover, press and state changes stay 150 to 320 ms.
 - Allowed: spring entrances for messages, cards and steps; a 60 ms stagger on short lists (`--i`); press scale (0.98) on buttons and cards; a 2 px lift on hover for tappable rows (`lift`); sheet and menu open; a badge changing state; nothing loops.
 - Not allowed: other looping animations, parallax, scroll hijack, magnetic buttons, particle effects, pulsing red dots. A pulsing red element in a fire services app reads as an alarm.
-- `prefers-reduced-motion: reduce`: no transform motion, no avatar swell, Sig's reactions as face swaps, opacity fades at 120 ms.
+- `prefers-reduced-motion: reduce`: no transform motion, Sig's writing mark holds still, opacity fades at 120 ms.
 - No motion library. CSS easing curves and keyframes cover this intensity.
 
 ## 8. Quiet by default
