@@ -2,6 +2,8 @@
 
 Follow-on to `ai-assistant-avatar.md`. That doc settled what Sig is; this one covers how Sig moves and reacts on the page: to typing, buttons, files, duplicates, sending and errors, plus a few playful extras. Researched 2026-10-26 from product case studies, animation-studio write-ups, design guidance and W3C. Checked against the current code: `web/src/components/chat/sig-avatar.tsx` (flat inline SVG, four faces), `chat-panel.tsx` and the motion utilities in `globals.css` (`animate-fade-up`, `lift`, `animate-breathe`).
 
+> **Outcome (2026-10-26):** option A was built (pilot reactions #1 to 11) and removed the same day. The product owner found the reactions decorative rather than useful, so Sig became a functional mark that moves only while it writes (spec D49). The research below is kept as the record.
+
 Confidence marks as in the first doc: **Official** (the maker's own page), **Research**, **Secondhand**, **Unconfirmed**.
 
 ## Summary

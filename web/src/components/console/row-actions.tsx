@@ -17,11 +17,10 @@ import {
 import type { Card, Staff } from "@/lib/api";
 import { ownership } from "@/lib/ownership";
 
-const MOVES: { column: string; label: string; admin?: boolean; resolvedOnly?: boolean }[] = [
+const MOVES: { column: string; label: string; admin?: boolean }[] = [
   { column: "approved", label: "Approved", admin: true },
   { column: "in_progress", label: "In progress" },
   { column: "resolved", label: "Resolved" },
-  { column: "fixed", label: "Fixed", resolvedOnly: true },
 ];
 
 /**
@@ -50,7 +49,7 @@ export function RowActions({
   const me = useMe();
   const open = !["declined", "closed", "acknowledged"].includes(card.status);
   const can = ownership(card, me, staff);
-  const moves = MOVES.filter((m) => (m.admin ? me.role === "admin" : can.holder) && (!m.resolvedOnly || card.status === "resolved"));
+  const moves = MOVES.filter((m) => (m.admin ? me.role === "admin" : can.holder));
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>

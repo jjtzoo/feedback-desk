@@ -38,7 +38,7 @@ async def test_full_lifecycle_end_to_end(
 
     # Darlene sees it on her board, in Approved only after an Admin approves.
     board = (await darlene.get("/api/console/board")).json()
-    assert [c["key"] for c in board["columns"]] == ["approved", "in_progress", "resolved", "fixed"]  # no admin columns
+    assert [c["key"] for c in board["columns"]] == ["approved", "in_progress", "resolved"]  # no admin columns
     assert board["view"] == "board"
     assert (await darlene.post(f"/api/console/items/{ref}/start")).status_code == 409  # not approved yet
 
@@ -86,10 +86,15 @@ async def test_full_lifecycle_end_to_end(
     assert not any("cache key" in h for h in history)  # internal notes never show
 
     # Resolve needs a note; then the submitter replies and it reopens.
+    overdue = {"inbox": "overdue"}
+    assert [i["reference"] for i in (await darlene.get("/api/console/items", params=overdue)).json()["items"]] == [ref]
     assert (await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": ""})).status_code == 400
     assert (await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fix deployed"})).json()[
         "status"
     ] == "resolved"
+    # A resolved item has met its Expected by date: no longer overdue.
+    assert (await darlene.get("/api/console/items", params=overdue)).json()["items"] == []
+    assert (await darlene.get("/api/console/counts")).json()["overdue"] == 0
     resolved = (await staff.get(f"/api/feedback/{ref}/tracker")).json()["history"]
     assert resolved[0]["text"] == "Resolved: Fix deployed" and resolved[1]["text"] == "Update: Fix deployed"
     # The Windows clock ticks every ~16 ms; the reply must land after the assignee last read it.
@@ -149,7 +154,6 @@ async def test_close_follows_the_state_and_endings_go_to_the_archive(
     close = f"/api/console/items/{dropped}/close"
     assert (await darlene.post(close, json={"reason": "", "ending": "fixed"})).status_code == 409
     assert (await darlene.post(close, json={"reason": " ", "ending": "wont_fix"})).status_code == 400
-    assert (await darlene.post(f"/api/console/items/{dropped}/move", json={"column": "fixed"})).status_code == 409
     r = await darlene.post(close, json={"reason": "The HR bot replaces it", "ending": "wont_fix"})
     assert r.json()["status"] == "declined" and r.json()["ending"] == "wont_fix"
     t = (await staff.get(f"/api/feedback/{dropped}/tracker")).json()
@@ -162,14 +166,15 @@ async def test_close_follows_the_state_and_endings_go_to_the_archive(
 
     await darlene.post(f"/api/console/items/{done}/start")
     await darlene.post(f"/api/console/items/{done}/resolve", json={"body": "Deployed"})
-    assert (await darlene.post(f"/api/console/items/{done}/move", json={"column": "fixed"})).json()["ending"] == "fixed"
+    assert (await darlene.post(f"/api/console/items/{done}/close", json={"reason": ""})).json()["ending"] == "fixed"
 
-    # The board's last column holds only Fixed items (D47); the rest wait in the Archive.
+    # The board ends at Resolved; every ended item waits in the Archive (D47, D52).
     board = (await darlene.get("/api/console/board")).json()
-    fixed = [c["reference"] for c in next(c for c in board["columns"] if c["key"] == "fixed")["items"]]
-    assert done in fixed and dropped not in fixed
     everywhere = [c["reference"] for col in board["columns"] for c in col["items"]]
-    assert dropped not in everywhere
+    assert done not in everywhere and dropped not in everywhere
+    archived = (await darlene.get("/api/console/board", params={"inbox": "archive"})).json()["columns"]
+    by_ending = {c["key"]: [i["reference"] for i in c["items"]] for c in archived}
+    assert by_ending["fixed"] == [done] and by_ending["wont_fix"] == [dropped] and by_ending["acknowledged"] == []
     archive = (await darlene.get("/api/console/items", params={"inbox": "archive", "ending": "wont_fix"})).json()
     assert [i["reference"] for i in archive["items"]] == [dropped]
     found = (await darlene.get("/api/console/items", params={"inbox": "archive", "q": done})).json()

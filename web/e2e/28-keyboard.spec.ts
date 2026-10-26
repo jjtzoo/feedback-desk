@@ -133,7 +133,7 @@ test("S28.01 Tab through the landing page, chat, tracker and console: a visible 
 
   await openChat(page);
   const chat = await tabStops(page);
-  expectOrder(chat, ["Smoke Signal", ...HEADER, "Account: Liam Carter", /^Back to home/, /^Attach a file/, "Your message"]);
+  expectOrder(chat, ["Smoke Signal", ...HEADER, "Account: Liam Carter", /^Attach a file/, "Your message"]);
 
   await page.goto(`/track/${ref}`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -161,7 +161,7 @@ test("S28.01 Tab through the landing page, chat, tracker and console: a visible 
     /^Account: Darlene/,
     "Work",
     /^Assigned to me/,
-    /^Unassigned \/ needs review/,
+    /^Triage/,
     /^Overdue/,
     "Channels",
     "Releases",

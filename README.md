@@ -47,14 +47,17 @@ docker compose exec api python -m app.seed
 
 Open http://localhost:3000. Sign in with the local development picker (placeholder people from `backend/seed/`); Mailpit shows every email at http://localhost:8025. API docs: http://localhost:8001/api/docs.
 
-Without Docker:
+Without Docker, one command starts the API and the web app in the same terminal; Ctrl+C stops both:
 
-```bash
-cd backend && uv run python -m scripts.dev_server
-cd web && npm install && npm run dev
+```powershell
+.\dev.ps1
 ```
 
-The API then runs on port 8001 with a throwaway Postgres (`pgserver`), the stub model and email off. Port 8000 is left free for other local apps.
+```bash
+./dev.sh
+```
+
+(`dev.ps1` on Windows, `dev.sh` on macOS and Linux.) The script runs `uv run python -m scripts.dev_server` in `backend` and `npm run dev` in `web`, installs the web packages on the first run, and stops early if port 8001 or 3000 is already taken. The API then runs on port 8001 with a throwaway Postgres (`pgserver`), the stub model and email off. Port 8000 is left free for other local apps.
 
 ## Switching on the real agent
 

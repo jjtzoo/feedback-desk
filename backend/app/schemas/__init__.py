@@ -410,7 +410,7 @@ class MergeIn(BaseModel):
 
 
 class MoveIn(BaseModel):
-    column: Literal["approved", "in_progress", "resolved", "fixed"]
+    column: Literal["approved", "in_progress", "resolved"]
     note: str = Field(default="", max_length=1000)
 
 

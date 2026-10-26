@@ -20,7 +20,7 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 ## Run and test
 
 - Docker: `cp .env.example .env`, `docker compose --profile dev up --build`, `docker compose exec api python -m app.seed`.
-- Without Docker: `cd backend && uv run python -m scripts.dev_server` (API on 8001, dev sign-in on, stub model), `cd web && npm run dev`. Port 8000 belongs to another local app; don't kill it.
+- Without Docker: `.\dev.ps1` (Windows) or `./dev.sh` starts both in one terminal, Ctrl+C stops both; separately: `cd backend && uv run python -m scripts.dev_server` (API on 8001, dev sign-in on, stub model), `cd web && npm run dev`. Port 8000 belongs to another local app; don't kill it.
 - Checks before any merge: `cd backend && uv run ruff check . && uv run mypy && uv run pytest`; `cd web && npm run build`.
 - Browser tests: `cd web && npm run test:e2e` (Playwright, own ports 8002/3100, or `E2E_API_PORT`/`E2E_WEB_PORT`/`E2E_CONTROL_PORT` in a second worktree; own database, stub model). Their rules are in `web/e2e/CLAUDE.md`; app bugs they find go in `web/e2e/FINDINGS.md`, never fixed inside a test change. Agent changes also run `uv run python -m evals.run_routing` (gate 85 % project, 85 % work type, 80 % assignee on Gemini).
 
@@ -38,7 +38,7 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 
 ## UI
 
-Visual direction D17: modern and red-led (landing page mockup D, everything else mockup E; `docs/design/mockups/directions-red.html`). Use shadcn/ui components; load the `fire-services-ui` skill for its structure and accessibility rules, but follow D17 for colour and type until the skill is updated. Mobile first, keyboard-usable, AA contrast, status never by colour alone.
+Visual direction D17: modern and red-led (landing page mockup D, everything else mockup E; `docs/design/mockups/directions-red.html`). Use shadcn/ui components; load the `fire-services-ui` skill for its structure and accessibility rules, but follow D17 for colour and type until the skill is updated. Mobile first, keyboard-usable, AA contrast, status never by colour alone. Light theme only (D48); the chat fills the page and Sig moves only while it writes (D49).
 Brand assets (Puff logo, icons, Sig) live in `web/public/brand/`; wiring and rules: `docs/design/smoke-signal-integration.md` (D37, open).
 
 ## Not part of this project

@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T01:23:13.495Z",
-  "commit": "ade4334",
-  "uncommitted": false,
+  "ran": "2026-10-26T02:57:12.265Z",
+  "commit": "6984fa3",
+  "uncommitted": true,
   "spec": "28-keyboard.spec.ts",
-  "fingerprint": "b1986eb68da2663a",
+  "fingerprint": "d3325b2daa8068da",
   "caught": {
     "S28.01": true,
     "S28.02": true,

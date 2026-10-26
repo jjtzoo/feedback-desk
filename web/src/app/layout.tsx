@@ -17,23 +17,13 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#14161a" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
+  themeColor: "#14161a",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en-AU" className={`${jakarta.variable} ${jetbrains.variable} antialiased`} suppressHydrationWarning>
+    <html lang="en-AU" className={`${jakarta.variable} ${jetbrains.variable} antialiased`}>
       <body className="min-h-dvh">
-        <script
-          // Follow the device theme before paint, so dark mode doesn't flash.
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{if(window.matchMedia('(prefers-color-scheme: dark)').matches)document.documentElement.classList.add('dark')}catch(e){}",
-          }}
-        />
         <TooltipProvider delayDuration={300}>{children}</TooltipProvider>
         <Toaster position="top-center" />
       </body>
