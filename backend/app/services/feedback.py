@@ -203,17 +203,20 @@ async def submit(db: AsyncSession, sub: Submission) -> Created:
 
     routing = await route(db, fb, project, float(confidence.get("project", 1.0 if project else 0.0)))
     fb.status = routing.status
+    # Shown as "Auto-assigned ... · owner of X" until a person approves, reassigns or corrects it (D56).
+    fb.routed = routing.reason
     events.log(
         db, fb.id, SYSTEM, "status", before={"status": "new"}, after={"status": fb.status, "reason": routing.reason}
     )
     if routing.assignee is not None:
         fb.assignee_id = routing.assignee.id
+        # Routing is code, not the model (D2), so the system makes the assignment.
         events.log(
             db,
             fb.id,
-            AGENT,
+            SYSTEM,
             "assigned",
-            after={"assignee": routing.assignee.google_email, "reason": routing.reason},
+            after={"assignee": routing.assignee.google_email, "name": routing.assignee.name, "reason": routing.reason},
             public_text=f"Assigned to {routing.assignee.name}",
         )
     if fb.status == "acknowledged":
@@ -221,6 +224,7 @@ async def submit(db: AsyncSession, sub: Submission) -> Created:
 
     await embeddings.store(db, fb.id, f"{fb.title}. {fb.summary}")
     await _notify_new(db, fb, routing)
+    await notifications.refresh_approvals(db)
     return Created(await load(db, feedback_id=fb.id), routing)
 
 
@@ -482,6 +486,7 @@ async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) 
         )
         fb.status = "in_progress"
         fb.resolved_at = None
+    await notifications.settle(db, fb.id, notifications.ANSWER, f"{fb.ref_no}: you replied", recipient=user.email)
     await notifications.notify_assignee(
         db,
         fb,

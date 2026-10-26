@@ -22,7 +22,13 @@ STREAM_CHECK_SECONDS = 3
 @router.get("/notifications", response_model=NotificationsOut)
 async def list_notifications(db: Db, user: CurrentUser) -> NotificationsOut:
     rows, unread = await notifications.list_for(db, user.email)
-    return NotificationsOut(items=[NotificationOut.model_validate(n) for n in rows], unread=unread)
+    items = [
+        NotificationOut.model_validate(n).model_copy(
+            update={"item_status": n.feedback.status, "item_ending": n.feedback.ending} if n.feedback else {}
+        )
+        for n in rows
+    ]
+    return NotificationsOut(items=items, unread=unread)
 
 
 @router.post("/notifications/read", status_code=204)
@@ -35,8 +41,9 @@ async def read(body: ReadIn, db: Db, user: CurrentUser) -> Response:
 async def stream(
     request: Request, user: StreamUser, fb_session: Annotated[str | None, Cookie()] = None
 ) -> EventSourceResponse:
-    """Sends {"unread": n} whenever something new arrives. Checks Postgres (no Redis, D26), and
-    the sign-in each time: signing out, or a revoked or expired session, ends the stream."""
+    """Sends {"unread": n} whenever the bell changes: a new notification, or one settled or updated
+    in place (D54, D55). Checks Postgres (no Redis, D26), and the sign-in each time: signing out,
+    or a revoked or expired session, ends the stream."""
 
     async def events() -> AsyncIterator[dict[str, str]]:
         last: str | None = "start"
@@ -47,9 +54,9 @@ async def stream(
                 return
             unread: int | None = None
             async with session_scope() as db:
-                newest = await notifications.latest_id(db, user.email)
-                if newest != last:
-                    last = newest
+                state = await notifications.bell_state(db, user.email)
+                if state != last:
+                    last = state
                     unread = await notifications.unread_count(db, user.email)
             if unread is not None:  # sent outside any transaction, so an open tab holds nothing
                 yield {"event": "unread", "data": json.dumps({"unread": unread})}

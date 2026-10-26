@@ -36,6 +36,8 @@ STATUSES = (
 )
 OPEN_STATUSES = ("new", "needs_review", "awaiting_approval", "approved", "in_progress", "resolved")
 CLOSED_STATUSES = ("acknowledged", "declined", "closed")
+# Waiting for an Admin's decision: the Approvals queue and its count.
+APPROVAL_STATUSES = ("awaiting_approval", "needs_review")
 # How a closed or declined item ended (D44). Praise (acknowledged) has none.
 ENDINGS = ("fixed", "wont_fix", "duplicate", "declined", "no_longer_needed")
 ENDED_STATUSES = ("closed", "declined")
