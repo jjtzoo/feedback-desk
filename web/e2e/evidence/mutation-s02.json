@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T00:16:06.453Z",
-  "commit": "8858e8f",
-  "uncommitted": true,
+  "ran": "2026-10-26T04:26:50.476Z",
+  "commit": "388eba9",
+  "uncommitted": false,
   "spec": "02-landing.spec.ts",
-  "fingerprint": "9f30e83bec33865e",
+  "fingerprint": "5daec9edbe6dbaef",
   "caught": {
     "S02.01": true,
     "S02.02": true,
@@ -18,7 +18,6 @@
     "S02.11": true,
     "S02.12": true,
     "S02.13": true,
-    "S02.14": true,
-    "S02.15": true
+    "S02.14": true
   }
 }
