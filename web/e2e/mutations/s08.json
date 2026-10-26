@@ -8,7 +8,7 @@
   "S08.07": ["toHaveCount(4)", "toHaveCount(5)", 2],
   "S08.08": ["(await fullHistory()).toEqual", "(await fullHistory()).not.toEqual"],
   "S08.09": ["\"_blank\"", "\"_blankx\""],
-  "S08.10": ["this quarter", "this quarterx"],
+  "S08.10": ["Reason: Working as designed", "Reason: Working as designedx"],
   "S08.11": ["find that feedback", "find that feedbackx"],
   "S08.12": ["find that feedback", "find that feedbackx"]
 }

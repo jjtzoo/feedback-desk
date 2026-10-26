@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-25T23:14:10.496Z",
-  "commit": "90dd8bc",
+  "ran": "2026-10-25T23:29:52.572Z",
+  "commit": "09fe04f",
   "uncommitted": false,
   "spec": "01-sign-in-roles.spec.ts",
-  "fingerprint": "e41769d69a8b0508",
+  "fingerprint": "8540475714d9fe41",
   "caught": {
     "S01.01": true,
     "S01.02": true,
