@@ -82,6 +82,11 @@ def apply_update(draft: Draft, updates: dict[str, Any], valid_slugs: set[str]) -
             v = str(value).strip()
             if field in ("summary", "title") and not v:
                 errors.append(f"{field} can't be empty.")
+            elif field in ("summary", "title") and v.lower().startswith(("the user", "user ")):
+                errors.append(
+                    f"Write the {field} in their terms, about the tool and what happens (for example "
+                    "'IT Asset: asset search takes about a minute'), never 'The user ...'."
+                )
             else:
                 new[field] = v[: TEXT_LIMITS[field]]
         elif field in BRIEF_TEXT:
@@ -120,11 +125,14 @@ def draft_hash(draft: Draft) -> str:
 
 
 def card(draft: Draft, project_name: str | None) -> dict[str, Any]:
-    """What the confirm card shows: project, type, summary, priority (brief §4.1 step 6).
+    """What the confirm card shows: project, type, summary, priority (brief §4.1 step 6), and for a
+    fix what happened, plus what is still unknown so the person can add it (D63).
 
     Praise is thanks, not a request (D50): staff see "Praise" alone, with no work type or priority.
     """
     praise = draft.get("category") == "praise"
+    brief = draft.get("brief") or {}
+    happened = str(brief.get("actual") or brief.get("problem") or "") if draft.get("work_type") == "fix" else ""
     return {
         "project": project_name or "Not sure yet (the Digital team will check)",
         "work_type": "" if praise else WORK_TYPE_LABEL.get(draft.get("work_type", ""), ""),
@@ -132,7 +140,54 @@ def card(draft: Draft, project_name: str | None) -> dict[str, Any]:
         "priority": "" if praise else draft.get("priority", ""),
         "title": draft.get("title", ""),
         "summary": draft.get("summary", ""),
+        "what_happened": happened,
+        "gaps": [] if praise else list(brief.get("open_gaps") or []),
     }
+
+
+# Impact answers that fit the situation (D62): a fault is about getting work done, an idea about time
+# saved. "Annoying" stays off the chips (checklist S04.02, brief §5.1).
+IMPACT_FAULT = [
+    {"label": "Can't work at all", "value": "I can't work at all"},
+    {"label": "Slower, but I get there", "value": "It slows me down, but I get there"},
+    {"label": "Minor, I can live with it", "value": "It's minor, I can live with it"},
+]
+IMPACT_IDEA = [
+    {"label": "Would save me time daily", "value": "It would save me time every day"},
+    {"label": "Nice to have", "value": "It's a nice-to-have"},
+]
+IMPACT_QUESTION = re.compile(r"\b(affect\w*|impact\w*|how much|blocking)\b", re.IGNORECASE)
+
+
+def impact_chips(draft: Draft) -> list[dict[str, str]]:
+    idea = draft.get("work_type") in ("improvement", "new_feature") or draft.get("category") == "feature_request"
+    return IMPACT_IDEA if idea else IMPACT_FAULT
+
+
+REPLIES_MAX = 3
+REPLY_CHARS = 40
+PROMISE = re.compile(r"\b(we'll|we will|will be (fixed|sorted|done)|fixed by|guarantee\w*|promise\w*)\b", re.IGNORECASE)
+
+
+def quick_replies(values: list[str] | None, names: list[str]) -> list[str]:
+    """Answers the model suggests for its question (D62), kept only when short, in the person's
+    voice, promising nothing and naming nobody on the team (D2)."""
+    people = [re.compile(rf"\b{re.escape(n.lower())}\b") for name in names for n in {name, name.split()[0]} if n]
+    kept: list[str] = []
+    for value in values or []:
+        text = " ".join(str(value).split())
+        low = text.lower()
+        if (
+            not text
+            or len(text) > REPLY_CHARS
+            or text.endswith("?")
+            or PROMISE.search(text)
+            or any(p.search(low) for p in people)
+            or low in (k.lower() for k in kept)
+        ):
+            continue
+        kept.append(text)
+    return kept[:REPLIES_MAX]
 
 
 def first_sentence(text: str, limit: int = 120) -> str:

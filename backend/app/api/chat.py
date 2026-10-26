@@ -3,7 +3,7 @@ card, "+1 and comment", and the backup form when the model is down (F10).
 
 Messages stream back as server-sent events:
   message    {"text"}                               something the agent says
-  chips      {"kind", "options"}                    quick picks (project, impact)
+  chips      {"kind", "options"}                    quick picks (project, impact, reply)
   duplicates {"candidates"}                         likely duplicates, for "+1 and comment"
   draft      {"card", "hash"}                       the confirm card, once the draft is complete
   done       {"reference", "assigned_to", "status"} saved
@@ -43,7 +43,15 @@ from app.schemas import (
 from app.services import catalog, files, usage
 from app.services import feedback as feedback_service
 from app.services.actors import User
-from app.services.drafts import GENERAL, card, draft_hash, first_sentence, is_complete
+from app.services.drafts import (
+    GENERAL,
+    IMPACT_QUESTION,
+    card,
+    draft_hash,
+    first_sentence,
+    impact_chips,
+    is_complete,
+)
 from app.services.privacy import mask
 from app.services.ratelimit import RateLimiter
 
@@ -53,11 +61,6 @@ session_limiter = RateLimiter(get_settings().chat_sessions_per_user_per_hour, 36
 
 SHOW_SUMMARY_LEAD = "Here's what I'll send"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
-IMPACT_CHIPS = [
-    {"label": "Blocking my work", "value": "It's blocking my work"},
-    {"label": "Slowing me down", "value": "It's slowing me down"},
-    {"label": "Nice-to-have", "value": "It's a nice-to-have"},
-]
 
 
 @router.post("/chat/sessions", response_model=ChatStartOut)
@@ -108,6 +111,8 @@ async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> Ev
         "user_turns": int(state.get("user_turns") or 0) + 1,
         # The person's own words (masked), so update_draft can tell whether they named the tool.
         "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
+        # Suggested answers belong to one question: update_draft sets them again for the next one.
+        "replies": [],
     }
     return EventSourceResponse(_stream(user, session_id, parts, delta), headers=STREAM_HEADERS)
 
@@ -229,6 +234,20 @@ def _without_card_fields(text: str) -> str:
     return text if at < 0 else text[:at] + SHOW_SUMMARY
 
 
+async def _project_chips(user: User, state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every tool, the person's likely ones first and marked usual (D60), then "Not sure"."""
+    async with session_scope() as db:
+        projects = await catalog.list_projects(db)
+        source = str((state.get("context") or {}).get("source") or "")
+        usual = await catalog.likely_projects(db, user.email, source, projects)
+    rest = [p for p in projects if p not in usual]
+    return [
+        *({"label": p.name, "value": p.name, "usual": True} for p in usual),
+        *({"label": p.name, "value": p.name} for p in rest),
+        {"label": "Not sure", "value": "Not sure"},
+    ]
+
+
 def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False, default=str)}
 
@@ -275,15 +294,13 @@ async def _stream(
             project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
         yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": draft_hash(draft)})
     else:
+        replies = state.get("replies") or []
         if not draft.get("project_slug"):
-            async with session_scope() as db:
-                projects = await catalog.list_projects(db)
-            options = [{"label": p.name, "value": p.name} for p in projects] + [
-                {"label": "Not sure", "value": "Not sure"}
-            ]
-            yield _sse("chips", {"kind": "project", "options": options})
-        elif not draft.get("priority"):
-            yield _sse("chips", {"kind": "impact", "options": IMPACT_CHIPS})
+            yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
+        elif asking and replies:
+            yield _sse("chips", {"kind": "reply", "options": [{"label": r, "value": r} for r in replies]})
+        elif asking and not draft.get("priority") and IMPACT_QUESTION.search(said[-1]):
+            yield _sse("chips", {"kind": "impact", "options": impact_chips(draft)})
     if asking:
         await runtime.update_state(user, session_id, {"questions": int(state.get("questions") or 0) + 1})
     yield _sse("end", {})

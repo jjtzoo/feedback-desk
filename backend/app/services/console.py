@@ -249,6 +249,12 @@ async def reporter_counts(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.U
     return {i: 1 + extra.get(i, 0) for i in ids}
 
 
+def needs_detail(fb: Feedback) -> bool:
+    """Saved with open gaps and not yet added to by the person: the owner asks for info first (D63)."""
+    gaps = (fb.dev_brief or {}).get("open_gaps")
+    return bool(gaps) and fb.status in OPEN_STATUSES and fb.submitter_replied_at is None
+
+
 def needs_priority_review(fb: Feedback, reporters: int) -> bool:
     """Suggest, never apply, a priority review once enough different people report the same open
     item (D38). Staff never see the count, so asking colleagues to +1 has nothing to aim at."""

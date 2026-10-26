@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db import session_scope
 from app.models import DigitalStaff, Feedback, Project, RoutingRule
 from app.services import files, privacy
-from app.services.drafts import apply_update, card, draft_hash, missing
+from app.services.drafts import apply_update, card, draft_hash, impact_chips, missing, quick_replies
 from app.services.router import route
 
 # --- privacy -------------------------------------------------------------------------------
@@ -185,16 +185,16 @@ def test_draft_validation_rejects_unknown_values() -> None:
 def test_a_tool_only_counts_as_named_when_the_person_said_it() -> None:
     from types import SimpleNamespace
 
-    from agent.tools import _names
+    from app.services.catalog import mentions
 
     intranet = SimpleNamespace(
         name="Intranet site itself", slug="intranet", aliases=["intranet"], keywords=["home page", "tile", "menu"]
     )
-    assert not _names("page is slow to load", intranet)  # "page" alone names nothing
-    assert _names("The intranet home page is slow", intranet)
-    assert _names("the Flipbook tile on the home page goes to a 404", intranet)
+    assert not mentions("page is slow to load", intranet)  # "page" alone names nothing
+    assert mentions("The intranet home page is slow", intranet)
+    assert mentions("the Flipbook tile on the home page goes to a 404", intranet)
     rake = SimpleNamespace(name="RAKE Agent", slug="rake-agent", aliases=["rake"], keywords=["policy answer"])
-    assert _names("RAKE gives a blank answer", rake) and not _names("the drake is broken", rake)
+    assert mentions("RAKE gives a blank answer", rake) and not mentions("the drake is broken", rake)
 
 
 def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
@@ -280,3 +280,45 @@ def test_choosing_gemini_exports_the_key_before_the_agent_is_built(monkeypatch: 
         assert os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] == "false"
     finally:
         agent_runtime.reset()
+
+
+def test_a_summary_about_the_user_is_refused() -> None:
+    draft, errors = apply_update({}, {"summary": "The user reported the system is slow.", "title": "Slow"}, set())
+    assert "summary" not in draft and draft["title"] == "Slow"
+    assert errors and "never 'The user" in errors[0]
+
+
+def test_the_card_shows_what_happened_and_the_open_gaps_for_a_fix() -> None:
+    draft = {
+        "work_type": "fix",
+        "category": "performance",
+        "brief": {"actual": "Search takes a minute", "open_gaps": ["Since when"]},
+    }
+    shown = card(draft, "IT Asset")
+    assert shown["what_happened"] == "Search takes a minute" and shown["gaps"] == ["Since when"]
+    assert card({**draft, "work_type": "new_feature"}, "IT Asset")["what_happened"] == ""
+    assert card({**draft, "category": "praise"}, "IT Asset")["gaps"] == []
+
+
+def test_impact_chips_fit_a_fault_or_an_idea() -> None:
+    fault = [c["label"] for c in impact_chips({"work_type": "fix", "category": "performance"})]
+    idea = [c["label"] for c in impact_chips({"work_type": "new_feature", "category": "feature_request"})]
+    assert "Can't work at all" in fault and not any("nice" in label.lower() for label in fault)
+    assert "Nice to have" in idea and "Can't work at all" not in idea
+
+
+def test_suggested_replies_are_short_and_promise_nothing_and_name_nobody() -> None:
+    kept = quick_replies(
+        [
+            "Every time",
+            "every time",
+            "Since Monday",
+            "We'll fix it today",
+            "Ask Darlene",
+            "Which screen?",
+            "x" * 41,
+            "Only on my laptop",
+        ],
+        ["Darlene Antonette Duran"],
+    )
+    assert kept == ["Every time", "Since Monday", "Only on my laptop"]

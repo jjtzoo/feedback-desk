@@ -68,6 +68,7 @@ def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) 
         channel=fb.channel,
         reporters=count,
         priority_review=console.needs_priority_review(fb, count),
+        needs_detail=console.needs_detail(fb),
     )
 
 

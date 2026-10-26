@@ -45,6 +45,8 @@ async def test_bug_conversation_routes_to_the_owner_and_waits_for_approval(staff
         "priority": "P1",
         "title": "RAKE gives a blank answer when I ask about leave.",
         "summary": "RAKE gives a blank answer when I ask about leave.",
+        "what_happened": "got an empty box",
+        "gaps": ["Steps to reproduce"],
     }
     assert await count() == 0  # nothing saved before Confirm
 
@@ -345,3 +347,29 @@ def test_a_message_that_lists_the_card_fields_is_cut_back_to_the_lead_in() -> No
     listed = f"Looks like someone raised this.\n\n{SHOW_SUMMARY}\n\n**Title:** Blank answer\n**Priority:** P2"
     assert _without_card_fields(listed) == f"Looks like someone raised this.\n\n{SHOW_SUMMARY}"
     assert _without_card_fields(ASK_IMPACT) == ASK_IMPACT
+
+
+async def test_the_tool_chips_put_the_persons_usual_tools_first(staff: httpx.AsyncClient) -> None:
+    await submit_via_chat(
+        staff, "RAKE gives a blank answer when I ask about leave.", ["It's blocking my work", "I expected an answer"]
+    )
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "The export button is broken")
+    chips = first(events, "chips")
+    assert chips is not None and chips["kind"] == "project"
+    assert chips["options"][0] == {"label": "RAKE Agent", "value": "RAKE Agent", "usual": True}
+    assert not any(o.get("usual") for o in chips["options"][1:])
+
+
+async def test_impact_chips_only_follow_an_impact_question(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "RAKE gives a blank answer when I ask about leave.")
+    chips = first(events, "chips")
+    assert chips is not None and chips["kind"] == "impact"
+    assert [o["label"] for o in chips["options"]] == [
+        "Can't work at all",
+        "Slower, but I get there",
+        "Minor, I can live with it",
+    ]
+    events = await say(staff, sid, "I can't work at all")
+    assert texts(events)[-1] == ASK_EXPECTED and first(events, "chips") is None  # an open question: no chips

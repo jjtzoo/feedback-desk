@@ -277,6 +277,7 @@ class CardOut(Out):
     channel: str
     reporters: int
     priority_review: bool
+    needs_detail: bool
 
 
 class ColumnOut(Out):

@@ -18,7 +18,7 @@ from google.genai import types
 from app.services.drafts import first_sentence
 
 ASK_PROJECT = "Which tool is this about?"
-ASK_IMPACT = "How much is this affecting your work: blocking it, slowing you down, or nice-to-have?"
+ASK_IMPACT = "How much is this affecting your work?"
 ASK_EXPECTED = "What did you expect to happen, and what happened instead?"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
 PRESS_CONFIRM = "Press Confirm on the summary to send it, or tell me what to change."
@@ -135,8 +135,8 @@ BLOCKING = (
     "nobody can",
     "no one can",
 )
-ANNOYING = ("slowing me down", "annoying", "frustrating", "painful", "major")
-MINOR = ("minor", "typo", "cosmetic", "small thing", "a bit")
+ANNOYING = ("slowing me down", "slows me down", "annoying", "frustrating", "painful", "major")
+MINOR = ("minor", "typo", "cosmetic", "small thing", "a bit", "save me time")
 NICE = ("nice to have", "nice-to-have", "idea", "would be nice", "someday")
 CONFIRM_WORDS = ("yes", "yep", "yeah", "correct", "looks good", "that's right", "send it", "submit", "ok", "okay")
 EXPECT_RE = re.compile(
@@ -363,6 +363,9 @@ def _correction(text: str, projects: list[dict[str, Any]], draft: dict[str, Any]
     if not upd:
         brief = draft.get("brief", {})
         upd["problem"] = f"{brief.get('problem', draft.get('summary', ''))} {text.strip()}".strip()[:2000]
+        # Something added at the card answers its first open gap (D63).
+        if brief.get("open_gaps"):
+            upd["open_gaps"] = brief["open_gaps"][1:]
     return upd
 
 

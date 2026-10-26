@@ -17,22 +17,28 @@ from app.db import session_scope
 from app.services import catalog, embeddings
 from app.services import feedback as feedback_service
 from app.services.actors import User
-from app.services.drafts import GENERAL, apply_update, missing
+from app.services.drafts import GENERAL, apply_update, missing, quick_replies
 
 log = logging.getLogger(__name__)
 UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
 
 
-async def list_projects() -> dict[str, Any]:
+async def list_projects(tool_context: ToolContext) -> dict[str, Any]:
     """List the intranet projects (platforms and agents) staff can give feedback on.
 
     Returns:
         projects: slug (use it in update_draft), name, group, description, keywords and aliases.
         Use "general" when nothing fits.
+        usual_tools: names of the tools this person most likely means (the page they came from,
+        then what they reported before), strongest first. A guess to ask about, never to file under.
     """
+    who = dict(tool_context.state.get("user") or {})
+    source = str((tool_context.state.get("context") or {}).get("source") or "")
     async with session_scope() as db:
         projects = await catalog.list_projects(db)
+        usual = await catalog.likely_projects(db, str(who.get("email") or ""), source, projects)
         return {
+            "usual_tools": [p.name for p in usual],
             "projects": [
                 {
                     "slug": p.slug,
@@ -43,7 +49,7 @@ async def list_projects() -> dict[str, Any]:
                     "aliases": list(p.aliases),
                 }
                 for p in projects
-            ]
+            ],
         }
 
 
@@ -76,6 +82,7 @@ async def update_draft(
     submitter_quote: str | None = None,
     open_gaps: list[str] | None = None,
     flag_abuse: bool | None = None,
+    replies: list[str] | None = None,
 ) -> dict[str, Any]:
     """Save what you know into the draft. Pass only the fields you are setting.
 
@@ -106,21 +113,28 @@ async def update_draft(
         asking_for: developer brief, the requested behaviour in their words.
         done_when: developer brief, 1 to 3 acceptance criteria.
         submitter_quote: a short quote from their message.
-        open_gaps: what you couldn't find out.
+        open_gaps: what you couldn't find out, each as a short plain phrase, e.g. "Which screen is slow".
         flag_abuse: true if the message is abusive about a named colleague.
+        replies: up to 3 short answers the person might tap for the question you are about to ask,
+            in their words (e.g. "Every time", "Since this morning"). Leave out for a question that
+            needs their own words, like what happened.
 
     Returns:
         draft, missing (required fields still empty) and errors (rejected values).
     """
-    updates = {k: v for k, v in locals().items() if k != "tool_context"}
+    updates = {k: v for k, v in locals().items() if k not in ("tool_context", "replies")}
     async with session_scope() as db:
         projects = await catalog.list_projects(db)
+        staff = await catalog.list_staff(db)
+    if replies is not None:
+        # Shown as chips under this turn's question; the API clears them each turn.
+        tool_context.state["replies"] = quick_replies(replies, [s.name for s in staff])
     draft, errors = apply_update(dict(tool_context.state.get("draft") or {}), updates, {p.slug for p in projects})
     result: dict[str, Any] = {}
     slug = draft.get("project_slug")
     chosen = next((p for p in projects if p.slug == slug), None)
     said = str(tool_context.state.get("user_text") or "")
-    if chosen and slug != tool_context.state.get("project_hint") and not _names(said, chosen):
+    if chosen and slug != tool_context.state.get("project_hint") and not catalog.mentions(said, chosen):
         if UNSURE_RE.search(said.lower()):
             # They were asked and don't know: the Digital team checks it (needs review), no more questions.
             draft["project_slug"] = GENERAL
@@ -136,13 +150,6 @@ async def update_draft(
     # Any edit means the person has not confirmed this version (D12).
     tool_context.state["draft_confirmed"] = False
     return {"draft": draft, "missing": missing(draft), "errors": errors, **result}
-
-
-def _names(said: str, project: Any) -> bool:
-    """Whether the person's words name the project: its name, an alias or a keyword, as whole words."""
-    low = said.lower()
-    words = [project.name, project.slug.replace("-", " "), *project.aliases, *project.keywords]
-    return any(re.search(rf"\b{re.escape(w.lower())}\b", low) for w in words if w)
 
 
 async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str, Any]:
