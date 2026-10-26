@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.db import session_scope
 from app.models import DigitalStaff, Feedback, Project, RoutingRule
 from app.services import files, privacy
-from app.services.drafts import apply_update, draft_hash, missing
+from app.services.drafts import apply_update, card, draft_hash, missing
 from app.services.router import route
 
 # --- privacy -------------------------------------------------------------------------------
@@ -205,6 +205,14 @@ def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
     assert "priority" in missing(bug)  # anything else still waits for the impact question
     kept, _ = apply_update({}, {**praise, "priority": "P2"}, {"rake-agent"})
     assert kept["priority"] == "P2"  # a priority the model did set is left alone
+
+
+def test_praise_card_shows_praise_alone_without_a_priority() -> None:
+    praise, _ = apply_update({}, COMPLETE | {"category": "praise", "work_type": "no_change"}, {"rake-agent"})
+    shown = card(praise, "RAKE Agent")
+    assert (shown["work_type"], shown["category"], shown["priority"]) == ("", "Praise", "")
+    bug, _ = apply_update({}, COMPLETE, {"rake-agent"})
+    assert card(bug, "RAKE Agent")["priority"] == bug["priority"]
 
 
 def test_draft_hash_changes_with_any_field() -> None:

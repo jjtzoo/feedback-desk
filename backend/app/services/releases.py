@@ -111,7 +111,7 @@ async def _sources(db: AsyncSession, project: Project, start: datetime, end: dat
         seen.add(fb.id)
         out.append(
             {
-                "title": f"In progress: {fb.title}",
+                "title": fb.title,
                 "body": first_sentence(msg.body, 200),
                 "work_type": fb.work_type if fb.work_type in SECTION else None,
                 "source_type": "progress",

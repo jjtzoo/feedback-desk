@@ -6,7 +6,7 @@ import { PriorityBadge } from "@/components/badges";
 import { Button } from "@/components/ui/button";
 import type { ChatCard, Priority } from "@/lib/api";
 
-/** "Here's what I'll send" (brief §4.1.6): project, type, summary, priority; Confirm or Change. */
+/** "Here's what I'll send" (brief §4.1.6): project, type, summary, priority (none for praise, D50); Confirm or Change. */
 export function ConfirmCard({
   card,
   busy,
@@ -38,10 +38,14 @@ export function ConfirmCard({
               <dd className="whitespace-pre-wrap">{v}</dd>
             </div>
           ))}
-        <dt className="font-medium text-muted-foreground">Priority</dt>
-        <dd>
-          <PriorityBadge priority={(card.priority || null) as Priority | null} />
-        </dd>
+        {card.priority && (
+          <>
+            <dt className="font-medium text-muted-foreground">Priority</dt>
+            <dd>
+              <PriorityBadge priority={card.priority as Priority} />
+            </dd>
+          </>
+        )}
       </dl>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button className="h-11 rounded-xl px-5 text-base" onClick={onConfirm} disabled={busy}>
