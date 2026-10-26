@@ -1,7 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { postJson, raiseBug } from "./helpers";
+import { getJson, postJson, raise, raiseBug } from "./helpers";
 
 // Manual checklist section 10: the bell, what raises a notification, and muting an item.
 // Liam stands in for Mario (the person who raised it); RAKE Agent is Darlene's, so she is assigned.
@@ -191,4 +191,77 @@ test("S10.08 Mute stops notifications for the item and Unmute brings them back",
 
 test("S10.09 Under Docker, Mailpit holds one email per notification", async () => {
   test.skip(true, "Not automated: needs Docker and Mailpit, and this machine has no Docker (no Docker Desktop, no WSL distro); the browser tests run with email off");
+});
+
+test("S10.10 Once Chris approves a P1, Mike's 'P1 needs approval' turns read and reads 'approved by Chris', with an Approved badge", async ({ page, signIn, team }) => {
+  await signIn("Mike");
+  await clearBell(page);
+  const ref = await raise(await team.as("Liam"), "RAKE Agent gives a blank answer when I ask about leave.", ["It's blocking my work", "I expected an answer about leave, but got an empty box"], "rake-agent");
+  await page.goto("/console");
+  await openBell(page);
+  const asked = row(page, new RegExp(`P1 needs approval: ${ref}`));
+  await expect(asked).toContainText("Awaiting approval");
+  await expect(asked).toContainText("Unread");
+
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+  await page.reload();
+  await openBell(page);
+  const settled = row(page, new RegExp(`${ref} approved by Chris`));
+  await expect(settled).toContainText("Approved");
+  await expect(settled).not.toContainText("Unread");
+  await expect(row(page, new RegExp(`P1 needs approval: ${ref}`))).toHaveCount(0);
+  // Mike doesn't hold it, so opening it offers no Start work.
+  await settled.click();
+  await expect(page.getByRole("dialog").getByText(ref, { exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog").getByRole("button", { name: "Start work" })).toHaveCount(0);
+});
+
+test("S10.11 Each notification's badge shows the item's stage now, for the owner and for the person who raised it", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await raiseBug(page, "rake-agent", "RAKE Agent drops my last message after a refresh");
+  const darlene = await team.as("Darlene");
+  await darlene.goto("/console");
+  await openBell(darlene);
+  const assigned = row(darlene, new RegExp(`New feedback assigned to you: ${ref}`));
+  await expect(assigned).toContainText("Awaiting approval");
+
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+  await darlene.reload();
+  await openBell(darlene);
+  await expect(assigned).toContainText("Approved");
+
+  await postJson(darlene, `/console/items/${ref}/start`);
+  await page.goto("/my");
+  await openBell(page);
+  // Liam's "is planned" was sent at stage 2; it now says where the item is.
+  const planned = row(page, new RegExp(`${ref} is planned`));
+  await expect(planned).toContainText("In progress");
+});
+
+test("S10.12 Each Admin has one standing 'N items waiting for your approval' row that follows the count and goes at zero", async ({ page, signIn, team }) => {
+  // Start from an empty queue: earlier tests in this file leave items waiting.
+  const chris = await team.as("Chris");
+  for (const item of await getJson<{ reference: string }[]>(chris, "/console/approvals")) await postJson(chris, `/console/items/${item.reference}/approve`);
+  await signIn("Mike");
+  const liam = await team.as("Liam");
+  const first = await raiseBug(liam, "rake-agent", "RAKE Agent shows two scroll bars on the answer");
+  const second = await raiseBug(liam, "rake-agent", "RAKE Agent cuts off long policy names");
+
+  await page.goto("/console");
+  const approvals = page.getByRole("navigation", { name: "Console" }).getByRole("link", { name: /^Approvals/ });
+  await openBell(page);
+  await expect(row(page, /^2 items waiting for your approval/)).toHaveCount(1);
+  await expect(approvals).toHaveAccessibleName(/^Approvals ?, 2 waiting$/);
+
+  await postJson(chris, `/console/items/${first}/approve`);
+  await page.reload();
+  await openBell(page);
+  await expect(row(page, /^1 item waiting for your approval/)).toHaveCount(1);
+  await expect(row(page, /items? waiting for your approval/)).toHaveCount(1);
+
+  await postJson(chris, `/console/items/${second}/decline`, { reason: "Covered by another fix" });
+  await page.reload();
+  await openBell(page);
+  await expect(row(page, /items? waiting for your approval/)).toHaveCount(0);
+  await expect(approvals).toHaveAccessibleName("Approvals");
 });

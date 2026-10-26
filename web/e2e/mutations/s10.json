@@ -6,5 +6,8 @@
   "S10.05": ["2 unread", "3 unread"],
   "S10.06": ["6 unread", "5 unread"],
   "S10.07": ["2 unread", "1 unread"],
-  "S10.08": ["toHaveCount(0)", "toHaveCount(1)"]
+  "S10.08": ["toHaveCount(0)", "toHaveCount(1)"],
+  "S10.10": ["approved by Chris`", "approved by Chrisx`"],
+  "S10.11": ["toContainText(\"In progress\")", "toContainText(\"Resolved\")"],
+  "S10.12": ["/^1 item waiting for your approval/", "/^2 items waiting for your approval/"]
 }

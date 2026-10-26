@@ -194,6 +194,8 @@ class Feedback(Base):
     expected_by: Mapped[date | None] = mapped_column(Date)
     ending: Mapped[str | None] = mapped_column(String(20))
     close_reason: Mapped[str | None] = mapped_column(Text)
+    # Routing's reason while its choice of person and tool still stands; cleared once a person acts (D56).
+    routed: Mapped[str | None] = mapped_column(String(40))
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = _now()
     first_response_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -301,7 +303,14 @@ class Notification(Base):
     email_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     email_after: Mapped[datetime] = _now()
     emailed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set once anyone acts on what the notification asked for; outcome says what happened (D54).
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    outcome: Mapped[str | None] = mapped_column(String(300))
     created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = _now()
+
+    # Read with the notification, so the bell shows the item's stage as it is now (D54).
+    feedback: Mapped[Feedback | None] = relationship(lazy="raise")
 
 
 class NotificationMute(Base):
