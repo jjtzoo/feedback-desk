@@ -49,12 +49,12 @@ test("S07.02 a row shows the reference, title, tool or 'Tool to confirm', a plai
   await expect(row).toContainText(ref);
   await expect(row).toContainText(title);
   await expect(row).toContainText("RAKE Agent");
-  await expect(row).toContainText(/waiting for approval/i);
+  await expect(row).toContainText(/under review/i);
   await expect(row.locator("time")).toHaveText(/^updated (just now|.+ ago)$/);
 
   const noTool = page.getByRole("link", { name: new RegExp(unsure) });
   await expect(noTool).toContainText("Tool to confirm");
-  await expect(noTool).toContainText(/being checked/i);
+  await expect(noTool).toContainText(/under review/i);
 
   // The stage badge on its own: the status line above also starts with "Received", so match the whole badge text.
   await expect(row.getByText("Received", { exact: true })).toBeVisible();

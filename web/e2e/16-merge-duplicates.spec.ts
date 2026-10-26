@@ -61,9 +61,9 @@ async function merged(page: Page, separate: string, into: string) {
 /** What Aisha, who raised the merged item, sees: its tracker points at the original by a link, and she follows the original. */
 async function expectFollowsOriginal(aisha: Page, separate: string, original: string) {
   await aisha.goto(`/track/${separate}`);
-  await expect(aisha.getByRole("heading", { level: 1 })).toHaveText(`Merged into ${original}`);
+  await expect(aisha.getByRole("heading", { level: 1 })).toHaveText(`Duplicate of ${original}`);
   const progress = aisha.getByRole("region", { name: "Progress" });
-  await expect(progress.getByRole("listitem").filter({ hasText: "Closed" })).not.toContainText("not yet");
+  await expect(progress.getByRole("listitem").filter({ hasText: "Duplicate" })).not.toContainText("not yet");
   const link = progress.getByRole("link", { name: original, exact: true });
   await expect(link).toHaveAttribute("href", `/track/${original}`);
   await link.click();
@@ -74,7 +74,7 @@ async function expectFollowsOriginal(aisha: Page, separate: string, original: st
   await expect(aisha.getByRole("link", { name: new RegExp(`${original}(?!\\d)`) })).toContainText("Following");
 }
 
-test("S16.01 'Merge into it' closes the item, its tracker says 'Merged into FB-…' with a link, and its submitter follows the original", async ({ team }) => {
+test("S16.01 'Merge into it' closes the item, its tracker says 'Duplicate of FB-…' with a link, and its submitter follows the original", async ({ team }) => {
   const { original, separate } = await pair(team, PAIRS.flipbook);
   const darlene = await team.as("Darlene");
 

@@ -64,7 +64,7 @@ test("S24.02 staff opening one of Mario's items get the same 'We can't find that
   // Mario himself can open it, so the page below is refused by who is asking and not by a missing item.
   const mario = await team.as("Mario");
   await mario.goto(`/track/${marios}`);
-  await expect(mario.getByRole("heading", { level: 1 })).toHaveText("Received, waiting for approval");
+  await expect(mario.getByRole("heading", { level: 1 })).toHaveText("Under review");
 
   await signIn("Rafael");
   const heading = page.getByRole("heading", { name: "We can't find that feedback" });

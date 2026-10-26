@@ -77,10 +77,10 @@ function publishReleases(team: Team) {
   return published;
 }
 
-test("S11.01 Before anything is published, What's new says nothing is published yet", async ({ page, signIn }) => {
+test("S11.01 Before anything is published, Fixes and updates says nothing is published yet", async ({ page, signIn }) => {
   await signIn("Liam");
   await page.goto("/whats-new");
-  await expect(page.getByRole("heading", { name: "What's new" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fixes and updates" })).toBeVisible();
   await expect(page.getByText("Nothing published yet. Each Friday the Digital team shares what changed.")).toBeVisible();
   await expect(page.getByRole("article")).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Filter by tool" })).toHaveCount(0);
@@ -90,7 +90,7 @@ test.describe("once releases are published", () => {
   // Raising and resolving six items through the stub takes a while on the first test.
   test.describe.configure({ timeout: 120_000 });
 
-  test("S11.02 One card per project with Week ending, items grouped New, Improved, Fixed", async ({ page, signIn, team }) => {
+  test("S11.02 One card per project with Week ending, items grouped Fixed, Improved, New", async ({ page, signIn, team }) => {
     await publishReleases(team);
     await signIn("Liam");
     await page.goto("/whats-new");
@@ -102,7 +102,7 @@ test.describe("once releases are published", () => {
     for (const card of await cards.all()) await expect(card.getByText(/Week ending Fri,? \d{1,2} [A-Za-z]{3}/)).toBeVisible();
 
     const rake = cards.filter({ has: page.getByRole("heading", { level: 2, name: "RAKE Agent" }) });
-    await expect(rake.getByRole("heading", { level: 3 })).toHaveText(["New", "Improved", "Fixed"]);
+    await expect(rake.getByRole("heading", { level: 3 })).toHaveText(["Fixed", "Improved", "New"]);
     const section = (name: string) => rake.locator("section").filter({ has: page.getByRole("heading", { level: 3, name, exact: true }) });
     await expect(section("New").getByRole("listitem")).toHaveCount(1);
     await expect(section("New").getByRole("listitem")).toContainText(NEW_ITEM);
@@ -149,7 +149,7 @@ test.describe("once releases are published", () => {
     await expect(page.getByRole("listitem").filter({ hasText: FIXED_ITEM })).not.toContainText("From your feedback");
 
     await page.getByRole("button", { name: /^Notifications/ }).click();
-    await expect(page.getByText("Your feedback made it into this week's RAKE Agent release")).toBeVisible();
+    await expect(page.getByText("Your feedback made it into this week's RAKE Agent fixes and updates")).toBeVisible();
   });
 
   test("S11.05 Published items leave out unticked items, staff names and internal notes", async ({ page, signIn, team }) => {

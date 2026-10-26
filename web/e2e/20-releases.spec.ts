@@ -295,7 +295,7 @@ test("S20.07 Approve and publish publishes the release, tells the contributors a
   await expect(card.getByRole("listitem").filter({ hasText: NEW_ITEM })).toContainText("From your feedback");
   await expect(card).not.toContainText(FIXED_ITEM);
   await page.getByRole("button", { name: /^Notifications/ }).click();
-  await expect(page.getByText("Your feedback made it into this week's RAKE Agent release")).toBeVisible();
+  await expect(page.getByText("Your feedback made it into this week's RAKE Agent fixes and updates")).toBeVisible();
 });
 
 test("S20.08 A draft left alone stays Draft and never appears on What's new", async ({ page, signIn, team }) => {
@@ -315,7 +315,7 @@ test("S20.08 A draft left alone stays Draft and never appears on What's new", as
   // Staff see none of it, whether or not RAKE Agent has been published.
   await signIn("Rafael");
   await page.goto("/whats-new");
-  await expect(page.getByRole("heading", { name: "What's new" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Fixes and updates" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: /Training Portal|CPD Tracker/ })).toHaveCount(0);
   await expect(page.getByText(PORTAL_ITEM)).toHaveCount(0);
   for (const item of CPD_ITEMS) await expect(page.getByText(item)).toHaveCount(0);

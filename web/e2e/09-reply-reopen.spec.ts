@@ -83,9 +83,9 @@ test("S09.04 A Closed or Declined item has no reply box", async ({ page, signIn,
   const darlene = await team.as("Darlene");
 
   const closed = await approvedBug(page, marc, "RAKE Agent should whistle on start-up");
-  await postJson(darlene, `/console/items/${closed}/close`, { reason: "Done" });
+  await postJson(darlene, `/console/items/${closed}/close`, { reason: "Done", ending: "no_longer_needed" });
   await page.goto(`/track/${closed}`);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Closed");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("No longer needed");
   await expect(page.getByLabel("Reply or add details")).toHaveCount(0);
 
   const declined = await raiseBug(page, "rake-agent", "RAKE Agent should print on gold paper");
@@ -108,6 +108,6 @@ test("S09.05 Darlene replying on Liam's tracker is refused with 'Reply from the 
 
   // Nothing was added to Liam's history.
   await page.goto(`/track/${ref}`);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Approved, ready to start");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Planned, not started yet");
   await expect(await expandHistory(page)).not.toContainText("Trying to reply from here");
 });

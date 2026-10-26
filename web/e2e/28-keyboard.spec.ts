@@ -86,7 +86,7 @@ function expectOrder(stops: Stop[], wanted: (string | RegExp)[]) {
   expect(missing, `not reached in this order; Tab went: ${stops.map((s) => s.name).join(" > ")}`).toEqual([]);
 }
 
-const HEADER = ["Give feedback", "My feedback", "What's new", "Guide", /^Notifications/];
+const HEADER = ["Give feedback", "My feedback", "Fixes and updates", "Guide", /^Notifications/];
 
 const card = (page: Page) => page.getByRole("region", { name: "Your feedback" });
 
@@ -229,7 +229,7 @@ test("S28.03 Esc closes a dialog and focus returns to the button that opened it;
   await expect(decline).toBeFocused();
 });
 
-test("S28.04 A select, a switch and a checkbox all work with the keyboard alone", async ({ page, signIn, team }) => {
+test("S28.04 A select, a switch and a radio button all work with the keyboard alone", async ({ page, signIn, team }) => {
   test.setTimeout(90_000);
 
   // Select: on the landing page, Enter opens "Already know which tool?", the arrows move, Enter picks.
@@ -291,7 +291,7 @@ test("S28.04 A select, a switch and a checkbox all work with the keyboard alone"
   await expect(role).toHaveText("Digital Staff");
   await expect.poll(async () => (await mario()).role).toBe("digital");
 
-  // Checkbox: "Won't fix" in the Close dialog of an item's panel, ticked and cleared with Space.
+  // Radio: the endings in the Close dialog of an item's panel, chosen with Space and the arrow keys.
   const ref = await raiseBug(await team.as("Rafael"), "rake-agent", "RAKE Agent shows an error when I use a checkbox");
   await page.goto(`/console?inbox=open&item=${ref}`);
   const header = page.locator("header", { hasText: ref });
@@ -300,12 +300,14 @@ test("S28.04 A select, a switch and a checkbox all work with the keyboard alone"
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Close", exact: true });
   await expect(dialog).toBeVisible();
-  const wontFix = dialog.getByRole("checkbox", { name: /Won't fix/ });
+  const wontFix = dialog.getByRole("radio", { name: /Won't fix/ });
+  const noLongerNeeded = dialog.getByRole("radio", { name: /No longer needed/ });
   await expect(wontFix).not.toBeChecked();
   await wontFix.focus();
   await page.keyboard.press("Space");
   await expect(wontFix).toBeChecked();
-  await page.keyboard.press("Space");
+  await page.keyboard.press("ArrowDown");
+  await expect(noLongerNeeded).toBeChecked();
   await expect(wontFix).not.toBeChecked();
 });
 
@@ -337,7 +339,7 @@ test("S28.05 Status never relies on colour: badges carry a word, the stepper and
   const bell = page.getByRole("banner").getByRole("button", { name: /^Notifications, \d+ unread$/ });
   await expect(bell).toBeVisible();
   await bell.click();
-  const approved = page.getByRole("link", { name: new RegExp(`${ref} was approved`) });
+  const approved = page.getByRole("link", { name: new RegExp(`${ref} is planned`) });
   await expect(approved).toBeVisible();
   await expect(approved).toHaveAccessibleName(/Unread/);
   await expect(approved.locator(".sr-only")).toHaveText("Unread");

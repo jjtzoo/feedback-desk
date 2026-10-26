@@ -207,46 +207,72 @@ test("S14.05 Resolve needs a note; with a note it becomes the tracker's last ent
   await expect(history(page).getByRole("listitem").first()).toContainText(`Resolved: ${note}`);
 });
 
-test("S14.06 Close shows its reason on the tracker; Won't fix without a reason is refused", async ({ page, signIn, team }) => {
+test("S14.06 Close asks how it ends and shows the reason on the tracker; Won't fix without a reason is refused", async ({ page, signIn, team }) => {
   await signIn("Mei");
   const reason = "Confirmed working after the weekend release";
   const closing = await inProgress(page, team, "rake-agent", "RAKE Agent citation list");
   const darlene = await team.as("Darlene");
 
-  // A plain close with a reason.
+  // No longer needed, with a reason.
   const panel = await openPanel(darlene, closing);
   await headerButton(panel, "Close").click();
   const dialog = actionDialog(darlene, "Close");
+  await dialog.getByRole("radio", { name: /No longer needed/ }).check();
   await dialog.getByLabel("Reason (shown to staff)").fill(reason);
   await submit(dialog).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
   await expect(dialog).toHaveCount(0);
   await openTracker(page, closing);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Closed");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("No longer needed");
   await expect(page.getByText(`Reason: ${reason}`)).toBeVisible();
 
-  // Another item, closed as Won't fix with the reason left empty.
+  // Another item: submitting without choosing how it ends is refused, then Won't fix with the reason left empty.
   const liam = await team.as("Liam");
   const declining = await approved(liam, team, "it-asset", "IT Asset licence register");
   const second = await openPanel(darlene, declining);
   await headerButton(second, "Close").click();
   const wontFix = actionDialog(darlene, "Close");
-  await wontFix.getByRole("checkbox", { name: /Won't fix/ }).click();
+  await submit(wontFix).click();
+  await expect(wontFix.getByRole("alert")).toHaveText("Choose how it ends.");
+  await wontFix.getByRole("radio", { name: /Won't fix/ }).check();
   await submit(wontFix).click();
   await expect(wontFix.getByRole("alert")).toHaveText("Reason (shown to staff) is needed.");
   await expect(wontFix).toBeVisible();
-  const refused = await darlene.request.post(`/api/console/items/${declining}/close`, { data: { reason: "", wont_fix: true } });
+  const refused = await darlene.request.post(`/api/console/items/${declining}/close`, { data: { reason: "", ending: "wont_fix" } });
   expect(refused.ok()).toBe(false);
   await openTracker(liam, declining);
-  await expect(liam.getByRole("heading", { level: 1 })).toHaveText("Approved, ready to start");
+  await expect(liam.getByRole("heading", { level: 1 })).toHaveText("Planned, not started yet");
 
   // With a reason it goes through, and the tracker shows it.
   await wontFix.getByLabel("Reason (shown to staff)").fill("Duplicate of the register rebuild");
   await submit(wontFix).click();
   await expect(wontFix).toHaveCount(0);
   await openTracker(liam, declining);
-  await expect(liam.getByRole("heading", { level: 1 })).toHaveText("Declined");
-  await expect(liam.getByText("Reason: Won't fix: Duplicate of the register rebuild")).toBeVisible();
+  await expect(liam.getByRole("heading", { level: 1 })).toHaveText("Won't fix");
+  await expect(liam.getByText("Reason: Duplicate of the register rebuild")).toBeVisible();
+});
+
+test("S14.08 On a Resolved item Close becomes 'Close as fixed': one confirm, no reason asked, and the tracker ends on Fixed", async ({ page, signIn, team }) => {
+  await signIn("Tom");
+  const ref = await inProgress(page, team, "rake-agent", "RAKE Agent glossary");
+  const darlene = await team.as("Darlene");
+  await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Glossary entries restored" });
+
+  const panel = await openPanel(darlene, ref);
+  await expect(headerButton(panel, "Close")).toHaveCount(0);
+  await headerButton(panel, "Close as fixed").click();
+  const dialog = actionDialog(darlene, "Close as fixed");
+  await expect(dialog.getByRole("radio")).toHaveCount(0);
+  await expect(dialog.getByRole("textbox")).toHaveCount(0);
+  await submit(dialog).click();
+  await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(panel.locator("header").getByText("Fixed", { exact: true })).toBeVisible();
+
+  await openTracker(page, ref);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fixed");
+  await expect(page.getByText("Reason:")).toHaveCount(0);
+  const last = page.getByRole("region", { name: "Progress" }).getByRole("listitem").filter({ hasText: "Fixed" });
+  await expect(last).toContainText("current stage");
 });
 
 test("S14.07 The dashboard's Avg time to first response changes after the first update on a new item", async ({ page, signIn, team }) => {

@@ -2,6 +2,6 @@
   "S28.01": ["/^Attach a file/", "/^Attach a filex/"],
   "S28.02": ["Sent\\. Your reference", "Sent\\. Yourx reference"],
   "S28.03": ["await expect(decline).toBeFocused();", "await expect(article).toBeFocused();"],
-  "S28.04": ["await expect(wontFix).toBeChecked();", "await expect(wontFix).not.toBeChecked();"],
+  "S28.04": ["await expect(noLongerNeeded).toBeChecked();", "await expect(noLongerNeeded).not.toBeChecked();"],
   "S28.05": ["\"Awaiting approval\"]", "\"Awaiting approvalx\"]"]
 }

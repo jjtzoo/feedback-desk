@@ -78,7 +78,7 @@ test.describe("8. Staff: tracker", () => {
 
     // The charcoal band holds the heading, the reference chip and the tool and category line.
     const band = page.getByRole("heading", { level: 1 }).locator("..");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Received, waiting for approval");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Under review");
     await expect(band).toContainText(ref);
     await expect(band).toContainText("RAKE Agent · Bug");
     await expect(band).not.toContainText("Expected by");
@@ -88,7 +88,7 @@ test.describe("8. Staff: tracker", () => {
     await expect(band).toContainText(/Expected by .*23/);
   });
 
-  test("S08.02 the stepper shows Received, Approved, In progress, Resolved and Closed, with done, current and future stages marked", async ({
+  test("S08.02 the stepper shows Received, Planned, In progress, Resolved and Closed, with done, current and future stages marked", async ({
     page,
     signIn,
     team,
@@ -100,7 +100,7 @@ test.describe("8. Staff: tracker", () => {
 
     const stages = page.getByRole("region", { name: "Progress" }).getByRole("listitem");
     await expect(stages).toHaveCount(5);
-    const names = ["Received", "Approved", "In progress", "Resolved", "Closed"];
+    const names = ["Received", "Planned", "In progress", "Resolved", "Closed"];
     for (const [i, name] of names.entries()) await expect(stages.nth(i)).toContainText(name);
 
     // Done stages are filled with a tick, the current one is ringed, future ones are outlined.
@@ -148,7 +148,7 @@ test.describe("8. Staff: tracker", () => {
     const ref = await raise(page, "The export button is broken and it's annoying", ["Not sure", "I expected it to export but got an error"]);
     await openTracker(page, ref);
 
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Received, being checked");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Under review");
     await expect(page.getByRole("region", { name: "Who has it" })).toContainText("The Digital team is checking who it belongs to.");
   });
 
@@ -210,7 +210,7 @@ test.describe("8. Staff: tracker", () => {
       at("Expected by"),
       at("Darlene started work"),
       at("Darlene opened your feedback"),
-      at("Approved by Marc"),
+      at("Planned (Marc accepted it)"),
     ];
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(order[0]).toBeGreaterThan(1);
@@ -305,7 +305,7 @@ test.describe("8. Staff: tracker", () => {
     expect(stored.headers()["content-type"]).toContain("application/pdf");
   });
 
-  test("S08.10 a declined, a won't-fix and a merged item explain themselves", async ({ page, signIn, team }) => {
+  test("S08.10 a declined, a won't-fix and a duplicate item explain themselves", async ({ page, signIn, team }) => {
     test.setTimeout(90_000);
     await signIn("Liam");
     const marc = await team.as("Marc");
@@ -317,19 +317,21 @@ test.describe("8. Staff: tracker", () => {
     await expect(page.getByText("Reason: Out of scope for this quarter")).toBeVisible();
 
     const wontFix = await approvedBug(page, team, "RAKE Agent crashes when I print in colour");
-    await postJson(darlene, `/console/items/${wontFix}/close`, { reason: "Working as designed", wont_fix: true });
+    await postJson(darlene, `/console/items/${wontFix}/close`, { reason: "Working as designed", ending: "wont_fix" });
     await openTracker(page, wontFix);
-    await expect(page.getByText("Reason: Won't fix: Working as designed")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Won't fix");
+    await expect(page.getByText("Reason: Working as designed")).toBeVisible();
 
     const original = await approvedBug(page, team, "RAKE Agent crashes when I save the original");
     const copy = await approvedBug(page, team, "RAKE Agent crashes when I save the copy");
     await postJson(marc, `/console/items/${copy}/merge`, { into: original });
     await openTracker(page, copy);
-    await expect(page.getByText(`Merged into ${original}. Follow that one for updates.`)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText(`Duplicate of ${original}`);
+    await expect(page.getByText(`Same request as ${original}. Follow that one for updates.`)).toBeVisible();
     await expect(page.getByText("Reason:")).toHaveCount(0);
     await page.getByRole("link", { name: original, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/track/${original}$`));
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Approved, ready to start");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Planned, not started yet");
   });
 
   test("S08.11 an unknown reference shows We can't find that feedback with a link to My feedback", async ({ page, signIn }) => {

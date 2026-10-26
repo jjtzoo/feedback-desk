@@ -151,7 +151,7 @@ test("S04.09 'Track it' opens that reference's tracker; coming back, 'Give more 
   await page.getByRole("link", { name: /Track it/ }).click();
   await expect(page).toHaveURL(new RegExp(`/track/${ref}$`));
   await expect(page.getByText(ref, { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Received, waiting for approval");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Under review");
 
   // Back to the chat: the sent screen may or may not still be there; either way the next step is a fresh chat.
   await page.goBack();
@@ -164,7 +164,7 @@ test("S04.09 'Track it' opens that reference's tracker; coming back, 'Give more 
   await expect(page.getByLabel("Your message")).toHaveValue("");
 });
 
-test("S04.10 Praise is confirmed without approval and its tracker shows Closed with Acknowledged", async ({ page, signIn }) => {
+test("S04.10 Praise is confirmed without approval and its tracker ends on Acknowledged", async ({ page, signIn }) => {
   await signIn("Mei");
   await openChat(page);
   await chatSay(page, "Thanks for the Training Portal update, works great");
@@ -176,8 +176,8 @@ test("S04.10 Praise is confirmed without approval and its tracker shows Closed w
   await page.getByRole("link", { name: /Track it/ }).click();
   await expect(page).toHaveURL(new RegExp(`/track/${ref}$`));
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Acknowledged, thank you");
-  const closed = page.getByRole("region", { name: "Progress" }).getByRole("listitem").filter({ hasText: "Closed" });
-  await expect(closed).toContainText("current stage");
+  const acknowledged = page.getByRole("region", { name: "Progress" }).getByRole("listitem").filter({ hasText: "Acknowledged" });
+  await expect(acknowledged).toContainText("current stage");
 });
 
 test("S04.11 The access-request phrase goes to Chris (routing rule), not Mario", async ({ page, signIn }) => {

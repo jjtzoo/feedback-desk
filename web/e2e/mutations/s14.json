@@ -4,6 +4,7 @@
   "S14.02": ["toContainText(update)", "toContainText(update + \"x\")"],
   "S14.03": ["Expected by date.\")", "Expected by date.x\")"],
   "S14.04": ["\"1 overdue\"", "\"2 overdue\""],
-  "S14.06": ["Reason: Won't fix: Duplicate", "Reason: Won't fix: Duplicatex"],
+  "S14.06": ["Reason: Duplicate of the register rebuild", "Reason: Duplicate of the register rebuildx"],
+  "S14.08": ["toHaveText(\"Fixed\")", "toHaveText(\"Fixedx\")"],
   "S14.07": ["? h$/", "? hx$/"]
 }
