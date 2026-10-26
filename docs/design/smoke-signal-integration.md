@@ -39,7 +39,7 @@ The 3D art is a vector stand-in. Once D37 is approved, commission a proper rende
 2. **Colours come from tokens.** Components never contain hex values (globals.css says so). The snippets below use `currentColor` and Tailwind theme classes (`fill-primary`, `fill-band`, `fill-muted-foreground`, `fill-primary-foreground`).
 3. **Always say it's AI.** Wherever Sig speaks, its name has an `AI` tag beside it, and the staff footer says chats are processed by Google's Gemini model.
 4. **Puff is the logo; Sig is never the logo.** The favicon, `BrandMark` and the tile all use Puff.
-5. **Motion.** The Ready state gets a slow idle swell: 5 s, scale 1 to 1.04. Nothing loops while Sig is writing. With reduced motion on, there is no swell.
+5. **Motion.** Sig moves only in the chat, and only in answer to something the person does (`docs/research/sig-motion-interactions.md`, part 3). When Sig turns Ready it swells once (one 5 s cycle, scale 1 to 1.04) and then rests: nothing loops (WCAG 2.2.2). The pilot reactions (`reaction` on `SigAvatar`, set from `chat-panel.tsx`: pop, look-down, nod, wow, tilt, lean, hop-puff, double-hop, glitch, slump, wink) are CSS keyframes that play once, 1.2 s at most, never hold up the next step and never flash. Sending is Sig sending up a Puff, never a hose gag. No Sig motion in the console, toasts or notifications. With reduced motion on, there is no swell and a reaction is a face swap only; the Puff fades without rising.
 6. **Status is never shown by the face alone.** Every state also has words, such as "Sig is writing…" or "Sig isn't available right now".
 7. **Words.** Sig puts out *problems*, never people's comments. Don't write copy that "puts out", "extinguishes" or "hoses down" feedback. Praise gets passed on to the team.
 8. **Accessibility.** The avatar is decorative (`aria-hidden`) wherever the name "Sig" is in the text beside it. 3D illustrations use `alt=""` unless they carry meaning. Sig's face must read at 32 px on `bg-muted` in both themes.
@@ -61,14 +61,14 @@ Add after the `lift` utility:
   }
 }
 
-/* Sig's idle swell (D37): the only new looping motion. It stops under reduced motion. */
+/* Sig's idle swell (D37): one 5 s cycle each time Sig turns Ready, then rest. Nothing loops (WCAG 2.2.2). */
 @utility animate-breathe {
-  animation: breathe 5s ease-in-out infinite;
+  animation: breathe 5s ease-in-out;
   transform-origin: 50% 90%;
 }
 ```
 
-Then add `.animate-breathe` to the "Loops stop" rule inside `@media (prefers-reduced-motion: reduce)`, next to `.animate-spin` and `.animate-pulse`.
+Then add `.animate-breathe` to the "Loops stop" rule (so there is no swell at all) inside `@media (prefers-reduced-motion: reduce)`, next to `.animate-spin` and `.animate-pulse`.
 
 ### 2. `web/src/components/chat/sig-avatar.tsx` (new), replacing `assistant-avatar.tsx`
 
@@ -264,7 +264,7 @@ Then search for any test that asserts the old strings and update it, for example
 - [ ] `BrandMark` shows Puff in the staff header, console header and sign-in page; the wordmark reads Smoke Signal.
 - [ ] The favicon and apple-touch icon are the Puff icon.
 - [ ] The chat header shows `SigAvatar` in the right state (ready, writing, sent, offline), with the name "Sig" and an AI tag.
-- [ ] The only new looping animation is the Ready swell, and it stops under reduced motion.
+- [ ] Nothing loops: the Ready swell plays one 5 s cycle, and there is none under reduced motion.
 - [ ] The 3D Sig appears only at 96 px tall or larger.
 - [ ] No hex values in components; no "Feedback assistant" strings left; `assistant-avatar.tsx` is gone and has no leftover imports.
 - [ ] Lint, typecheck, build, backend tests and the routing gate all pass.
