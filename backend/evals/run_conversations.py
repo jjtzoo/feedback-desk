@@ -8,6 +8,7 @@ model cost from the usage ledger.
 
     uv run python -m evals.run_conversations            # every case
     uv run python -m evals.run_conversations --only existing
+    uv run python -m evals.run_conversations --set pressure    # hostile and malformed input
 """
 
 import argparse
@@ -109,6 +110,7 @@ async def run(cases: list[dict[str, Any]]) -> list[Result]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", help="run only cases whose name starts with this")
+    parser.add_argument("--set", default="conversation", help="case file in evals/: conversation (default) or pressure")
     args = parser.parse_args()
 
     from scripts.local_db import start
@@ -129,7 +131,8 @@ def main() -> None:
     command.upgrade(Config(str(Path(__file__).resolve().parent.parent / "alembic.ini")), "head")
     asyncio.run(seed())
 
-    cases = list(yaml.safe_load(SET.read_text(encoding="utf-8"))["cases"])
+    case_file = SET.with_name(f"{args.set}_set.yaml")
+    cases = list(yaml.safe_load(case_file.read_text(encoding="utf-8"))["cases"])
     if args.only:
         cases = [c for c in cases if c["name"].startswith(args.only)]
     choice = model_choice()
