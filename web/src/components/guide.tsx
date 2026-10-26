@@ -44,7 +44,7 @@ const STEPS: Record<Area, Step[]> = {
       action: "Click the bell",
       target: "bell",
     },
-    { title: "What's new", body: "The changes the team releases each Friday.", action: "Click What's new", target: "nav-whats-new" },
+    { title: "Fixes and updates", body: "The fixes and changes the team releases each Friday.", action: "Click Fixes and updates", target: "nav-whats-new" },
     {
       title: "Your account",
       body: "Your initials, top right, open your account menu: who you're signed in as, and Sign out.",
@@ -82,7 +82,7 @@ const STEPS: Record<Area, Step[]> = {
     },
     {
       title: "Releases",
-      body: "Each Friday a release is drafted per project. The owner ticks, edits and publishes it to What's new. Nothing publishes on its own.",
+      body: "Each Friday a release is drafted per project. The owner ticks, edits and publishes it to Fixes and updates. Nothing publishes on its own.",
       action: "Click Releases",
       target: "console-releases",
     },

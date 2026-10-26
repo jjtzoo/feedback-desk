@@ -1,7 +1,7 @@
-import { CheckCircle2, CircleDot, Clock3, Hammer, Minus, OctagonAlert, ThumbsUp, TriangleAlert, XCircle } from "lucide-react";
+import { CheckCircle2, CircleDot, Clock3, Copy, Hammer, Minus, OctagonAlert, ThumbsUp, TriangleAlert, XCircle } from "lucide-react";
 
-import type { Priority, Stage, Status, WorkType } from "@/lib/api";
-import { PRIORITY_LABEL, PRIORITY_WORD, STAGE_LABEL, STATUS_LABEL, WORK_TYPE_LABEL } from "@/lib/format";
+import type { Ending, Priority, Stage, Status, WorkType } from "@/lib/api";
+import { ENDING_LABEL, PRIORITY_LABEL, PRIORITY_WORD, STAGE_LABEL, STATUS_LABEL, WORK_TYPE_LABEL } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 // Every badge pairs a word with an icon, so status never relies on colour (fire-services-ui).
@@ -51,12 +51,29 @@ const STATUS_ICON: Record<Status, typeof Clock3> = {
   closed: CheckCircle2,
 };
 
-export function StatusBadge({ status, className }: { status: Status; className?: string }) {
-  const Icon = STATUS_ICON[status];
+// An ended item shows how it ended instead of "Closed" or "Declined" (D44).
+const ENDING_TONE: Record<Ending, string> = {
+  fixed: "bg-success-tint text-success",
+  wont_fix: "bg-brand-tint text-brand-text",
+  duplicate: "bg-secondary text-muted-foreground",
+  declined: "bg-brand-tint text-brand-text",
+  no_longer_needed: "bg-secondary text-muted-foreground",
+};
+
+const ENDING_ICON: Record<Ending, typeof Clock3> = {
+  fixed: CheckCircle2,
+  wont_fix: XCircle,
+  duplicate: Copy,
+  declined: XCircle,
+  no_longer_needed: Minus,
+};
+
+export function StatusBadge({ status, ending = null, className }: { status: Status; ending?: Ending | null; className?: string }) {
+  const Icon = ending ? ENDING_ICON[ending] : STATUS_ICON[status];
   return (
-    <span className={cn(base, STATUS_TONE[status], className)}>
+    <span className={cn(base, ending ? ENDING_TONE[ending] : STATUS_TONE[status], className)}>
       <Icon className="size-3.5" aria-hidden="true" />
-      {STATUS_LABEL[status]}
+      {ending ? ENDING_LABEL[ending] : STATUS_LABEL[status]}
     </span>
   );
 }

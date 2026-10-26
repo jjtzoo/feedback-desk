@@ -1,4 +1,4 @@
-"""Staff side: projects, My feedback, the tracker, follow-ups, files, What's new (brief §4.1, §4.2, §4.8)."""
+"""Staff side: projects, My feedback, the tracker, follow-ups, files, Fixes and updates (brief §4.1, §4.2, §4.8)."""
 
 import uuid
 from datetime import UTC, datetime
@@ -52,7 +52,8 @@ async def my_feedback(db: Db, user: CurrentUser) -> list[MyItemOut]:
             project=f.project.name if f.project else None,
             stage=STAGE_OF[f.status],
             status=f.status,
-            status_text=feedback_service.STATUS_TEXT[f.status],
+            ending=f.ending,
+            status_text=feedback_service.status_text(f),
             updated_at=f.updated_at,
             created_at=f.created_at,
             following=f.submitter_email != user.email,
@@ -74,6 +75,7 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         work_type=labels["work_type"],
         priority=fb.priority,
         status=fb.status,
+        ending=fb.ending,
         status_text=v.status_text,
         stage=v.stage,
         stages=v.stages,
@@ -81,7 +83,7 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         assignee=v.assignee,
         latest_update=v.latest_update,
         history=[TimelineOut(at=h.at, text=h.text, detail=h.detail) for h in v.history],
-        close_reason=fb.close_reason,
+        close_reason=feedback_service.shown_reason(fb),
         merged_into=v.merged_into,
         attachments=[AttachmentOut.model_validate(a) for a in v.attachments],
         can_reply=v.can_reply,

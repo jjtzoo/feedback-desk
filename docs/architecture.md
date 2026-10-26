@@ -7,7 +7,7 @@ How the system fits together, per the company handover manual §17. Decisions (D
 
 | Component | Where | What it does |
 | --- | --- | --- |
-| Web app | `web/` (Next.js App Router, React, TypeScript, Tailwind, shadcn/ui) | Staff area: a help-centre style landing page at `/` (one Give feedback action, four starting points, tool picker, recent feedback), the chat at `/chat` (`?project=` preselects a tool, `?start=` pre-fills a starter), My feedback, tracker, What's new and the console at `/console` (work as board, list or cards with inbox counts from `GET /console/counts`, approvals, channels, releases, dashboard, admin; the item opens in a side panel with its properties, one activity feed and previous/next). It forwards `/api/*` to the API; it never touches the database or the model. |
+| Web app | `web/` (Next.js App Router, React, TypeScript, Tailwind, shadcn/ui) | Staff area: a help-centre style landing page at `/` (one Give feedback action, four starting points, tool picker, recent feedback), the chat at `/chat` (`?project=` preselects a tool, `?start=` pre-fills a starter), My feedback, tracker, Fixes and updates and the console at `/console` (work as board, list or cards with inbox counts from `GET /console/counts`, approvals, channels, releases, dashboard, admin; the item opens in a side panel with its properties, one activity feed and previous/next). It forwards `/api/*` to the API; it never touches the database or the model. |
 | API | `backend/app/` (FastAPI) | Sign-in, every business rule (`app/services/`), the router that assigns owners, approvals, notifications, files, channels, releases, reports. Roles checked on every call. |
 | Agent | `backend/agent/` (Google ADK) | One LlmAgent: talks to staff, classifies, writes the developer brief, calls `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`. Runs in the API process locally; on Vertex AI Agent Engine in production (D7). |
 | Worker | `backend/app/worker.py` | Sends the email for each notification (3 tries), runs the daily digest and the Friday release drafter. A loop locally; a Cloud Run job started every minute by Cloud Scheduler in the cloud (D33). |
@@ -39,7 +39,7 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 | Table | Purpose |
 | --- | --- |
 | `projects`, `digital_staff`, `routing_rules` | The catalogue, people who can be assigned, admin overrides |
-| `feedback` | One row per item: classification, status (nine values), assignee, developer brief, context, dates |
+| `feedback` | One row per item: classification, status (nine values), ending (how a closed or declined item ended, D44), assignee, developer brief, context, dates |
 | `feedback_messages` | Chat transcript, replies, internal notes, progress updates, follow-ups |
 | `feedback_events` | Append-only audit and routing training signal; `is_public` drives the tracker |
 | `feedback_followers` | Staff who added "+1 and comment" (one row per person, never the submitter). The console's reporter tally is 1 + these rows; at `PRIORITY_REVIEW_REPORTERS` (3) it suggests a priority review, never applies one (D38, proposed) |
@@ -114,4 +114,4 @@ Every chat turn and embedding call writes an `app.model_usage` row (tokens, esti
 
 1. **Submitting:** chat message (PII masked) → agent classifies and fills the draft → confirm card → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications.
 2. **Approving and working:** Admin approves or declines → owner starts work, posts updates and an Expected by date, resolves with a public note → every public change is an event the tracker shows, and a notification in the app and by email.
-3. **Friday release:** drafter collects the week's resolved items, public progress and channel notes → owner ticks and edits → publishes → What's new, contributors notified.
+3. **Friday release:** drafter collects the week's resolved items, public progress and channel notes → owner ticks and edits → publishes → Fixes and updates, contributors notified.

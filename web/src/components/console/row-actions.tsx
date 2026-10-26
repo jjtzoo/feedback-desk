@@ -16,11 +16,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Card, Staff } from "@/lib/api";
 
-const MOVES: { column: string; label: string; admin?: boolean }[] = [
+const MOVES: { column: string; label: string; admin?: boolean; resolvedOnly?: boolean }[] = [
   { column: "approved", label: "Approved", admin: true },
   { column: "in_progress", label: "In progress" },
   { column: "resolved", label: "Resolved" },
-  { column: "closed", label: "Closed" },
+  { column: "fixed", label: "Fixed", resolvedOnly: true },
 ];
 
 /**
@@ -76,7 +76,7 @@ export function RowActions({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>Move to</DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                {MOVES.filter((m) => !m.admin || me.role === "admin").map((m) => (
+                {MOVES.filter((m) => (!m.admin || me.role === "admin") && (!m.resolvedOnly || card.status === "resolved")).map((m) => (
                   <DropdownMenuItem key={m.column} onSelect={() => onMove(m.column)}>
                     {m.label}
                   </DropdownMenuItem>

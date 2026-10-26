@@ -1,8 +1,9 @@
 {
-  "ran": "2026-10-22T02:42:41.438Z",
+  "ran": "2026-10-26T01:21:39.012Z",
+  "commit": "465d538",
+  "uncommitted": false,
   "spec": "20-releases.spec.ts",
-  "fingerprint": "335f5646868c3dfb",
-  "fingerprintAdded": "2026-10-22, from the spec file, unchanged since the check",
+  "fingerprint": "9d7e9e39e8359598",
   "caught": {
     "S20.01": true,
     "S20.02": true,

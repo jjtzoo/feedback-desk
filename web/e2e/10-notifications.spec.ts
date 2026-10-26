@@ -22,7 +22,7 @@ test("S10.01 A bell in the staff header and the console header, with an unread c
   const ref = await raiseBug(page, "rake-agent", "RAKE Agent crashes when I upload a large file");
   await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
 
-  // Staff header: Liam was told it was approved.
+  // Staff header: Liam was told it is planned.
   await page.goto("/my");
   await expect(page.getByRole("banner").getByRole("button", { name: /^Notifications, \d+ unread$/ })).toBeVisible();
 
@@ -79,7 +79,7 @@ test("S10.03 Clicking a notification opens the tracker and the item turns read",
   await page.goto("/my");
   await expect(bell(page)).toHaveAccessibleName("Notifications, 1 unread");
   await openBell(page);
-  const approved = row(page, new RegExp(`${ref} was approved`));
+  const approved = row(page, new RegExp(`${ref} is planned`));
   await expect(approved).toHaveAccessibleName(/Unread/);
   await approved.click();
 
@@ -90,7 +90,7 @@ test("S10.03 Clicking a notification opens the tracker and the item turns read",
 });
 
 test("S10.04 Clicking an 'assigned to you' notification opens the console with that item's panel", async ({ page, signIn, team }) => {
-  const title = "RAKE Agent shows the wrong date on my report";
+  const title = "RAKE Agent shows the wrong date on the summary";
   await signIn("Liam");
   const ref = await raiseBug(page, "rake-agent", title);
 
@@ -136,7 +136,7 @@ test("S10.06 Approve, start, update, reply, resolve and close each notify the pe
   await page.goto("/my");
   await expect(bell(page)).toHaveAccessibleName("Notifications, 6 unread");
   await openBell(page);
-  const titles = [`${ref} was approved`, `${ref} is being worked on`, `Update on ${ref}`, `replied on ${ref}`, `${ref} is resolved`, `${ref} is closed`];
+  const titles = [`${ref} is planned`, `${ref} is being worked on`, `Update on ${ref}`, `replied on ${ref}`, `${ref} is resolved`, `${ref} is fixed`];
   for (const title of titles) await expect(row(page, new RegExp(title)), title).toBeVisible();
 });
 
@@ -160,7 +160,7 @@ test("S10.07 A new item notifies the owner on assignment and again when the subm
 
 test("S10.08 Mute stops notifications for the item and Unmute brings them back", async ({ page, signIn, team }) => {
   await signIn("Liam");
-  const ref = await raiseBug(page, "rake-agent", "RAKE Agent shows the wrong date on my report");
+  const ref = await raiseBug(page, "rake-agent", "RAKE Agent shows the wrong date on the summary");
   await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
   await clearBell(page);
   const darlene = await team.as("Darlene");
@@ -174,7 +174,7 @@ test("S10.08 Mute stops notifications for the item and Unmute brings them back",
   await postJson(darlene, `/console/items/${ref}/update`, { body: "First update while muted" });
   await page.reload();
   await openBell(page);
-  await expect(row(page, new RegExp(`${ref} was approved`))).toBeVisible();
+  await expect(row(page, new RegExp(`${ref} is planned`))).toBeVisible();
   await expect(row(page, new RegExp(`Update on ${ref}`))).toHaveCount(0);
   await expect(bell(page)).toHaveAccessibleName("Notifications");
 

@@ -99,7 +99,7 @@ test("S18.01 Approvals lists waiting items P1 first with a red outline, each wit
   for (const name of ["Approve", "Decline", "Ask for info"]) await expect(card.getByRole("button", { name, exact: true })).toBeVisible();
 });
 
-test("S18.02 Approve takes it off the list into Darlene's Approved column; the tracker shows Approved by Chris and Darlene is told", async ({
+test("S18.02 Approve takes it off the list into Darlene's Approved column; the tracker shows Planned (Chris accepted it) and Darlene is told", async ({
   page,
   signIn,
   team,
@@ -120,12 +120,12 @@ test("S18.02 Approve takes it off the list into Darlene's Approved column; the t
 
   // The tracker has reached Approved: the heading, the stage and the history entry say so.
   await liam.goto(`/track/${ref}`);
-  await expect(liam.getByRole("heading", { level: 1 })).toHaveText("Approved, ready to start");
+  await expect(liam.getByRole("heading", { level: 1 })).toHaveText("Planned, not started yet");
   const stages = liam.getByRole("region", { name: "Progress" }).getByRole("listitem");
   await expect(stages.nth(0)).toContainText(", done");
-  await expect(stages.nth(1)).toContainText("Approved");
+  await expect(stages.nth(1)).toContainText("Planned");
   await expect(stages.nth(1)).toContainText(", current stage");
-  await expect(liam.getByRole("region", { name: "Tracking history" }).getByRole("listitem").filter({ hasText: "Approved by Chris" })).toBeVisible();
+  await expect(liam.getByRole("region", { name: "Tracking history" }).getByRole("listitem").filter({ hasText: "Planned (Chris accepted it)" })).toBeVisible();
 
   await darlene.goto("/console");
   await bell(darlene).click();
@@ -285,7 +285,7 @@ test("S18.09 The History tab of an approved and a declined item shows who, when 
 
   await signIn("Chris");
   for (const [ref, text] of [
-    [approved, "Approved by Chris"],
+    [approved, "Planned (Chris accepted it)"],
     [declined, `Declined: ${reason}`],
   ]) {
     await page.goto(`/console?inbox=open&item=${ref}`);

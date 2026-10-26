@@ -20,11 +20,12 @@ from app.services.drafts import CATEGORY_LABEL, GENERAL, WORK_TYPE_LABEL, Draft,
 from app.services.privacy import is_abusive_about, mask
 from app.services.router import Routing, route
 
+# Staff-side words (D43): stage 2 is "Planned" for staff; the console and Admins keep "Approved".
 STATUS_TEXT = {
     "new": "Received",
-    "needs_review": "Received, being checked",
-    "awaiting_approval": "Received, waiting for approval",
-    "approved": "Approved, ready to start",
+    "needs_review": "Under review",
+    "awaiting_approval": "Under review",
+    "approved": "Planned, not started yet",
     "in_progress": "Being worked on",
     "resolved": "Resolved",
     "acknowledged": "Acknowledged, thank you",
@@ -33,11 +34,36 @@ STATUS_TEXT = {
 }
 STAGE_LABEL = {
     "received": "Received",
-    "approved": "Approved",
+    "approved": "Planned",
     "in_progress": "In progress",
     "resolved": "Resolved",
     "closed": "Closed",
 }
+# How an item ended (D44); the tracker's last step and the status line show it.
+ENDING_TEXT = {
+    "fixed": "Fixed",
+    "wont_fix": "Won't fix",
+    "duplicate": "Duplicate",
+    "declined": "Declined",
+    "no_longer_needed": "No longer needed",
+}
+# Endings that carry a reason staff see; Fixed needs none and a duplicate links to the original.
+ENDINGS_WITH_REASON = ("wont_fix", "declined", "no_longer_needed")
+
+
+def status_text(fb: Feedback, merged_into: str | None = None) -> str:
+    """What staff see as the item's state: the ending's name once it has ended."""
+    if fb.ending == "duplicate" and merged_into:
+        return f"Duplicate of {merged_into}"
+    if fb.ending:
+        return ENDING_TEXT[fb.ending]
+    return STATUS_TEXT[fb.status]
+
+
+def shown_reason(fb: Feedback) -> str | None:
+    return fb.close_reason if fb.ending in ENDINGS_WITH_REASON else None
+
+
 TARGET_FROM_GROUP = {"platforms": "platform", "agents": "agent", "other": "intranet"}
 
 
@@ -317,6 +343,13 @@ class TrackerView:
     muted: bool
 
 
+def _public_text(e: FeedbackEvent) -> str:
+    # Approvals logged before D43 read "Approved by Chris"; staff see "Planned (Chris accepted it)".
+    if e.event_type == "status" and e.after.get("status") == "approved" and e.actor_name:
+        return f"Planned ({e.actor_name} accepted it)"
+    return e.public_text or ""
+
+
 async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
     fb = await load(db, ref_no=ref_no)
     if not await can_view(db, user, fb):
@@ -355,10 +388,13 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         if to and to not in reached:
             reached[to] = ev.created_at
     current_index = STAGES.index(stage)
+    last_label = (
+        status_text(fb) if fb.ending else "Acknowledged" if fb.status == "acknowledged" else STAGE_LABEL["closed"]
+    )
     stages = [
         {
             "key": s,
-            "label": STAGE_LABEL[s],
+            "label": last_label if s == "closed" else STAGE_LABEL[s],
             "state": "done" if i < current_index else "current" if i == current_index else "todo",
             "at": reached.get(s).isoformat() if reached.get(s) and i <= current_index else None,  # type: ignore[union-attr]
         }
@@ -376,7 +412,7 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
             history.append(TimelineEntry(m.created_at, "You added details", m.body))
         else:
             history.append(TimelineEntry(m.created_at, "Another staff member added details"))
-    history += [TimelineEntry(e.created_at, e.public_text or "") for e in public_events]
+    history += [TimelineEntry(e.created_at, _public_text(e)) for e in public_events]
     history.sort(key=lambda h: h.at, reverse=True)
 
     latest = next((m for m in reversed(messages) if m.message_type in ("progress", "reply")), None)
@@ -396,12 +432,9 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
     files = list(
         await db.scalars(select(Attachment).where(Attachment.feedback_id == fb.id).order_by(Attachment.created_at))
     )
-    text = STATUS_TEXT[fb.status]
-    if fb.status == "declined" and merged:
-        text = f"Merged into {merged}"
     return TrackerView(
         feedback=fb,
-        status_text=text,
+        status_text=status_text(fb, merged),
         stage=stage,
         stages=stages,
         assignee=assignee,
@@ -473,5 +506,5 @@ def label(fb: Feedback) -> dict[str, str]:
         "work_type": WORK_TYPE_LABEL.get(fb.work_type or "", ""),
         "category": CATEGORY_LABEL.get(fb.category or "", ""),
         "stage": STAGE_LABEL[STAGE_OF[fb.status]],
-        "status": STATUS_TEXT[fb.status],
+        "status": status_text(fb),
     }

@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/chat", label: "Give feedback", tour: "nav-chat" },
   { href: "/my", label: "My feedback", tour: "nav-my" },
-  { href: "/whats-new", label: "What's new", tour: "nav-whats-new" },
+  { href: "/whats-new", label: "Fixes and updates", tour: "nav-whats-new" },
 ];
 
 /** The tracker belongs to My feedback, so that item stays highlighted there. */

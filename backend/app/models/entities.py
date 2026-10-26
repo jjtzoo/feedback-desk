@@ -33,6 +33,8 @@ from app.models.enums import (
     CHANNELS,
     CONSOLE_VIEWS,
     EFFORTS,
+    ENDED_STATUSES,
+    ENDINGS,
     IMPACTS,
     MESSAGE_TYPES,
     PRIORITIES,
@@ -152,6 +154,8 @@ class Feedback(Base):
         CheckConstraint("effort IS NULL OR " + check_in("effort", EFFORTS), name="effort"),
         CheckConstraint("sentiment IS NULL OR " + check_in("sentiment", SENTIMENTS), name="sentiment"),
         CheckConstraint(check_in("channel", CHANNELS), name="channel"),
+        CheckConstraint("ending IS NULL OR " + check_in("ending", ENDINGS), name="ending"),
+        CheckConstraint("(ending IS NOT NULL) = (" + check_in("status", ENDED_STATUSES) + ")", name="ended"),
         Index(None, "status", "created_at"),
         Index(None, "assignee_id", "status"),
         Index(None, "project_id", "status"),
@@ -188,6 +192,7 @@ class Feedback(Base):
     channel: Mapped[str] = mapped_column(String(10), default="chat")
     flagged: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     expected_by: Mapped[date | None] = mapped_column(Date)
+    ending: Mapped[str | None] = mapped_column(String(20))
     close_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = _now()
     updated_at: Mapped[datetime] = _now()

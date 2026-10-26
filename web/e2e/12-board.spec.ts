@@ -40,7 +40,7 @@ const TEXT = {
   overdue2: "The RAKE Agent sync is stuck with an error", // Grace: P2, Approved, overdue
   progress: "The RAKE Agent answer history is confusing to read", // Grace: improvement, In progress, overdue
   resolved: "Please add a dark mode to the RAKE Agent", // Rafael: new feature, Resolved
-  closed: "The RAKE Agent report download is broken and shows a blank page", // Mei: Closed
+  closed: "The RAKE Agent report download is broken and shows a blank page", // Mei: Fixed
   awaiting: "The RAKE Agent upload button is broken", // Tom: Awaiting approval, Darlene's
   flagged: "Darlene is useless, the RAKE agent keeps crashing", // Rafael: flagged, Needs review, nobody's
   review: "The export button is broken and it's annoying", // Mei: no tool, Needs review
@@ -81,7 +81,9 @@ async function buildWorld(team: Team): Promise<World> {
   }
   await postJson(darlene, `/console/items/${refs.progress}/start`);
   await postJson(darlene, `/console/items/${refs.resolved}/resolve`, { body: "Dark mode is on the list for the next release" });
-  await postJson(darlene, `/console/items/${refs.closed}/close`, { reason: "Not needed any more" });
+  await postJson(darlene, `/console/items/${refs.closed}/start`);
+  await postJson(darlene, `/console/items/${refs.closed}/resolve`, { body: "The download works again" });
+  await postJson(darlene, `/console/items/${refs.closed}/close`, { ending: "fixed" });
   for (const [key, expected_by] of [["p1", PAST], ["overdue2", PAST_TOO], ["progress", PAST], ["due", FAR_AHEAD]] as const) {
     await postJson(darlene, `/console/items/${refs[key]}/update`, { body: "Chasing this up", expected_by });
   }
@@ -177,10 +179,10 @@ test("S12.01 As Darlene, /console opens the Work page on 'Assigned to me' in Boa
   await expect(page.getByRole("columnheader")).toHaveCount(0);
 });
 
-test("S12.02 Darlene's board has Approved, In progress, Resolved and Closed; Marc's also has Needs review and Awaiting approval", async ({ page, signIn, team }) => {
+test("S12.02 Darlene's board has Approved, In progress, Resolved and Fixed; Marc's also has Needs review and Awaiting approval", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   await openWork(page, "Board");
-  await expect(page.locator(`${COLUMN} h2`)).toHaveText([/^Approved \d+$/, /^In progress \d+$/, /^Resolved \d+$/, /^Closed \d+$/]);
+  await expect(page.locator(`${COLUMN} h2`)).toHaveText([/^Approved \d+$/, /^In progress \d+$/, /^Resolved \d+$/, /^Fixed \d+$/]);
 
   const marc = await team.as("Marc");
   await openWork(marc, "Board");
@@ -190,7 +192,7 @@ test("S12.02 Darlene's board has Approved, In progress, Resolved and Closed; Mar
     /^Approved \d+$/,
     /^In progress \d+$/,
     /^Resolved \d+$/,
-    /^Closed \d+$/,
+    /^Fixed \d+$/,
   ]);
 });
 
@@ -198,7 +200,7 @@ test("S12.03 A column header shows the item count, and 'N overdue' when a card i
   await signIn("Darlene");
   await openWork(page, "Board");
 
-  // Approved holds four of Darlene's items, two of them overdue; In progress one, overdue; Resolved and Closed one each, none overdue.
+  // Approved holds four of Darlene's items, two of them overdue; In progress one, overdue; Resolved and Fixed one each, none overdue.
   const approved = column(page, "Approved");
   await expect(approved.getByRole("heading", { level: 2 })).toHaveText("Approved 4");
   await expect(approved.locator(CARD)).toHaveCount(4);
@@ -208,7 +210,7 @@ test("S12.03 A column header shows the item count, and 'N overdue' when a card i
   await expect(inProgress.getByRole("heading", { level: 2 })).toHaveText("In progress 1");
   await expect(inProgress.getByText("1 overdue")).toBeVisible();
 
-  for (const title of ["Resolved", "Closed"]) {
+  for (const title of ["Resolved", "Fixed"]) {
     const done = column(page, title);
     await expect(done.getByRole("heading", { level: 2 })).toHaveText(`${title} 1`);
     await expect(done.getByText(/\d+ overdue/)).toHaveCount(0);
@@ -267,7 +269,7 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
 });
 
 // Moving cards. Each test raises its own items, so the world above (and the counts S12.03 checks) is left alone.
-// Marc's six columns, and Darlene's Closed column, run past the right edge of a 1280 px window, so these
+// Marc's six columns, and Darlene's Fixed column, run past the right edge of a 1280 px window, so these
 // tests use a 1920 px screen and every drag stays inside the window.
 test.describe("moving cards", () => {
   test.use({ viewport: { width: 1920, height: 1080 } });
@@ -309,11 +311,11 @@ test.describe("moving cards", () => {
     await expect(cardIn(page, "In progress", ref)).toBeVisible();
     await expect(cardIn(page, "Approved", ref)).toHaveCount(0);
 
-    // The person who raised it sees the stepper move on: Approved done, In progress current.
+    // The person who raised it sees the stepper move on: Planned done, In progress current.
     const liam = await team.as("Liam");
     await liam.goto(`/track/${ref}`);
     const stages = liam.getByRole("region", { name: "Progress" }).getByRole("listitem");
-    await expect(stages.nth(1)).toContainText("Approved, done");
+    await expect(stages.nth(1)).toContainText("Planned, done");
     await expect(stages.nth(2)).toContainText("In progress, current stage");
   });
 
@@ -341,23 +343,32 @@ test.describe("moving cards", () => {
     await expect(cardIn(page, "In progress", ref)).toHaveCount(0);
   });
 
-  test("S12.07 Dragging a card to Closed opens the Close dialog", async ({ page, signIn, team }) => {
+  test("S12.07 Dragging a Resolved card to Fixed opens the Close as fixed dialog and one confirm closes it; an In progress card is refused", async ({ page, signIn, team }) => {
+    const darlene = await team.as("Darlene");
     const ref = await item(team, "Tom", "RAKE Agent spell checker underlines Australian spelling", "rake-agent");
-    await postJson(await team.as("Darlene"), `/console/items/${ref}/start`);
+    await postJson(darlene, `/console/items/${ref}/start`);
+    await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Added the Australian dictionary" });
+    const working = await item(team, "Mei", "RAKE Agent grammar hints repeat the same advice", "rake-agent");
+    await postJson(darlene, `/console/items/${working}/start`);
     await signIn("Darlene");
     await gotoWork(page);
 
-    await drag(page, ref, "Closed");
-    const dialog = page.getByRole("dialog", { name: "Close" });
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText("Closing ends the item for everyone following it.")).toBeVisible();
+    // Only a resolved item can be fixed: an In progress card is refused and stays.
+    await drag(page, working, "Fixed");
+    await expect(page.getByText("Only resolved items can move to Fixed. Use Close on the item to say why it ends.", { exact: true })).toBeVisible();
+    await expect(cardIn(page, "In progress", working)).toBeVisible();
 
-    await dialog.getByLabel("Reason (shown to staff)").fill("Already fixed by the dictionary update");
-    // The form's own Close button, not the dialog's corner X (also called Close).
-    await dialog.locator("form").getByRole("button", { name: "Close", exact: true }).click();
+    await drag(page, ref, "Fixed");
+    const dialog = page.getByRole("dialog", { name: "Close as fixed", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("The work is done. The item ends as Fixed for everyone following it.")).toBeVisible();
+    await expect(dialog.getByRole("textbox")).toHaveCount(0);
+
+    // The form's own button, not the dialog's corner X.
+    await dialog.locator('button[type="submit"]').click();
     await expect(dialog).toHaveCount(0);
-    await expect(page.getByText(`${ref} closed`, { exact: true })).toBeVisible();
-    await expect(cardIn(page, "Closed", ref)).toBeVisible();
+    await expect(page.getByText(`${ref} closed as fixed`, { exact: true })).toBeVisible();
+    await expect(cardIn(page, "Fixed", ref)).toBeVisible();
   });
 
   test("S12.08 As Marc, dragging an Awaiting approval card to In progress is refused and the card stays", async ({ page, signIn, team }) => {
@@ -438,7 +449,7 @@ test("S12.11 The chosen view (List) survives a reload and signing out and in; Ma
   await expect(page.getByRole("columnheader")).toHaveCount(0);
 });
 
-test("S12.12 Each inbox tab (Assigned to me, Unassigned / needs review, All open, Overdue, Closed) filters Board, List and Cards", async ({ page, signIn }) => {
+test("S12.12 Each inbox tab (Assigned to me, Unassigned / needs review, All open, Overdue, Archive) filters Board, List and Cards", async ({ page, signIn }) => {
   await signIn("Marc");
   const cards = await allCards(page);
   const inboxes = [
@@ -449,7 +460,7 @@ test("S12.12 Each inbox tab (Assigned to me, Unassigned / needs review, All open
     },
     { label: "All open", refs: refsOf(cards.filter((c) => OPEN.includes(c.status))) },
     { label: "Overdue", refs: OVERDUE.map((key) => world[key]) },
-    { label: "Closed", refs: refsOf(cards.filter((c) => CLOSED.includes(c.status))) },
+    { label: "Archive", refs: refsOf(cards.filter((c) => CLOSED.includes(c.status))) },
   ];
   // Every tab has something to show, so an empty screen can never pass for the right answer.
   for (const inbox of inboxes) expect(inbox.refs.length, inbox.label).toBeGreaterThan(0);
@@ -587,4 +598,66 @@ test("S12.15 Cards view is one column of cards, most urgent first", async ({ pag
     expect(Math.abs(b.x - shown[0].x), `card ${i + 1} lines up with the first`).toBeLessThan(1);
     if (i > 0) expect(b.y, `card ${i + 1} is below card ${i}`).toBeGreaterThan(shown[i - 1].y);
   }
+});
+
+test("S12.16 The Archive lists every ended item under how it ended; the Ended as filter and the search narrow it, and other inboxes have no such filter", async ({ page, signIn, team }) => {
+  test.setTimeout(180_000);
+  const [darlene, marc, chris] = await Promise.all(["Darlene", "Marc", "Chris"].map((name) => team.as(name)));
+  const rake = async (who: string, text: string) => raise(await team.as(who), text, IMPACT, "rake-agent");
+  const approved = async (who: string, text: string) => {
+    const ref = await rake(who, text);
+    await postJson(chris, `/console/items/${ref}/approve`);
+    return ref;
+  };
+
+  const wontFix = await approved("Liam", "The RAKE Agent colour picker shows an error");
+  await postJson(darlene, `/console/items/${wontFix}/close`, { reason: "Working as designed", ending: "wont_fix" });
+  const notNeeded = await approved("Aisha", "The RAKE Agent font picker shows an error");
+  await postJson(darlene, `/console/items/${notNeeded}/close`, { reason: "Replaced by the new theme", ending: "no_longer_needed" });
+  const declined = await rake("Tom", "The RAKE Agent icon picker shows an error");
+  await postJson(marc, `/console/items/${declined}/decline`, { reason: "Out of scope this quarter" });
+  const original = await approved("Grace", "The RAKE Agent theme picker shows an error");
+  const copy = await approved("Rafael", "The RAKE Agent theme chooser shows an error");
+  await postJson(marc, `/console/items/${copy}/merge`, { into: original });
+  const praise = await raise(await team.as("Mei"), "Thanks for the Training Portal update, works great");
+
+  await signIn("Marc");
+  const ended = refsOf((await allCards(page)).filter((c) => CLOSED.includes(c.status)));
+  for (const ref of [wontFix, notNeeded, declined, copy, praise, world.closed]) expect(ended, ref).toContain(ref);
+  expect(ended).not.toContain(original);
+
+  // The list groups the ended items by how they ended; praise has no ending of its own.
+  await openWork(page, "List", "?inbox=archive");
+  await expectRefs(page, "List", ended);
+  for (const group of ["Fixed", "Won't fix", "Duplicate", "Declined", "No longer needed", "Praise"]) {
+    await expect(page.getByRole("row").filter({ hasText: new RegExp(`^${group} \\d+$`) }), group).toHaveCount(1);
+  }
+  await expect(page.getByRole("row").filter({ hasText: wontFix }).getByText("Won't fix", { exact: true })).toBeVisible();
+
+  const pick = async (option: string) => {
+    await page.getByRole("button", { name: "Filter", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Ended as", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: option, exact: true }).click();
+  };
+  await pick("Won't fix");
+  await expect(page).toHaveURL(/[?&]ending=wont_fix(&|$)/);
+  await expectRefs(page, "List", [wontFix]);
+  await pick("Praise");
+  await expect(page).toHaveURL(/[?&]ending=acknowledged(&|$)/);
+  await expectRefs(page, "List", [praise]);
+  await page.getByRole("button", { name: "Remove Ended as filter", exact: true }).click();
+  await expectRefs(page, "List", ended);
+
+  // Search works inside the Archive.
+  const box = page.getByRole("textbox", { name: "Search", exact: true });
+  await box.fill("icon picker");
+  await box.press("Enter");
+  await expectRefs(page, "List", [declined]);
+
+  // Only the Archive has the filter; leaving it drops the choice.
+  await pick("Declined");
+  await page.getByRole("tab", { name: /^All open/ }).click();
+  await expect(page).not.toHaveURL(/ending=/);
+  await page.getByRole("button", { name: "Filter", exact: true }).click();
+  await expect(page.getByRole("menuitem", { name: "Ended as", exact: true })).toHaveCount(0);
 });

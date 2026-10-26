@@ -49,7 +49,7 @@ async function build(team: Team): Promise<Refs> {
 
   const closed = await raiseBug(mei, "training-portal", "The Training Portal profile page shows an error when I open it");
   await approve(closed);
-  await postJson(chris, `/console/items/${closed}/close`, { reason: "Not needed any more", wont_fix: false });
+  await postJson(chris, `/console/items/${closed}/close`, { reason: "Not needed any more", ending: "no_longer_needed" });
 
   return { started, approved, feature, usability, resolved, closed };
 }

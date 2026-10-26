@@ -415,7 +415,7 @@ test("S13.10 The History tab lists every event with who and when, internal ones 
   await expect(entries.filter({ hasText: "(internal)" })).toHaveCount(events.filter((e) => !e.is_public).length);
 
   // Who and what, public ones plain, internal ones marked.
-  for (const text of ["Rafael Santos · Received via chat", "Chris · Approved by Chris", "Darlene · Darlene started work"]) {
+  for (const text of ["Rafael Santos · Received via chat", "Chris · Planned (Chris accepted it)", "Darlene · Darlene started work"]) {
     const entry = entries.filter({ hasText: text });
     await expect(entry, text).toHaveCount(1);
     await expect(entry).not.toContainText("(internal)");

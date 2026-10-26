@@ -21,8 +21,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { api, errorText, type Board, type Card, type ConsoleView, type ItemList, type Project, type Staff, type Status } from "@/lib/api";
-import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, WORK_TYPES, WORK_TYPE_LABEL, age, day } from "@/lib/format";
+import { api, errorText, type Board, type Card, type ConsoleView, type Ending, type ItemList, type Project, type Staff } from "@/lib/api";
+import { CATEGORIES, CATEGORY_LABEL, ENDING_LABEL, PRIORITIES, WORK_TYPES, WORK_TYPE_LABEL, age, day } from "@/lib/format";
 import { defaultInbox } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
 
@@ -31,33 +31,46 @@ const INBOXES = [
   { key: "needs_review", label: "Unassigned / needs review" },
   { key: "open", label: "All open" },
   { key: "overdue", label: "Overdue" },
-  { key: "closed", label: "Closed" },
+  { key: "archive", label: "Archive" },
 ] as const;
 const INBOX_EMPTY: Record<string, string> = {
   mine: "Nothing is assigned to you.",
   needs_review: "All caught up. Nothing is waiting to be looked at.",
   open: "Nothing is open right now.",
   overdue: "Nothing is overdue.",
-  closed: "Nothing has been closed yet.",
+  archive: "Nothing has ended yet.",
 };
-const FILTERS = ["project", "category", "priority", "work_type", "assignee", "q"] as const;
+const FILTERS = ["project", "category", "priority", "work_type", "assignee", "q", "ending"] as const;
+/** The Archive filter by how an item ended. Praise has no ending, so the API matches it by status. */
+const ENDING_OPTIONS: [string, string][] = [
+  ...(Object.entries(ENDING_LABEL) as [Ending, string][]),
+  ["acknowledged", "Praise"],
+];
 const VIEWS: { key: ConsoleView; label: string }[] = [
   { key: "board", label: "Board" },
   { key: "list", label: "List" },
   { key: "cards", label: "Cards" },
 ];
 
+type Group = { title: string; match: (c: Card) => boolean };
+
 /** The list groups by stage in the board's order, so the list and the board read the same way. */
-const GROUPS: { title: string; statuses: Status[] }[] = [
-  { title: "Needs review", statuses: ["needs_review", "new"] },
-  { title: "Awaiting approval", statuses: ["awaiting_approval"] },
-  { title: "Approved", statuses: ["approved"] },
-  { title: "In progress", statuses: ["in_progress"] },
-  { title: "Resolved", statuses: ["resolved"] },
-  { title: "Closed", statuses: ["acknowledged", "declined", "closed"] },
+const GROUPS: Group[] = [
+  { title: "Needs review", match: (c) => c.status === "needs_review" || c.status === "new" },
+  { title: "Awaiting approval", match: (c) => c.status === "awaiting_approval" },
+  { title: "Approved", match: (c) => c.status === "approved" },
+  { title: "In progress", match: (c) => c.status === "in_progress" },
+  { title: "Resolved", match: (c) => c.status === "resolved" },
+  { title: "Fixed", match: (c) => c.status === "closed" },
 ];
 
-type Pending = { ref: string; kind: "resolve" | "close" | "update"; column?: "resolved" | "closed" };
+/** The Archive groups by how each item ended. */
+const ARCHIVE_GROUPS: Group[] = [
+  ...(Object.entries(ENDING_LABEL) as [Ending, string][]).map(([ending, title]) => ({ title, match: (c: Card) => c.ending === ending })),
+  { title: "Praise", match: (c) => c.status === "acknowledged" },
+];
+
+type Pending = { ref: string; kind: "resolve" | "fix" | "update"; column?: "resolved" | "fixed" };
 
 function Work() {
   const router = useRouter();
@@ -141,8 +154,15 @@ function Work() {
   }
 
   async function move(ref: string, column: string) {
-    if (column === "resolved" || column === "closed") {
-      setPending({ ref, kind: column === "resolved" ? "resolve" : "close", column });
+    if (column === "fixed") {
+      const status = [...(board?.columns.flatMap((c) => c.items) ?? []), ...(list?.items ?? [])].find((c) => c.reference === ref)?.status;
+      if (status !== "resolved") {
+        toast.error("Only resolved items can move to Fixed. Use Close on the item to say why it ends.");
+        return;
+      }
+    }
+    if (column === "resolved" || column === "fixed") {
+      setPending({ ref, kind: column === "resolved" ? "resolve" : "fix", column });
       return;
     }
     try {
@@ -172,7 +192,7 @@ function Work() {
         toast.success("Saved");
       } else {
         await api.post(`/console/items/${pending.ref}/move`, { column: pending.column, note: r.text });
-        toast.success(`${pending.ref} ${pending.column}`);
+        toast.success(pending.column === "fixed" ? `${pending.ref} closed as fixed` : `${pending.ref} resolved`);
       }
       reload();
       return true;
@@ -184,9 +204,10 @@ function Work() {
 
   const effectiveView = view ?? board?.view ?? "board";
   const items = effectiveView === "board" ? null : list?.items;
+  const groupSet = inbox === "archive" ? ARCHIVE_GROUPS : GROUPS;
   const groups = useMemo(
-    () => GROUPS.map((g) => ({ title: g.title, rows: (items ?? []).filter((c) => g.statuses.includes(c.status)) })).filter((g) => g.rows.length > 0),
-    [items],
+    () => groupSet.map((g) => ({ title: g.title, rows: (items ?? []).filter(g.match) })).filter((g) => g.rows.length > 0),
+    [items, groupSet],
   );
 
   // The order the panel steps through with Previous and Next: the order on screen.
@@ -201,6 +222,7 @@ function Work() {
     { param: "work_type", label: "Work type", options: WORK_TYPES.map((w) => [w, WORK_TYPE_LABEL[w]]) },
     { param: "category", label: "Category", options: CATEGORIES.map((c) => [c, CATEGORY_LABEL[c]]) },
     { param: "priority", label: "Priority", options: PRIORITIES.map((p) => [p, p]) },
+    ...(inbox === "archive" ? [{ param: "ending", label: "Ended as", options: ENDING_OPTIONS }] : []),
   ];
   const filterValues = Object.fromEntries(filterFields.map((f) => [f.param, params.get(f.param)]));
   const filtered = filterFields.some((f) => params.get(f.param)) || Boolean(params.get("q"));
@@ -232,7 +254,7 @@ function Work() {
         </ToggleGroup>
       </div>
 
-      <Tabs value={inbox} onValueChange={(v) => setParam("inbox", v)}>
+      <Tabs value={inbox} onValueChange={(v) => setParams({ inbox: v, ending: null })}>
         <TabsList aria-label="Inbox" className="h-auto w-full justify-start gap-1 overflow-x-auto p-1">
           {INBOXES.map((b) => (
             <TabsTrigger key={b.key} value={b.key} className="h-9 flex-none px-4">
@@ -366,7 +388,7 @@ function Work() {
                             <PriorityBadge showCode priority={c.priority} />
                           </TableCell>
                           <TableCell>
-                            <StatusBadge status={c.status} />
+                            <StatusBadge status={c.status} ending={c.ending} />
                           </TableCell>
                           <TableCell>{c.assignee?.name ?? "Unassigned"}</TableCell>
                           <TableCell className="font-mono text-xs tabular">{age(c.created_at)}</TableCell>

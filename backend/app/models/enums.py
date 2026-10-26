@@ -22,7 +22,7 @@ EFFORTS = ("S", "M", "L")
 RECOMMENDATIONS = ("implement", "decline", "needs_info")
 SENTIMENTS = ("positive", "neutral", "negative")
 
-# Nine internal statuses (D4). Won't fix and merged are close reasons on "declined" (D21).
+# Nine internal statuses (D4). Won't fix and merged are endings on "declined" (D21, D44).
 STATUSES = (
     "new",
     "needs_review",
@@ -36,6 +36,9 @@ STATUSES = (
 )
 OPEN_STATUSES = ("new", "needs_review", "awaiting_approval", "approved", "in_progress", "resolved")
 CLOSED_STATUSES = ("acknowledged", "declined", "closed")
+# How a closed or declined item ended (D44). Praise (acknowledged) has none.
+ENDINGS = ("fixed", "wont_fix", "duplicate", "declined", "no_longer_needed")
+ENDED_STATUSES = ("closed", "declined")
 
 # Five tracker stages staff see, and the statuses behind each.
 STAGES = ("received", "approved", "in_progress", "resolved", "closed")

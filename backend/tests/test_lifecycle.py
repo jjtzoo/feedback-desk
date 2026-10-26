@@ -38,7 +38,7 @@ async def test_full_lifecycle_end_to_end(
 
     # Darlene sees it on her board, in Approved only after an Admin approves.
     board = (await darlene.get("/api/console/board")).json()
-    assert [c["key"] for c in board["columns"]] == ["approved", "in_progress", "resolved", "closed"]  # no admin columns
+    assert [c["key"] for c in board["columns"]] == ["approved", "in_progress", "resolved", "fixed"]  # no admin columns
     assert board["view"] == "board"
     assert (await darlene.post(f"/api/console/items/{ref}/start")).status_code == 409  # not approved yet
 
@@ -49,6 +49,9 @@ async def test_full_lifecycle_end_to_end(
     assert (await darlene.post(f"/api/console/items/{ref}/approve")).status_code == 403
     r = await marc.post(f"/api/console/items/{ref}/approve")
     assert r.status_code == 200 and r.json()["status"] == "approved"
+    # Staff see stage 2 as Planned (D43).
+    planned = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    assert planned["status_text"] == "Planned, not started yet" and planned["stages"][1]["label"] == "Planned"
 
     # Darlene opens it (first-open event), starts work, posts an update with Expected by.
     detail = (await darlene.get(f"/api/console/items/{ref}")).json()
@@ -74,7 +77,7 @@ async def test_full_lifecycle_end_to_end(
     for line in (
         "Expected by Fri 23 Oct",
         "Darlene started work",
-        "Approved by Marc",
+        "Planned (Marc accepted it)",
         "Darlene opened your feedback",
         "Assigned to Darlene",
         "Received via chat",
@@ -102,9 +105,14 @@ async def test_full_lifecycle_end_to_end(
     assert card["unread_reply"] is True
 
     await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fixed for mobile too"})
+    # A resolved item closes as fixed, never as won't fix (D45).
+    wont = await darlene.post(f"/api/console/items/{ref}/close", json={"reason": "x", "ending": "wont_fix"})
+    assert wont.status_code == 409
     r = await darlene.post(f"/api/console/items/{ref}/close", json={"reason": ""})
-    assert r.json()["status"] == "closed"
-    assert (await staff.get(f"/api/feedback/{ref}/tracker")).json()["can_reply"] is False
+    assert r.json()["status"] == "closed" and r.json()["ending"] == "fixed"
+    t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    assert t["can_reply"] is False and t["status_text"] == "Fixed" and t["stages"][4]["label"] == "Fixed"
+    assert t["close_reason"] is None and "Fixed" in [h["text"] for h in t["history"]]
 
     # The submitter heard about every stage, in the app and (queued) by email.
     assert await notes_for(STAFF) == ["stage", "stage", "progress", "stage", "stage", "stage"]
@@ -126,7 +134,47 @@ async def test_decline_needs_a_reason_and_tells_the_submitter(
     assert r.json()["status"] == "declined"
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
     assert t["stage"] == "closed" and t["close_reason"] == "RAKE is being replaced next month"
+    assert r.json()["ending"] == "declined" and t["status_text"] == "Declined"
     assert "Declined: RAKE is being replaced next month" in [h["text"] for h in t["history"]]
+
+
+async def test_close_follows_the_state_and_endings_go_to_the_archive(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    dropped, done = await raise_bug(staff), await raise_bug(staff)
+    for ref in (dropped, done):
+        await marc.post(f"/api/console/items/{ref}/approve")
+
+    # An open item can't close as fixed, and needs a reason for the other endings (D45).
+    close = f"/api/console/items/{dropped}/close"
+    assert (await darlene.post(close, json={"reason": "", "ending": "fixed"})).status_code == 409
+    assert (await darlene.post(close, json={"reason": " ", "ending": "wont_fix"})).status_code == 400
+    assert (await darlene.post(f"/api/console/items/{dropped}/move", json={"column": "fixed"})).status_code == 409
+    r = await darlene.post(close, json={"reason": "The HR bot replaces it", "ending": "wont_fix"})
+    assert r.json()["status"] == "declined" and r.json()["ending"] == "wont_fix"
+    t = (await staff.get(f"/api/feedback/{dropped}/tracker")).json()
+    assert t["status_text"] == "Won't fix" and t["close_reason"] == "The HR bot replaces it"
+    mine = {i["reference"]: i for i in (await staff.get("/api/my/feedback")).json()}
+    assert mine[dropped]["status_text"] == "Won't fix" and mine[dropped]["ending"] == "wont_fix"
+    async with session_scope() as db:
+        titles = list(await db.scalars(select(Notification.title).where(Notification.recipient_email == STAFF)))
+    assert f"{dropped} won't be fixed" in titles and f"{dropped} is planned" in titles
+
+    await darlene.post(f"/api/console/items/{done}/start")
+    await darlene.post(f"/api/console/items/{done}/resolve", json={"body": "Deployed"})
+    assert (await darlene.post(f"/api/console/items/{done}/move", json={"column": "fixed"})).json()["ending"] == "fixed"
+
+    # The board's last column holds only Fixed items (D47); the rest wait in the Archive.
+    board = (await darlene.get("/api/console/board")).json()
+    fixed = [c["reference"] for c in next(c for c in board["columns"] if c["key"] == "fixed")["items"]]
+    assert done in fixed and dropped not in fixed
+    everywhere = [c["reference"] for col in board["columns"] for c in col["items"]]
+    assert dropped not in everywhere
+    archive = (await darlene.get("/api/console/items", params={"inbox": "archive", "ending": "wont_fix"})).json()
+    assert [i["reference"] for i in archive["items"]] == [dropped]
+    found = (await darlene.get("/api/console/items", params={"inbox": "archive", "q": done})).json()
+    assert [i["reference"] for i in found["items"]] == [done]
+    assert (await darlene.get("/api/console/items", params={"inbox": "archive", "ending": "x"})).status_code == 400
 
 
 async def test_ask_for_info_keeps_the_item_waiting(staff: httpx.AsyncClient, marc: httpx.AsyncClient) -> None:
@@ -183,7 +231,7 @@ async def test_merge_moves_the_submitter_to_the_original(
     r = await darlene.post(f"/api/console/items/{dup}/merge", json={"into": original})
     assert r.json()["status"] == "declined" and r.json()["merged_into"] == original
     t = (await other.get(f"/api/feedback/{dup}/tracker")).json()
-    assert t["status_text"] == f"Merged into {original}"
+    assert t["status_text"] == f"Duplicate of {original}" and t["ending"] == "duplicate"
     assert (await other.get(f"/api/feedback/{original}/tracker")).status_code == 200  # now follows the original
     await other.aclose()
 
@@ -286,7 +334,8 @@ async def test_list_filters_search_and_bulk(staff: httpx.AsyncClient, marc: http
     assert (await marc.get("/api/console/items", params={"inbox": "all"})).json()["view"] == "list"
     r = await marc.post("/api/console/bulk", json={"references": [a, b], "action": "close", "reason": "Test cleanup"})
     assert r.json() == {"done": 2}
-    assert (await marc.get("/api/console/items", params={"inbox": "closed"})).json()["total"] == 2
+    archive = (await marc.get("/api/console/items", params={"inbox": "archive", "ending": "no_longer_needed"})).json()
+    assert archive["total"] == 2 and {i["ending"] for i in archive["items"]} == {"no_longer_needed"}
 
 
 async def test_needs_review_column_is_for_the_triage_lead(

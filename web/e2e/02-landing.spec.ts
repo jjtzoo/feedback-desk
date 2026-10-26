@@ -131,7 +131,7 @@ test("S02.02 The Guide's first card explains step 1, and steps with something to
     ["Give feedback", "OK"],
     ["My feedback", "OK"],
     ["Updates", "OK"],
-    ["What's new", "OK"],
+    ["Fixes and updates", "OK"],
     ["Your account", "OK"],
     ["Your console", "Next"],
     ["That's it", "Done"],
@@ -186,7 +186,7 @@ test("S02.04 While the small card says 'Click Give feedback', clicking anywhere 
   const before = await page.evaluate(() => history.length);
 
   const header = banner(page);
-  for (const name of ["My feedback", "What's new", "Console"]) await header.getByRole("link", { name, exact: true }).click();
+  for (const name of ["My feedback", "Fixes and updates", "Console"]) await header.getByRole("link", { name, exact: true }).click();
   await header.getByRole("button", { name: /^Notifications/ }).click();
   await header.getByRole("button", { name: "Account: Mario" }).click();
 
@@ -223,7 +223,7 @@ test("S02.05 Clicking the highlighted control does its normal job, the dimming g
   expect(Math.round(viewport.height - (box.y + box.height))).toBe(16);
 
   // The page is free to use, and the tour waits.
-  await banner(page).getByRole("link", { name: "What's new", exact: true }).click();
+  await banner(page).getByRole("link", { name: "Fixes and updates", exact: true }).click();
   await expect(page).toHaveURL(/\/whats-new$/);
   await expect(card).toBeVisible();
 });
@@ -280,7 +280,7 @@ test("S02.07 Skip this step moves on, Skip tour ends the tour, Esc ends it excep
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(tryCard(page)).toBeVisible();
   await press(tryCard(page), "Next");
-  await expect(tourCard(page, "What's new")).toContainText("Step 6 of 9");
+  await expect(tourCard(page, "Fixes and updates")).toContainText("Step 6 of 9");
 });
 
 test("S02.08 As Mario the console's Guide runs Work, Channels, Releases, Dashboard, then Smoke Signal home; Chris also gets Approvals and Admin", async ({ page, signIn, team }) => {
@@ -374,7 +374,7 @@ test("S02.13 'Your recent feedback' shows your latest 3 items with their stage, 
   await expect(rows).toContainText([items[3][1], items[2][1], items[1][1]]);
   for (const row of await rows.all()) {
     await expect(row).toContainText(/FB-\d{4}/);
-    await expect(row).toContainText("Received, waiting for approval");
+    await expect(row).toContainText("Under review");
   }
   await expect(recent.getByText(items[0][1])).toHaveCount(0);
 
