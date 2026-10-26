@@ -61,6 +61,7 @@ session_limiter = RateLimiter(get_settings().chat_sessions_per_user_per_hour, 36
 
 SHOW_SUMMARY_LEAD = "Here's what I'll send"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
+NO_WORDS = "Sorry, I lost my train of thought there. Could you say that again?"
 
 
 @router.post("/chat/sessions", response_model=ChatStartOut)
@@ -257,9 +258,11 @@ def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
 async def _stream(
     user: User, session_id: str, parts: list[types.Part], delta: dict[str, Any]
 ) -> AsyncIterator[dict[str, str]]:
+    said = False
     try:
         async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
             async for raw in runtime.run_turn(user, session_id, parts, delta):
+                said = said or bool(raw.strip())
                 yield _sse("message", {"text": _without_card_fields(raw)})
     except TimeoutError:
         log.warning("agent turn timed out session=%s", session_id)
@@ -293,6 +296,9 @@ async def _stream(
     keep = step == "show_card" or (step is None and shown is not None and state.get("card_hash") == shown)
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
+    if not said:
+        # The model can end a turn with tool calls and no words (seen on Gemini 3.8 Flash): never an empty reply.
+        yield _sse("message", {"text": SHOW_SUMMARY if keep and shown else NO_WORDS})
     if keep and shown:
         async with session_scope() as db:
             slug = draft.get("project_slug")

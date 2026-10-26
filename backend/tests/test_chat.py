@@ -19,7 +19,7 @@ from agent.stub import (
     SHOW_SUMMARY,
 )
 from app import agent_runtime
-from app.api.chat import _without_card_fields
+from app.api.chat import NO_WORDS, _without_card_fields
 from app.config import get_settings
 from app.db import session_scope
 from app.models import Attachment, Feedback, FeedbackEvent, FeedbackMessage, Notification
@@ -416,6 +416,20 @@ async def test_model_error_switches_to_the_backup_form(
 
     monkeypatch.setattr(agent_runtime, "run_turn", broken)
     assert first(await say(staff, sid, "RAKE is broken"), "fallback") == {"reason": "error"}
+
+
+async def test_a_turn_with_no_words_never_shows_an_empty_reply(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Gemini once ended a turn with tool calls and no text (access-new-starter, 27 Oct)."""
+    sid = await start_chat(staff)
+
+    async def silent(*args: Any, **kwargs: Any) -> Any:
+        return
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_runtime, "run_turn", silent)
+    assert texts(await say(staff, sid, "I need access to the Financial Platform")) == [NO_WORDS]
 
 
 async def test_sessions_survive_an_api_restart(staff: httpx.AsyncClient) -> None:
