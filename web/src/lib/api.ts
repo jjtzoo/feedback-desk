@@ -91,11 +91,17 @@ export interface ChatCard {
   priority: string;
   title: string;
   summary: string;
+  /** For a fix: what they saw, so they can correct it (D63). */
+  what_happened: string;
+  /** What Sig couldn't find out; the card offers a box to add it (D63). */
+  gaps: string[];
 }
 
 export interface Chip {
   label: string;
   value: string;
+  /** One of the person's likely tools (D60): shown first. */
+  usual?: boolean;
 }
 
 export interface Duplicate {
@@ -199,6 +205,8 @@ export interface Card {
   reporters: number;
   /** Enough people reported it that a priority review is suggested (never applied by itself). */
   priority_review: boolean;
+  /** Saved with open gaps the person hasn't added to yet: ask for info first (D63). */
+  needs_detail: boolean;
 }
 
 export interface Column {

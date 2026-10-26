@@ -1,6 +1,6 @@
 "use client";
 
-import { Flag, Paperclip, TrendingUp, Users } from "lucide-react";
+import { CircleHelp, Flag, Paperclip, TrendingUp, Users } from "lucide-react";
 
 import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
 import type { Card } from "@/lib/api";
@@ -33,6 +33,11 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
         {card.priority_review && (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
             <TrendingUp className="size-3" aria-hidden="true" /> Review priority
+          </span>
+        )}
+        {card.needs_detail && (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+            <CircleHelp className="size-3" aria-hidden="true" /> Needs detail
           </span>
         )}
       </span>

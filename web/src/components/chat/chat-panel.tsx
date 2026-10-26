@@ -360,17 +360,15 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                 </li>
               )}
               {chips.length > 0 && !busy && (
-                <li className="flex flex-wrap gap-1.5" aria-label="Quick answers">
-                  {chips.map((c) => (
-                    <button
-                      key={c.value}
-                      type="button"
-                      onClick={() => void send(c.value)}
-                      className="min-h-11 rounded-full border px-4 text-sm font-medium hover:bg-muted"
-                    >
-                      {c.label}
-                    </button>
-                  ))}
+                <li className="grid gap-2" aria-label="Quick answers">
+                  {/* The person's likely tools first, under their own label (D60). */}
+                  {chips.some((c) => c.usual) && (
+                    <div className="grid gap-1.5">
+                      <p className="text-xs font-medium text-muted-foreground">Your usual tools</p>
+                      <ChipRow chips={chips.filter((c) => c.usual)} onPick={(v) => void send(v)} />
+                    </div>
+                  )}
+                  <ChipRow chips={chips.filter((c) => !c.usual)} onPick={(v) => void send(v)} />
                 </li>
               )}
               {duplicates.length > 0 && !busy && (
@@ -392,7 +390,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
               )}
               {card && (
                 <li>
-                  <ConfirmCard card={card.card} busy={busy} onConfirm={() => void confirm()} onChange={change} />
+                  <ConfirmCard card={card.card} busy={busy} onConfirm={() => void confirm()} onChange={change} onAdd={(detail) => void send(detail)} />
                 </li>
               )}
             </ol>
@@ -480,5 +478,17 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         </div>
       )}
     </section>
+  );
+}
+
+function ChipRow({ chips, onPick }: { chips: Chip[]; onPick: (value: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {chips.map((c) => (
+        <button key={c.value} type="button" onClick={() => onPick(c.value)} className="min-h-11 rounded-full border px-4 text-sm font-medium hover:bg-muted">
+          {c.label}
+        </button>
+      ))}
+    </div>
   );
 }

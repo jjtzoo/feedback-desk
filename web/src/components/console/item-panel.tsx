@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, FileText, Lock, TrendingUp, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleHelp, FileText, Lock, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -173,6 +173,11 @@ export function ItemPanel({
                 {item.priority_review && (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-warning">
                     <TrendingUp className="size-3.5" aria-hidden="true" /> Priority review suggested
+                  </span>
+                )}
+                {item.needs_detail && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                    <CircleHelp className="size-3.5" aria-hidden="true" /> Needs detail: ask for info first
                   </span>
                 )}
                 <span className="ml-auto flex gap-1">
