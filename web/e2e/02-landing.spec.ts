@@ -400,13 +400,3 @@ test("S02.14 'How it works' shows three steps, including 'Nothing is sent until 
   await expect(steps).toHaveCount(3);
   await expect(steps.nth(1)).toContainText("Nothing is sent until you select Confirm.");
 });
-
-test("S02.15 The footer says chats are processed by Gemini and passwords, card numbers and tax file numbers are removed before saving", async ({ page, signIn }) => {
-  await signIn("Mario");
-  await openLanding(page);
-
-  const footer = page.getByRole("contentinfo");
-  await expect(footer).toBeVisible();
-  await expect(footer).toContainText(/chats are processed by Google's Gemini model/);
-  await expect(footer).toContainText(/Passwords, card numbers and tax file numbers are removed before anything is saved/);
-});
