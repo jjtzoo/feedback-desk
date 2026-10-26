@@ -458,7 +458,11 @@ async def test_the_27_oct_goformz_opening_offers_the_persons_goformz_first_and_n
     events = await say(staff, sid, "I'm having trouble with my app it's so slow")
     chips = first(events, "chips")
     assert chips is not None and chips["kind"] == "project"
-    assert chips["options"][0] == {"label": "GoFormz Extension Portal", "value": "GoFormz Extension Portal", "usual": True}
+    assert chips["options"][0] == {
+        "label": "GoFormz Extension Portal",
+        "value": "GoFormz Extension Portal",
+        "usual": True,
+    }
     assert ASK_IMPACT not in texts(events)
 
 
