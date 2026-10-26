@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-22T22:32:17.942Z",
-  "commit": "6320f20",
-  "uncommitted": true,
+  "ran": "2026-10-26T05:58:11.134Z",
+  "commit": "f72c129",
+  "uncommitted": false,
   "spec": "06-backup-form.spec.ts",
-  "fingerprint": "b17049aa650e05ca",
+  "fingerprint": "c520621d08a8c8be",
   "caught": {
     "S06.01": true,
     "S06.02": true,
