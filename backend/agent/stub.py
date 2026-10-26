@@ -260,6 +260,10 @@ def _describe(contents: list[types.Content], projects: list[dict[str, Any]]) -> 
         return _say(EXISTING)
     category = _category(low)
     slug = _match_project(low, projects)
+    if slug and not category and len(low.split()) <= 3:
+        # A tool's name on its own reports nothing yet (review item 20): ask, don't start a draft.
+        name = next(p["name"] for p in projects if p["slug"] == slug)
+        return _say(f"What's happening with {name}?")
     if not category and not slug:
         if len(low.split()) < 4 or _is_noise(low):
             return _say(NOISE)

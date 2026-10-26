@@ -496,3 +496,14 @@ async def test_the_tool_question_gets_tool_chips_even_with_a_guessed_project(
         agent_runtime, "run_turn", _model_says("How much is this affecting your work?", {"draft": guess})
     )
     assert first(await say(staff, sid, "AFSS Portal"), "chips") is None
+
+
+async def test_a_tool_name_alone_starts_no_report(staff: httpx.AsyncClient) -> None:
+    """Review item 18: "RAKE Agent" on its own after a question about Sig is not a report yet."""
+    sid = await start_chat(staff)
+    await say(staff, sid, "what is your role")
+    events = await say(staff, sid, "RAKE Agent")
+    assert texts(events) == ["What's happening with RAKE Agent?"] and first(events, "chips") is None
+    events = await say(staff, sid, "why do we need you when we already have rake rgent")
+    assert texts(events) == [ABOUT_SIG] and first(events, "draft") is None
+    assert await count() == 0
