@@ -2,10 +2,10 @@
 
 import { CircleHelp, Flag, Paperclip, TrendingUp, Users } from "lucide-react";
 
-import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
+import { NewMark, PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
 import { AutoMarker } from "@/components/console/routing-line";
 import type { Card } from "@/lib/api";
-import { age, day, when } from "@/lib/format";
+import { age, day, isSettled, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** A card on the board and in Cards view (brief §4.4). */
@@ -19,12 +19,9 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
         dragging && "rotate-1 shadow-lg",
       )}
     >
-      {card.unread_reply && (
-        <span className="absolute top-3 right-3 size-2.5 rounded-full bg-foreground" title="The submitter replied" aria-label="Unread reply from the submitter" />
-      )}
-      <span className="flex flex-wrap items-center gap-1.5 pr-4">
+      <span className="flex flex-wrap items-center gap-1.5">
         <span className="font-mono text-xs font-semibold">{card.reference}</span>
-        <PriorityBadge showCode priority={card.priority} className="h-5 px-2 text-[11px]" />
+        <PriorityBadge showCode quiet={isSettled(card.status)} priority={card.priority} className="h-5 px-2 text-[11px]" />
         <WorkTypeBadge workType={card.work_type} className="h-5 px-2 text-[11px]" />
         {card.flagged && (
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-destructive">
@@ -41,6 +38,7 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
             <CircleHelp className="size-3" aria-hidden="true" /> Needs detail
           </span>
         )}
+        {card.unread && <NewMark label="New reply" className="ml-auto" />}
       </span>
       <span className="line-clamp-2 font-semibold leading-snug">{card.title}</span>
       <span className="text-sm text-muted-foreground">
