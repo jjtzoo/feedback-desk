@@ -19,6 +19,7 @@ Status = Literal[
     "declined",
     "closed",
 ]
+Ending = Literal["fixed", "wont_fix", "duplicate", "declined", "no_longer_needed"]
 Priority = Literal["P1", "P2", "P3", "P4"]
 WorkType = Literal["fix", "improvement", "new_feature", "no_change"]
 Category = Literal[
@@ -205,6 +206,7 @@ class MyItemOut(Out):
     project: str | None
     stage: str
     status: Status
+    ending: Ending | None
     status_text: str
     updated_at: datetime
     created_at: datetime
@@ -226,6 +228,7 @@ class TrackerOut(Out):
     work_type: str
     priority: str | None
     status: Status
+    ending: Ending | None
     status_text: str
     stage: str
     stages: list[dict[str, Any]]
@@ -261,6 +264,7 @@ class CardOut(Out):
     category: Category | None
     priority: Priority | None
     status: Status
+    ending: Ending | None
     stage: str
     submitter_name: str
     assignee: PersonOut | None
@@ -293,7 +297,7 @@ class CountsOut(Out):
     needs_review: int
     open: int
     overdue: int
-    closed: int
+    archive: int
     approvals: int
 
 
@@ -368,7 +372,8 @@ class NoteIn(BaseModel):
 
 class CloseIn(BaseModel):
     reason: str = Field(default="", max_length=1000)
-    wont_fix: bool = False
+    # None closes a resolved item as fixed and an open one as no longer needed (D45).
+    ending: Literal["fixed", "wont_fix", "no_longer_needed"] | None = None
 
 
 class FieldsIn(BaseModel):
@@ -384,7 +389,7 @@ class MergeIn(BaseModel):
 
 
 class MoveIn(BaseModel):
-    column: Literal["approved", "in_progress", "resolved", "closed"]
+    column: Literal["approved", "in_progress", "resolved", "fixed"]
     note: str = Field(default="", max_length=1000)
 
 

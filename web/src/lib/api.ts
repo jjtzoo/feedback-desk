@@ -11,6 +11,8 @@ export type Status =
   | "acknowledged"
   | "declined"
   | "closed";
+/** How a closed or declined item ended (D44). Praise (acknowledged) has none. */
+export type Ending = "fixed" | "wont_fix" | "duplicate" | "declined" | "no_longer_needed";
 export type Stage = "received" | "approved" | "in_progress" | "resolved" | "closed";
 export type Priority = "P1" | "P2" | "P3" | "P4";
 export type WorkType = "fix" | "improvement" | "new_feature" | "no_change";
@@ -128,6 +130,7 @@ export interface MyItem {
   project: string | null;
   stage: Stage;
   status: Status;
+  ending: Ending | null;
   status_text: string;
   updated_at: string;
   created_at: string;
@@ -156,6 +159,7 @@ export interface Tracker {
   work_type: string;
   priority: Priority | null;
   status: Status;
+  ending: Ending | null;
   status_text: string;
   stage: Stage;
   stages: StageStep[];
@@ -180,6 +184,7 @@ export interface Card {
   category: Category | null;
   priority: Priority | null;
   status: Status;
+  ending: Ending | null;
   stage: Stage;
   submitter_name: string;
   assignee: Person | null;
@@ -467,6 +472,6 @@ export interface Counts {
   needs_review: number;
   open: number;
   overdue: number;
-  closed: number;
+  archive: number;
   approvals: number;
 }

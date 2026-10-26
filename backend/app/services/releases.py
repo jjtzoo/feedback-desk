@@ -245,7 +245,7 @@ async def publish(db: AsyncSession, user: User, release_id: uuid.UUID) -> Releas
             db,
             recipients,
             type="release",
-            title=f"Your feedback made it into this week's {name} release",
+            title=f"Your feedback made it into this week's {name} fixes and updates",
             body=item.title,
             link="/whats-new",
             feedback_id=fb.id,

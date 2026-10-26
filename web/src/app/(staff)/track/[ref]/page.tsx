@@ -166,7 +166,7 @@ export default function TrackerPage() {
             <p className="mt-5 rounded-2xl bg-muted p-4 text-sm">
               {t.merged_into ? (
                 <>
-                  Merged into{" "}
+                  Same request as{" "}
                   <Link className="font-mono font-semibold underline" href={`/track/${t.merged_into}`}>
                     {t.merged_into}
                   </Link>

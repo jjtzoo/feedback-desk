@@ -95,13 +95,15 @@ export function ItemPanel({
       ? act("update", { body: r.text, expected_by: r.expectedBy ?? null })
       : kind === "resolve"
         ? act("resolve", { body: r.text })
-        : kind === "close"
-          ? act("close", { reason: r.text, wont_fix: r.wontFix })
-          : kind === "decline"
-            ? act("decline", { reason: r.text })
-            : kind === "ask"
-              ? act("ask-info", { question: r.text, ask: r.ask })
-              : act("merge", { into: r.text }));
+        : kind === "fix"
+          ? act("close", { ending: "fixed" })
+          : kind === "close"
+            ? act("close", { reason: r.text, ending: r.ending })
+            : kind === "decline"
+              ? act("decline", { reason: r.text })
+              : kind === "ask"
+                ? act("ask-info", { question: r.text, ask: r.ask })
+                : act("merge", { into: r.text }));
     if (ok) toast.success("Saved");
     return ok;
   }
@@ -162,7 +164,7 @@ export function ItemPanel({
               <div className="flex flex-wrap items-center gap-1.5 pr-8">
                 <span className="font-mono text-sm font-semibold">{item.reference}</span>
                 <PriorityBadge showCode priority={item.priority} />
-                <StatusBadge status={item.status} />
+                <StatusBadge status={item.status} ending={item.ending} />
                 {item.reporters > 1 && (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
                     <Users className="size-3.5" aria-hidden="true" /> Reported by {item.reporters} people
@@ -217,8 +219,8 @@ export function ItemPanel({
                   </Button>
                 )}
                 {open && (
-                  <Button variant="ghost" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "close" })}>
-                    Close
+                  <Button variant="ghost" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: item.status === "resolved" ? "fix" : "close" })}>
+                    {item.status === "resolved" ? "Close as fixed" : "Close"}
                   </Button>
                 )}
               </div>

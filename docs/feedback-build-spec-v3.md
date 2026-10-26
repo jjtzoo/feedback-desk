@@ -94,7 +94,7 @@ The agent can also answer `general` when nothing fits; general items go to Needs
 | F14 | Notifications | 3 | In-app bell (live over SSE, 30-second polling fallback) plus email for the same event. Per-item mute. | Every stage change, update and reply notifies the submitter in the app and by email; notifications are kept 90 days. |
 | F15 | Project channels | 3 | A private channel per project for Digital Staff, with @mentions, #FB links, pinned notes and files. | Staff never see channel content. |
 | F16 | Dashboard and daily digest | 3 (first to slip) | Open items per project, assignee and category; weekly trend; time to first response; a daily digest of stale Needs review items. | Numbers match `feedback` and `feedback_events`. |
-| F17 | Friday releases | 4 (second to slip) | The agent drafts a release per active project every Friday 9:00 AEST; the owner ticks, edits and publishes; staff see a What's new page. | Nothing publishes automatically; channel items start unticked; contributors are notified. |
+| F17 | Friday releases | 4 (second to slip) | The agent drafts a release per active project every Friday 9:00 AEST; the owner ticks, edits and publishes; staff see a Fixes and updates page (D46). | Nothing publishes automatically; channel items start unticked; contributors are notified. |
 | F18 | Launch | 4 | Production on Google Cloud, a 3-day pilot with about 15 staff, the intranet tile, a staff guide and a console runbook. | Pilot complete, no P1 bugs open, Marc and Chris sign off UAT, tile live. |
 
 ### Out of scope for the MVP
@@ -134,7 +134,7 @@ The agent can also answer `general` when nothing fits; general items go to Needs
 | D18 | Local development email: Mailpit behind the same email interface as the Gmail API sender, so nothing reaches real inboxes before go-live. Decided 2026-10-20. | Keeps every email readable in tests. | |
 | D19 | Local development secrets: the AI Studio key is read from Secret Manager (`gcloud auth application-default login`) once ask 1 lands; until then development runs on the stub model and needs no key. A git-ignored `.env` holds only non-secret settings. Decided 2026-10-20. | Brief §8. | |
 | D20 | Interim roles until Chris names them: Marc is the triage lead; access requests route to Chris. Decided 2026-10-20; replace in the admin page when named. | Router needs both. | |
-| D21 | Won't fix is a close reason on Declined, not a tenth status. Decided 2026-10-20. | Matches the brief's nine-state lifecycle. | |
+| D21 | Won't fix is an ending on Declined, not a tenth status (recorded in `feedback.ending`, D44). Decided 2026-10-20. | Matches the brief's nine-state lifecycle. | |
 | D22 | The agent keeps a fourth tool, `update_draft`, beside the brief's three; it is what stops the model saving anything the user didn't confirm (D12). Decided 2026-10-20; tell Marc. | Safety guard. | |
 | D23 | Until asks 1, 2 and 4 land, local stand-ins sit behind the same interfaces: a development-only sign-in picker beside the Google OAuth flow, a local folder for files instead of Cloud Storage, Mailpit instead of the Gmail API, and the stub model and stub embeddings instead of Gemini. Each switches by config. Decided 2026-10-20. | Build everything now; plug the real services in later. | v2 D23 |
 | D24 | Follow the company engineering standard (Darlene's handover manual) for everything outside the brief: Git branches for every change, a README, CLAUDE.md and `docs/architecture.md` kept current, `.gitignore` and `.gcloudignore`, Cloud Run service YAML per environment, `deploy.sh` and `deploy.ps1`, `.env.example`, a generated `requirements.txt`, environment separation, a deployment review checklist, protected secrets in builds and logs, and periodic cloud cost reviews. | Manual §6 to §38. | New |
@@ -154,8 +154,13 @@ The agent can also answer `general` when nothing fits; general items go to Needs
 | D38 | Reporter tally: **OPEN.** **PROPOSED:** the console shows how many people reported an item (the submitter plus each distinct colleague who added a +1 or was merged in; one per person, the submitter never twice) on the board card and the item panel. At 3 or more (`PRIORITY_REVIEW_REPORTERS`) on an open item that is not already P1, it shows "Priority review suggested" to Digital Staff and Admins; the priority itself never changes without a person. Staff never see the count, and a +1 is only possible on a match the agent offers, so asking colleagues to pile on has nothing to aim at. Impact still rises with +1s as before (team at 1, company at 10). Marc to confirm the threshold and that this is a suggestion only. |
 | D39 | Console information architecture, from the benchmark of Linear, Jira Service Management, Canny, Chatwoot, Fider and Featurebase (2026-10-23). Built: sidebar with icons and counts (`GET /console/counts`); inbox tabs with counts; one Filter button with removable chips; the list grouped by stage with a row actions menu (open, post update, assign, move) that reuses the board's dialogs; one tone and icon per status everywhere; per-inbox empty states; the item panel with an always-visible Properties column, one Activity feed (All, Messages, Changes), previous and next, and an internal-note composer that changes colour and shows a lock; every merge goes through the merge dialog (never automatic, F8); the stage badge on My feedback. The staff landing page follows the benchmark's help-centre home (D17, decided 2026-10-26). Later: saved views, a command menu and single-key shortcuts are later. The sidebar is built on the shadcn `Tabs`, `ToggleGroup` and `DropdownMenu` parts and plain markup, not the shadcn sidebar block, to keep the existing mobile drawer and tour anchors. Second pass: Admins open Work on All open and see Approvals first in the sidebar (two of the three Admins are directors, not developers); the panel's Activity tab separates the Intake transcript (the chat word for word, in quotes, read-only, speakers named Assistant and Staff member) from the Conversation (replies and internal notes, with the composer) and the History; a new reply or note is marked Sent just now; the chat shows an Open My feedback line for people asking about a case they already sent; the Channels page says what it is for. | Benchmark notes in `C:\benchmark\captures` (consensus table, frontend audit). | |
 | D40 | Project channels (F15): **OPEN, with Marc.** Nothing in the feedback workflow depends on them: approve, ask for info (to the person or the owner), reply, resolve and merge all work through the item, its internal notes and the tracker. What channels add is a running chat per tool outside any one item (`@name` mentions that notify, `#FB` links that show the live stage, pinned notes) and the Friday release drafter reads them. **Options:** (a) keep as they are; (b) keep only the cross-item chat and the release input, and leave item-level talk to internal notes; (c) remove them and drop the channel input from the release drafter. **PROPOSED:** (b). The brief sets F15, so nothing is removed until Marc decides. | Overlap found while testing the console (2026-10-23). | |
-| D41 | Names on the staff tracker: **OPEN, with Marc.** The tracker shows the owner's name, role and email in Who has it, and history lines such as Reply from Darlene or Approved by Chris. A request was made that people outside the Digital team should not see these names, and that the intake chat be shown to the staff member as a word-for-word quoted transcript, as shared proof. The benchmark does not settle it (the JSM requester view shows agent names) and the brief specifies the Who has it card, so it is not changed here. **Options:** keep names; show a role (Digital team, an Admin) instead; keep the owner and hide approvers. The staff-side transcript also needs the API to return the chat messages to their own submitter. | Notes from testing (2026-10-23); brief §4.2. | |
+| D41 | Names on the staff tracker: **OPEN, with Marc.** The tracker shows the owner's name, role and email in Who has it, and history lines such as Reply from Darlene or Planned (Chris accepted it). A request was made that people outside the Digital team should not see these names, and that the intake chat be shown to the staff member as a word-for-word quoted transcript, as shared proof. The benchmark does not settle it (the JSM requester view shows agent names) and the brief specifies the Who has it card, so it is not changed here. **Options:** keep names; show a role (Digital team, an Admin) instead; keep the owner and hide approvers. The staff-side transcript also needs the API to return the chat messages to their own submitter. | Notes from testing (2026-10-23); brief §4.2. | |
 | D42 | Status questions in the chat. Someone who asks the agent for an update on a case they already sent was treated as new feedback. Built: a fixed Open My feedback line under the chat box (no model needed), and a rule in `backend/agent/instruction.md` ("Feedback that already exists": no draft, point to My feedback and Reply or add details, offer to raise something new). On Gemini (2026-10-26) the rule passed 28 of 28 conversation checks (`evals.run_conversations`) and the routing gate at 95 % project, 95 % work type, 97.5 % assignee (`docs/testing/conversation-eval-2026-10-26.md`). **OPEN, with Marc:** a read-only `list_my_feedback` tool so the agent can quote the status itself (a fifth tool, so a change to the agent design). | Seen in hand testing (2026-10-23). | |
+| D43 | Staff stage names. Decided by the product owner on 2026-10-26, for Marc's review. Staff see stage 2 as **Planned** (status line "Planned, not started yet") and the two waiting statuses, Needs review and Awaiting approval, as **Under review**, instead of "Received, being checked" and "Received, waiting for approval". The console and Admins keep Approved, Needs review and Awaiting approval, and the nine internal statuses are unchanged (D4). The history line for an approval reads "Planned (Chris accepted it)"; entries logged earlier as "Approved by Chris" are shown the same way to staff. **Changes the stage name in brief §4.2.2.** | Staff read "Approved" as "it will be done"; Planned says it is accepted and queued without promising a date. Benchmark: Canny, Fider, Featurebase. | Stage "Approved" and the "Received, ..." status lines |
+| D44 | Named endings. Decided by the product owner on 2026-10-26, for Marc's review. Every closed or declined item records how it ended in `feedback.ending`: **Fixed, Won't fix, Duplicate, Declined, No longer needed** (migration 0003, with checks that it is set exactly when the status is Closed or Declined). Statuses stay the nine of D4: Won't fix and Duplicate stay `declined` (D21), Fixed and No longer needed are `closed`. Praise (Acknowledged) has no ending and the Archive finds it by status. Staff see the ending as the tracker's last step and the heading ("Duplicate of FB-0123"); a reason shows only for Won't fix, Declined and No longer needed. The migration backfills existing items: closed after Resolved becomes Fixed, other closed becomes No longer needed, declined with a duplicate link becomes Duplicate, declined with a "Won't fix: " reason becomes Won't fix (prefix removed), other declined stays Declined; tested on a copy of the local database with a row for every case, upgrade, downgrade and upgrade again. **Changes the single "Closed" stage in brief §4.2.2 and the D21 wording.** | "Closed" told staff nothing about the outcome. Benchmark: Jira resolutions, Canny and Fider statuses. | Won't fix and merged as free-text close reasons (D21) |
+| D45 | The Close dialog follows the item's state. Decided by the product owner on 2026-10-26, for Marc's review. A Resolved item closes only as Fixed, with one confirm and no reason ("Close as fixed"). An open item closes only as Won't fix or No longer needed, and a reason is required because staff see it. The server enforces it in `console.close`, so the board drag, the row menu and the API follow the same rules: Fixed for an item that is not Resolved is refused (409 `not_resolved`), and any other ending for a Resolved item is refused (409 `resolved`); an item that is not really fixed is started again, not closed. | A single Close with a "Won't fix" box let a Resolved item end as anything and gave staff a vague closing line. | The Close dialog with a Won't fix checkbox |
+| D46 | "What's new" becomes **Fixes and updates**. Decided by the product owner on 2026-10-26, for Marc's review. The page title, the header link, the Guide step and the contributor notification ("Your feedback made it into this week's ... fixes and updates") use the new name, and each release lists Fixed first, then Improved, then New. The route stays `/whats-new`. **Changes the page name and section order in brief §4.8.** | Staff come to see whether their problem was fixed; the old name hid that. | The page name What's new and the New, Improved, Fixed order |
+| D47 | Board Fixed column and the Archive. Decided by the product owner on 2026-10-26, for Marc's review. The board's last column is **Fixed** and shows only items fixed in the last 7 days (`FIXED_SHOWN_DAYS`); a card can be dragged there only from Resolved. The **Closed** inbox becomes the **Archive**: every ended item, grouped by ending, with an "Ended as" filter (Praise included) and the existing search. "Assigned to me" shows open items and recently fixed ones, and its count only open ones. `GET /console/counts` returns `archive` instead of `closed`, the board move column is `fixed` instead of `closed`, and `GET /console/items` takes `ending`. | A 30-day Closed column mixed fixes with refusals and grew without limit. | The Closed column (last 30 days) and the Closed inbox |
 
 ### Asks to Chris (IT Director)
 
@@ -193,7 +198,7 @@ The intake agent talks to the user and classifies; the router decides the assign
 
 | Layer | Choice | Notes |
 | --- | --- | --- |
-| Front end | Next.js + React + TypeScript + Tailwind + shadcn/ui (D16) | One app: `/` staff landing page, `/chat` staff chat, tracker, My feedback, What's new; `/console` Digital Staff and Admin. Look at RAKE's chat UI for reference, don't copy it in. Reuse shadcn/ui components before writing new ones. |
+| Front end | Next.js + React + TypeScript + Tailwind + shadcn/ui (D16) | One app: `/` staff landing page, `/chat` staff chat, tracker, My feedback, Fixes and updates; `/console` Digital Staff and Admin. Look at RAKE's chat UI for reference, don't copy it in. Reuse shadcn/ui components before writing new ones. |
 | Auth | Google OAuth, redadair.com.au only | Role from `digital_staff`; everyone else is Staff. Session cookie: httpOnly, Secure, SameSite=Lax. |
 | API | Python 3.12, FastAPI, Pydantic v2, SSE for chat and notifications | Pydantic schemas for every agent output. Role checked on every call. |
 | Agent | Google ADK, single agent with tools, own package | `adk web` in development, Vertex AI Agent Engine in production. Gemini Flash via AI Studio key (D8). Prompt and project list versioned in the repo and the database. |
@@ -208,7 +213,7 @@ The intake agent talks to the user and classifies; the router decides the assign
 | Not used | Redis, Prisma, RAG Engine, Cloud Spanner, MCP servers (D26, D34) | Documented in `docs/architecture.md`. |
 
 ```
-Staff (intranet tile) ──► Web app (Cloud Run): staff landing and chat, tracker, My feedback, What's new
+Staff (intranet tile) ──► Web app (Cloud Run): staff landing and chat, tracker, My feedback, Fixes and updates
 Digital Staff, Admin ──► Web app (Cloud Run): console (board, list, cards, approvals, admin)
                                │
                                ▼
@@ -323,22 +328,22 @@ Embed each summary (Gemini embeddings, model and dimension in config) and compar
 Nine internal statuses; staff see five tracker stages. Digital Staff never update two things.
 
 ```
-New ──triaged──► Awaiting approval ──Admin approves──► Approved ──work starts──► In progress ⇄ Resolved ──► Closed
+New ──triaged──► Awaiting approval ──Admin approves──► Approved ──work starts──► In progress ⇄ Resolved ──► Closed (Fixed)
  │                    │      │                                                      (reopened by a submitter reply)
- └─low confidence─► Needs review ──► Awaiting approval
-                      │      └──Admin declines──► Declined or merged ──► Closed
-                      └──praise──► Acknowledged ──► Closed
+ └─low confidence─► Needs review ──► Awaiting approval          open item ──► Closed (No longer needed) or Declined (Won't fix)
+                      │      └──Admin declines──► Declined; merged ──► Declined (Duplicate)
+                      └──praise──► Acknowledged
 ```
 
 | Tracker stage (staff see) | Internal status |
 | --- | --- |
-| Received | New, Needs review, Awaiting approval |
-| Approved | Approved |
+| Received (staff see "Under review" for the last two) | New, Needs review, Awaiting approval |
+| Planned (the console says Approved, D43) | Approved |
 | In progress | In progress |
 | Resolved | Resolved |
-| Closed | Closed, Declined, Won't fix or merged, Acknowledged |
+| Closed (the last step is named by the ending, D44) | Closed, Declined, Acknowledged |
 
-Won't fix is a close reason on Declined, not a separate status (D21).
+How an item ended is the `feedback.ending` column (D44): **Fixed** and **No longer needed** are status Closed; **Won't fix**, **Duplicate** and **Declined** are status Declined (D21); praise (Acknowledged) has no ending. A Resolved item closes only as Fixed, an open one only as Won't fix or No longer needed (D45).
 
 ## Data model
 
@@ -383,7 +388,7 @@ All tables in schema `app` (ADK sessions in schema `adk`). Ids are UUIDs; times 
 | Progress update | Digital Staff | Update: found the cause, fix in testing |
 | Submitter reply | Staff | You added details |
 | Resolved | Digital Staff | Resolved: fix deployed |
-| Closed, merged, declined, won't fix | Digital Staff or Admin | Closed: merged into FB-0138 |
+| Closed, merged, declined, won't fix | Digital Staff or Admin | Duplicate of FB-0138 |
 
 ## API
 
@@ -505,7 +510,7 @@ Four one-week sprints, one per brief phase. Points are relative size, not hours;
 
 | ID | Story | Pts |
 | --- | --- | --- |
-| S4-1 | Friday release drafter (Cloud Scheduler, 9:00 AEST), owner review and publish, What's new page, contributor notifications (second to slip) | 5 |
+| S4-1 | Friday release drafter (Cloud Scheduler, 9:00 AEST), owner review and publish, Fixes and updates page, contributor notifications (second to slip) | 5 |
 | S4-2 | Production deploy: Cloud Run, Agent Engine, Cloud SQL, Cloud Storage, Secret Manager in australia-southeast1; backups; error alerting | 5 |
 | S4-3 | 3-day pilot with about 15 staff; daily fixes; no P1 open | 6 |
 | S4-4 | Feedback tile on the intranet home; one-page staff guide; console runbook | 2 |
@@ -528,7 +533,7 @@ Built against this spec, ahead of the sprint gates; merged to `main`, nothing de
 | Agent, router, brief, duplicates, attachments, backup form (S2-1 to S2-8) | Built and tested on the stub model; Word/Excel text, content-type checks, macro rejection, PII masking, abuse flag, cost log. Needs the AI Studio key (ask 3) to score the routing gate. |
 | Routing test set (S2-9) | A 40-item draft in `backend/evals/routing_set.yaml` and a runner; Marc to correct the labels. On Gemini 3.1 Flash-Lite (2026-10-21): 97.5 % project, 97.5 % work type, 100 % assignee, every brief complete: gate passed on the draft labels. The stub scores 75 % / 70 % / 75 % (keyword baseline). Re-run 2026-10-26 after the instruction changes: 97.5 % / 97.5 % / 100 %, pass. Conversation checks (`backend/evals/conversation_set.yaml`, 32 cases: follow-ups on existing feedback, misuse, privacy, off-topic, no tool named, apps we do not look after, varied writing): 32 of 32 on Gemini; record in `docs/testing/conversation-eval-2026-10-26.md`. |
 | Console, approvals, tracker, notifications, channels, dashboard, digest (S3-1 to S3-7) | Built and tested end to end; board drag-and-drop, list and cards views; in-app bell over SSE with polling fallback; email through Mailpit locally. |
-| Friday releases (S4-1) | Built: drafter, owner review, publish, What's new, contributor notifications. The drafter assembles from sources; AI rewording comes with the key. |
+| Friday releases (S4-1) | Built: drafter, owner review, publish, Fixes and updates, contributor notifications. The drafter assembles from sources; AI rewording comes with the key. |
 | Deployment (S1-1, S4-2) | Written, not run: `deploy.sh`, `deploy.ps1`, Cloud Run YAML, worker job, scheduler, CI workflow. Needs Google Cloud access (asks 1, 9) and the company GitHub repository (ask 5). Agent Engine deployment still to do once access exists. |
 | Pilot and launch (S4-3, S4-4) | Not started. |
 | Browser tests | Playwright tests of the manual checklist on the stub model and a local database: 219 of 227 items have a test; on the full run of 2026-10-25, 216 pass, 2 are known bugs awaiting a product decision (S22.01 allowance meter, S22.05 limit mid-chat, D36) and 1 is skipped (S10.09, needs Docker, which this machine does not have); 214 tests are shown able to fail; 91 of them also passed 10 runs in a row on 2026-10-23; mobile (S27), dark mode (S29) and reduced motion (S30) have no test yet. Random test failures on 2026-10-25 were traced to the API committing after it replied; fixed (`Db` in `app/api/deps.py` commits before the response) and covered by a backend test. Per requirement F1 to F18: `docs/testing/feature-evidence.md`; run reports: `docs/testing/browser-tests-2026-10-22.md`, `docs/testing/browser-tests-2026-10-23.md`; bugs: `web/e2e/FINDINGS.md`. Not run on staging or against Gemini. |
@@ -545,7 +550,7 @@ Whatever the direction:
 - **Status never relies on colour:** every badge shows a word, and an icon where it helps.
 - Keyboard-usable, readable contrast (WCAG AA) in light and dark themes.
 
-Staff screens: chat, confirm card, done, backup form, My feedback, tracker, What's new, notifications. Console: board, list, cards, detail panel (brief and properties side by side, one activity feed), approvals, project channel, release review, dashboard, admin.
+Staff screens: chat, confirm card, done, backup form, My feedback, tracker, Fixes and updates, notifications. Console: board, list, cards, detail panel (brief and properties side by side, one activity feed), approvals, project channel, release review, dashboard, admin.
 
 ## Non-functional requirements
 

@@ -4,13 +4,20 @@ import { Loader2 } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export type ActionKind = "update" | "resolve" | "close" | "decline" | "ask" | "merge";
+export type ActionKind = "update" | "resolve" | "fix" | "close" | "decline" | "ask" | "merge";
+
+/** How an open item can end by hand (D45). Fixed comes from a resolved item; duplicate and declined have their own actions. */
+export type CloseEnding = "wont_fix" | "no_longer_needed";
+
+const CLOSE_ENDINGS: [CloseEnding, string, string][] = [
+  ["wont_fix", "Won't fix", "We looked at it and the answer is no."],
+  ["no_longer_needed", "No longer needed", "It stopped mattering, or it's covered by something else."],
+];
 
 const COPY: Record<ActionKind, { title: string; description: string; field: string; button: string; required: boolean }> = {
   update: {
@@ -27,12 +34,19 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
     button: "Resolve",
     required: true,
   },
+  fix: {
+    title: "Close as fixed",
+    description: "The work is done. The item ends as Fixed for everyone following it.",
+    field: "",
+    button: "Close as fixed",
+    required: false,
+  },
   close: {
     title: "Close",
-    description: "Closing ends the item for everyone following it.",
+    description: "Choose how it ends. Staff see the ending and the reason on their tracker.",
     field: "Reason (shown to staff)",
     button: "Close",
-    required: false,
+    required: true,
   },
   decline: {
     title: "Decline",
@@ -60,7 +74,7 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
 export interface ActionResult {
   text: string;
   expectedBy?: string;
-  wontFix?: boolean;
+  ending?: CloseEnding;
   ask?: "submitter" | "owner";
 }
 
@@ -79,7 +93,7 @@ export function ActionDialog({
 }) {
   const [text, setText] = useState(initialText);
   const [expectedBy, setExpectedBy] = useState("");
-  const [wontFix, setWontFix] = useState(false);
+  const [ending, setEnding] = useState<CloseEnding | null>(null);
   const [ask, setAsk] = useState<"submitter" | "owner">("submitter");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +106,11 @@ export function ActionDialog({
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!kind) return;
-    if ((copy.required || (kind === "close" && wontFix)) && !text.trim()) {
+    if (kind === "close" && !ending) {
+      setError("Choose how it ends.");
+      return;
+    }
+    if (copy.required && !text.trim()) {
       setError(`${copy.field} is needed.`);
       return;
     }
@@ -101,12 +119,12 @@ export function ActionDialog({
       return;
     }
     setBusy(true);
-    const ok = await onSubmit(kind, { text: text.trim(), expectedBy: expectedBy || undefined, wontFix, ask });
+    const ok = await onSubmit(kind, { text: text.trim(), expectedBy: expectedBy || undefined, ending: ending ?? undefined, ask });
     setBusy(false);
     if (ok) {
       setText("");
       setExpectedBy("");
-      setWontFix(false);
+      setEnding(null);
       setError(null);
       onClose();
     }
@@ -122,9 +140,18 @@ export function ActionDialog({
     );
   } else if (kind === "close") {
     extra = (
-      <Label className="flex items-center gap-2 font-normal">
-        <Checkbox checked={wontFix} onCheckedChange={(v) => setWontFix(v === true)} /> Won&apos;t fix (the reason is required)
-      </Label>
+      <fieldset className="grid gap-2 text-sm">
+        <legend className="mb-2 font-medium">Ends as</legend>
+        {CLOSE_ENDINGS.map(([value, label, hint]) => (
+          <Label key={value} className="flex items-start gap-2 font-normal">
+            <input type="radio" name="close-ending" checked={ending === value} onChange={() => setEnding(value)} className="mt-0.5 size-4 accent-[var(--primary)]" />
+            <span>
+              <span className="font-medium">{label}</span>
+              <span className="block text-muted-foreground">{hint}</span>
+            </span>
+          </Label>
+        ))}
+      </fieldset>
     );
   } else if (kind === "ask") {
     extra = (
@@ -160,20 +187,22 @@ export function ActionDialog({
             <DialogDescription>{copy.description}</DialogDescription>
           </DialogHeader>
           {extra}
-          <div className="grid gap-2">
-            <Label htmlFor="action-text">{copy.field}</Label>
-            {kind === "merge" ? (
-              <Input id="action-text" placeholder="FB-0138" value={text} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
-            ) : (
-              <Textarea id="action-text" rows={4} value={text} maxLength={4000} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
-            )}
-            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-          </div>
+          {kind === "fix" ? null : (
+            <div className="grid gap-2">
+              <Label htmlFor="action-text">{copy.field}</Label>
+              {kind === "merge" ? (
+                <Input id="action-text" placeholder="FB-0138" value={text} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
+              ) : (
+                <Textarea id="action-text" rows={4} value={text} maxLength={4000} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
+              )}
+              {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+            </div>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" variant={kind === "decline" || (kind === "close" && wontFix) ? "destructive" : "default"} className="h-11 rounded-xl" disabled={busy}>
+            <Button type="submit" variant={kind === "decline" || (kind === "close" && ending === "wont_fix") ? "destructive" : "default"} className="h-11 rounded-xl" disabled={busy}>
               {busy && <Loader2 className="animate-spin" />} {copy.button}
             </Button>
           </DialogFooter>

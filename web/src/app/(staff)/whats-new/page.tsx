@@ -7,12 +7,12 @@ import { api, errorText, type Release, type WorkType } from "@/lib/api";
 import { day } from "@/lib/format";
 
 const SECTIONS: { key: WorkType; title: string }[] = [
-  { key: "new_feature", title: "New" },
-  { key: "improvement", title: "Improved" },
   { key: "fix", title: "Fixed" },
+  { key: "improvement", title: "Improved" },
+  { key: "new_feature", title: "New" },
 ];
 
-/** What's new (brief §4.8.4): published Friday releases per project, newest first. */
+/** Fixes and updates (brief §4.8.4, D46): published Friday releases per project, newest first, fixes first. */
 export default function WhatsNewPage() {
   const [releases, setReleases] = useState<Release[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,7 +27,7 @@ export default function WhatsNewPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <h1 className="text-3xl font-extrabold">What&apos;s new</h1>
+      <h1 className="text-3xl font-extrabold">Fixes and updates</h1>
       <p className="mt-1 text-muted-foreground">Changes to our tools each week.</p>
 
       {projects.length > 1 && (

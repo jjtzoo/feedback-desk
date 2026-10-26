@@ -1,4 +1,4 @@
-import type { Category, Priority, Stage, Status, WorkType } from "./api";
+import type { Category, Ending, Priority, Stage, Status, WorkType } from "./api";
 
 export const WORK_TYPE_LABEL: Record<WorkType, string> = {
   fix: "Fix",
@@ -44,9 +44,19 @@ export const STATUS_LABEL: Record<Status, string> = {
   closed: "Closed",
 };
 
+/** How an item ended, in the words staff and the console both use (D44). */
+export const ENDING_LABEL: Record<Ending, string> = {
+  fixed: "Fixed",
+  wont_fix: "Won't fix",
+  duplicate: "Duplicate",
+  declined: "Declined",
+  no_longer_needed: "No longer needed",
+};
+
+/** Staff stages (D43): the console keeps "Approved", staff see "Planned". */
 export const STAGE_LABEL: Record<Stage, string> = {
   received: "Received",
-  approved: "Approved",
+  approved: "Planned",
   in_progress: "In progress",
   resolved: "Resolved",
   closed: "Closed",

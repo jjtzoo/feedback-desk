@@ -53,6 +53,7 @@ def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) 
         category=fb.category,
         priority=fb.priority,
         status=fb.status,
+        ending=fb.ending,
         stage=STAGE_OF[fb.status],
         submitter_name=fb.submitter_name,
         assignee=PersonOut(id=fb.assignee.id, name=fb.assignee.name) if fb.assignee else None,
@@ -83,9 +84,10 @@ def _filters(
     date_to: date | None = None,
     sort: str = "urgent",
     page: int = 1,
+    ending: str | None = None,
 ) -> console.Filters:
     return console.Filters(
-        inbox, project, category, priority, status, work_type, assignee, q, date_from, date_to, sort, page
+        inbox, project, category, priority, status, work_type, assignee, q, date_from, date_to, sort, page, ending
     )
 
 
@@ -136,8 +138,11 @@ async def items(
     date_to: date | None = None,
     sort: str = "urgent",
     page: int = Query(default=1, ge=1),
+    ending: str | None = None,
 ) -> ListOut:
-    f = _filters(inbox, project, category, priority, status, work_type, assignee, q, date_from, date_to, sort, page)
+    f = _filters(
+        inbox, project, category, priority, status, work_type, assignee, q, date_from, date_to, sort, page, ending
+    )
     rows, total = await console.list_items(db, user, f)
     files = await console.has_files(db, [r.id for r in rows])
     reporters = await console.reporter_counts(db, [r.id for r in rows])
@@ -218,7 +223,7 @@ async def resolve(ref: str, body: NoteIn, db: Db, user: DigitalUser) -> DetailOu
 
 @router.post("/items/{ref}/close", response_model=DetailOut)
 async def close(ref: str, body: CloseIn, db: Db, user: DigitalUser) -> DetailOut:
-    await console.close(db, user, ref, body.reason, body.wont_fix)
+    await console.close(db, user, ref, body.reason, body.ending)
     return await _detail(db, user, ref)
 
 

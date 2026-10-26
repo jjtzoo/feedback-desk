@@ -24,7 +24,16 @@ from app.models import (
     Project,
     UserPreference,
 )
-from app.models.enums import CATEGORIES, CLOSED_STATUSES, OPEN_STATUSES, PRIORITIES, PRIORITY_RANK, STATUSES, WORK_TYPES
+from app.models.enums import (
+    CATEGORIES,
+    CLOSED_STATUSES,
+    ENDINGS,
+    OPEN_STATUSES,
+    PRIORITIES,
+    PRIORITY_RANK,
+    STATUSES,
+    WORK_TYPES,
+)
 from app.services import embeddings, events, notifications
 from app.services.actors import User
 from app.services.drafts import CATEGORY_LABEL, WORK_TYPE_LABEL
@@ -40,8 +49,10 @@ BOARD_COLUMNS = (
     ("approved", "Approved", ("approved",)),
     ("in_progress", "In progress", ("in_progress",)),
     ("resolved", "Resolved", ("resolved",)),
-    ("closed", "Closed", CLOSED_STATUSES),
+    ("fixed", "Fixed", ("closed",)),
 )
+# The board's last column shows only Fixed items, for this many days; every other ending goes to the Archive (D47).
+FIXED_SHOWN_DAYS = 7
 
 
 def _now() -> datetime:
@@ -74,7 +85,7 @@ def visible_columns(user: User) -> list[tuple[str, str, tuple[str, ...]]]:
 
 @dataclass
 class Filters:
-    inbox: str = "mine"  # mine | needs_review | open | closed | overdue | all
+    inbox: str = "mine"  # mine | needs_review | open | overdue | archive | all
     project: str | None = None
     category: str | None = None
     priority: str | None = None
@@ -86,6 +97,11 @@ class Filters:
     date_to: date | None = None
     sort: str = "urgent"  # urgent | newest | oldest | expected
     page: int = 1
+    ending: str | None = None  # in the Archive: an ending, or "acknowledged" for praise
+
+
+def _recently_fixed() -> Any:
+    return and_(Feedback.ending == "fixed", Feedback.updated_at >= _now() - timedelta(days=FIXED_SHOWN_DAYS))
 
 
 def _filtered(user: User, f: Filters) -> Select[Feedback]:
@@ -94,6 +110,7 @@ def _filtered(user: User, f: Filters) -> Select[Feedback]:
     today = _now().date()
     if f.inbox == "mine":
         conds.append(Feedback.assignee_id == user.staff_id)
+        conds.append(or_(Feedback.status.in_(OPEN_STATUSES), _recently_fixed()))
     elif f.inbox == "needs_review":
         conds.append(
             or_(
@@ -103,10 +120,16 @@ def _filtered(user: User, f: Filters) -> Select[Feedback]:
         )
     elif f.inbox == "open":
         conds.append(Feedback.status.in_(OPEN_STATUSES))
-    elif f.inbox == "closed":
+    elif f.inbox == "archive":
         conds.append(Feedback.status.in_(CLOSED_STATUSES))
     elif f.inbox == "overdue":
         conds.append(and_(Feedback.expected_by < today, Feedback.status.in_(OPEN_STATUSES)))
+    if f.ending == "acknowledged":
+        conds.append(Feedback.status == "acknowledged")
+    elif f.ending in ENDINGS:
+        conds.append(Feedback.ending == f.ending)
+    elif f.ending:
+        raise ServiceError("bad_filter", "Unknown ending.")
     if f.project:
         conds.append(Feedback.project.has(Project.slug == f.project))
     if f.category:
@@ -180,15 +203,15 @@ async def board(db: AsyncSession, user: User, f: Filters) -> list[Column]:
     today = _now().date()
     for key, title, statuses in visible_columns(user):
         query = _ordered(_filtered(user, f).where(Feedback.status.in_(statuses)), f.sort)
-        if key == "closed":
-            query = query.where(Feedback.updated_at >= _now() - timedelta(days=30))
+        if key == "fixed":
+            query = query.where(_recently_fixed())
         items = list(await db.scalars(query.limit(100)))
         overdue = sum(1 for i in items if i.expected_by and i.expected_by < today and i.status in OPEN_STATUSES)
         cols.append(Column(key, title, items, len(items), overdue))
     return cols
 
 
-INBOXES = ("mine", "needs_review", "open", "overdue", "closed")
+INBOXES = ("mine", "needs_review", "open", "overdue", "archive")
 
 
 async def counts(db: AsyncSession, user: User) -> dict[str, int]:
@@ -196,7 +219,10 @@ async def counts(db: AsyncSession, user: User) -> dict[str, int]:
     require_digital(user)
     out: dict[str, int] = {}
     for inbox in INBOXES:
-        ids = _filtered(user, Filters(inbox=inbox)).with_only_columns(Feedback.id).subquery()
+        query = _filtered(user, Filters(inbox=inbox))
+        if inbox == "mine":
+            query = query.where(Feedback.status.in_(OPEN_STATUSES))  # recently fixed items show, but aren't to do
+        ids = query.with_only_columns(Feedback.id).subquery()
         out[inbox] = int(await db.scalar(select(func.count()).select_from(ids)) or 0)
     waiting = select(func.count()).where(Feedback.status.in_(APPROVAL_STATUSES))
     out["approvals"] = int(await db.scalar(waiting) or 0) if user.is_admin else 0
@@ -401,21 +427,46 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
     return await load(db, feedback_id=fb.id)
 
 
-async def close(db: AsyncSession, user: User, ref_no: str, reason: str, wont_fix: bool = False) -> Feedback:
+CLOSE_TEXT = {"fixed": "Fixed", "wont_fix": "Won't fix", "no_longer_needed": "No longer needed"}
+CLOSE_TITLE = {
+    "fixed": "{ref} is fixed",
+    "wont_fix": "{ref} won't be fixed",
+    "no_longer_needed": "{ref} is no longer needed",
+}
+
+
+async def close(db: AsyncSession, user: User, ref_no: str, reason: str, ending: str | None = None) -> Feedback:
+    """Close with a named ending (D44, D45): a resolved item closes as fixed with no reason; an open one
+    as won't fix or no longer needed, with the reason staff see on their tracker."""
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
     if fb.status in CLOSED_STATUSES:
         raise Conflict("closed", "That item is already closed.")
-    if wont_fix:
-        if not reason.strip():
-            raise ServiceError("reason_required", "Give the reason; staff see it on their tracker.")
-        fb.close_reason = f"Won't fix: {reason.strip()}"
-        _set_status(db, fb, user, "declined", fb.close_reason[:200])
+    reason = reason.strip()
+    if fb.status == "resolved":
+        if ending not in (None, "fixed"):
+            raise Conflict("resolved", "A resolved item closes as fixed. If it isn't fixed, start work on it again.")
+        ending, reason = "fixed", ""
     else:
-        fb.close_reason = reason.strip() or None
-        _set_status(db, fb, user, "closed", "Closed" + (f": {reason.strip()[:140]}" if reason.strip() else ""))
+        ending = ending or "no_longer_needed"
+        if ending == "fixed":
+            raise Conflict("not_resolved", "Only resolved items can close as fixed. Resolve it first.")
+        if ending not in CLOSE_TEXT:
+            raise ServiceError("bad_value", "Close as won't fix or no longer needed.")
+        if not reason:
+            raise ServiceError("reason_required", "Give the reason; staff see it on their tracker.")
+    fb.ending = ending
+    fb.close_reason = reason[:1000] or None
+    # Won't fix stays a declined item (D21); fixed and no longer needed are closed.
+    text = CLOSE_TEXT[ending] + (f": {reason[:140]}" if reason else "")
+    _set_status(db, fb, user, "declined" if ending == "wont_fix" else "closed", text)
     await notifications.notify_submitters(
-        db, fb, type="stage", title=f"{fb.ref_no} is closed", body=fb.close_reason or "", actor_email=user.email
+        db,
+        fb,
+        type="stage",
+        title=CLOSE_TITLE[ending].format(ref=fb.ref_no),
+        body=fb.close_reason or "",
+        actor_email=user.email,
     )
     return await load(db, feedback_id=fb.id)
 
@@ -546,8 +597,8 @@ async def merge(db: AsyncSession, user: User, ref_no: str, into_ref: str) -> Fee
         )
     )
     fb.duplicate_of = target.id
-    fb.close_reason = f"Merged into {target.ref_no}"
-    _set_status(db, fb, user, "declined", f"Closed: merged into {target.ref_no}")
+    fb.ending, fb.close_reason = "duplicate", None
+    _set_status(db, fb, user, "declined", f"Duplicate of {target.ref_no}")
     events.log(
         db,
         target.id,
@@ -560,7 +611,7 @@ async def merge(db: AsyncSession, user: User, ref_no: str, into_ref: str) -> Fee
         db,
         fb,
         type="stage",
-        title=f"{fb.ref_no} was merged into {target.ref_no}",
+        title=f"{fb.ref_no} is a duplicate of {target.ref_no}",
         body="Follow the original item for updates.",
         actor_email=user.email,
     )
@@ -579,8 +630,10 @@ async def move(db: AsyncSession, user: User, ref_no: str, column: str, note: str
         return await start_work(db, user, ref_no)
     if column == "resolved":
         return await resolve(db, user, ref_no, note)
-    if column == "closed":
-        return await close(db, user, ref_no, note)
+    if column == "fixed":
+        if fb.status != "resolved":
+            raise Conflict("bad_move", "Only resolved items can move to Fixed. Use Close to say why it ends.")
+        return await close(db, user, ref_no, "", "fixed")
     raise Conflict("bad_move", "Cards can't be moved there.")
 
 
@@ -624,13 +677,14 @@ async def approve(db: AsyncSession, user: User, ref_no: str) -> Feedback:
     if fb.status not in ("awaiting_approval", "needs_review"):
         raise Conflict("decided", "That item has already been decided.")
     fb.approved_by, fb.approved_at = user.email, _now()
-    _set_status(db, fb, user, "approved", f"Approved by {user.name}")
+    # Staff see stage 2 as Planned (D43); the console keeps Approved.
+    _set_status(db, fb, user, "approved", f"Planned ({user.name} accepted it)")
     _first_response(fb)
     await notifications.notify_submitters(
         db,
         fb,
         type="stage",
-        title=f"{fb.ref_no} was approved",
+        title=f"{fb.ref_no} is planned",
         body="The team will start on it.",
         actor_email=user.email,
     )
@@ -647,7 +701,7 @@ async def decline(db: AsyncSession, user: User, ref_no: str, reason: str) -> Fee
     fb = await load(db, ref_no=ref_no)
     if fb.status not in ("awaiting_approval", "needs_review"):
         raise Conflict("decided", "That item has already been decided.")
-    fb.close_reason = reason.strip()[:1000]
+    fb.ending, fb.close_reason = "declined", reason.strip()[:1000]
     _set_status(db, fb, user, "declined", f"Declined: {reason.strip()[:140]}")
     _first_response(fb)
     await notifications.notify_submitters(
