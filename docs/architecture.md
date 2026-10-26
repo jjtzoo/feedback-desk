@@ -112,6 +112,6 @@ Every chat turn and embedding call writes an `app.model_usage` row (tokens, esti
 
 ## Key data flows
 
-1. **Submitting:** chat message (PII masked) → agent classifies and fills the draft → confirm card → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications.
+1. **Submitting:** chat message (PII masked) → agent classifies and fills the draft, asking what happened before impact (D61) with chips that fit (the person's usual tools first, impact by fault or idea, the model's checked replies; D60, D62) → confirm card, with what happened and anything still unknown (D63) → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications.
 2. **Approving and working:** Admin approves or declines → owner starts work, posts updates and an Expected by date, resolves with a public note → every public change is an event the tracker shows, and a notification in the app and by email.
 3. **Friday release:** drafter collects the week's resolved items, public progress and channel notes → owner ticks and edits → publishes → Fixes and updates, contributors notified.

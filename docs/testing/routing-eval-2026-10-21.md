@@ -60,6 +60,7 @@ Misses:
 | Date | Change under test | Project | Work type | Assignee | Incomplete briefs | Result | Misses |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-26 | Greeting now says Sig is Smoke Signal's AI assistant (`ui/smoke-signal-brand`); same model, setup and wrapper (database `fd_eval`) | 97.5 % (39 / 40) | 100 % (40 / 40) | 100 % (40 / 40) | 0 | PASS | Project: the Flipbook tile item, as above |
+| 2026-10-26 | Conversation quality (`fix/agent-conversation-quality`, D60 to D63): what happened before impact, one thing per message, chips that fit; gemini-3.1-flash-lite, a throwaway local database (`feedback_routing`) with dev sign-in | 97.5 % (39 / 40) | 95.0 % (38 / 40) | 100 % (40 / 40) | 0 | PASS | The Flipbook tile item, and the two improvements read as new features, as in the first run |
 
 ## The labelled set
 
