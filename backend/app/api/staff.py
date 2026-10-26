@@ -73,7 +73,7 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         project=fb.project.name if fb.project else None,
         category=labels["category"],
         work_type=labels["work_type"],
-        priority=fb.priority,
+        priority=None if fb.category == "praise" else fb.priority,  # praise is thanks, not a request (D50)
         status=fb.status,
         ending=fb.ending,
         status_text=v.status_text,
