@@ -4,6 +4,7 @@ The project list lives in the database, never in the prompt: a new intranet tool
 entry away from being recognised by the agent.
 """
 
+import re
 import uuid
 from typing import Any
 
@@ -31,6 +32,20 @@ async def project_by_slug(db: AsyncSession, slug: str, active_only: bool = True)
         query = query.where(Project.active.is_(True))
     project: Project | None = await db.scalar(query)
     return project
+
+
+UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
+
+
+def named_in(said: str, project: Any) -> bool:
+    """Whether the person's words name the project: its name, an alias or a keyword, as whole words.
+
+    Words end at anything but a Latin letter or digit, not at \\b: in "Flipbook的页面" the Chinese
+    characters count as word characters, so \\b would miss the name.
+    """
+    low = said.lower()
+    words = [project.name, project.slug.replace("-", " "), *project.aliases, *project.keywords]
+    return any(re.search(rf"(?<![a-z0-9]){re.escape(w.lower())}(?![a-z0-9])", low) for w in words if w)
 
 
 def _clean_list(values: Any) -> list[str]:

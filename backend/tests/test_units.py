@@ -185,16 +185,16 @@ def test_draft_validation_rejects_unknown_values() -> None:
 def test_a_tool_only_counts_as_named_when_the_person_said_it() -> None:
     from types import SimpleNamespace
 
-    from agent.tools import _names
+    from app.services.catalog import named_in
 
     intranet = SimpleNamespace(
         name="Intranet site itself", slug="intranet", aliases=["intranet"], keywords=["home page", "tile", "menu"]
     )
-    assert not _names("page is slow to load", intranet)  # "page" alone names nothing
-    assert _names("The intranet home page is slow", intranet)
-    assert _names("the Flipbook tile on the home page goes to a 404", intranet)
+    assert not named_in("page is slow to load", intranet)  # "page" alone names nothing
+    assert named_in("The intranet home page is slow", intranet)
+    assert named_in("the Flipbook tile on the home page goes to a 404", intranet)
     rake = SimpleNamespace(name="RAKE Agent", slug="rake-agent", aliases=["rake"], keywords=["policy answer"])
-    assert _names("RAKE gives a blank answer", rake) and not _names("the drake is broken", rake)
+    assert named_in("RAKE gives a blank answer", rake) and not named_in("the drake is broken", rake)
 
 
 def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
@@ -255,6 +255,14 @@ async def test_editing_the_draft_clears_the_confirmation() -> None:
     ctx = FakeContext(state={"draft": dict(COMPLETE), "draft_confirmed": True})
     await tools.update_draft(ctx, priority="P1")  # type: ignore[arg-type]
     assert ctx.state["draft_confirmed"] is False
+
+
+async def test_the_agent_is_told_the_card_is_hidden_while_a_required_field_is_empty() -> None:
+    # Found by the pressure set: someone who wouldn't pick an impact was told to press Confirm with no card.
+    ctx = FakeContext(state={"draft": {k: v for k, v in COMPLETE.items() if k != "priority"}})
+    result = await tools.update_draft(ctx, summary="RAKE gives blank answers")  # type: ignore[arg-type]
+    assert result["missing"] == ["priority"] and "No confirm card yet: priority" in result["card"]
+    assert "card" not in await tools.update_draft(ctx, priority="P3")  # type: ignore[arg-type]
 
 
 async def test_submit_tool_refuses_without_confirm_even_if_the_guard_is_skipped() -> None:

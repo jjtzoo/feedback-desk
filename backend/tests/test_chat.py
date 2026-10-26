@@ -341,6 +341,25 @@ async def test_sessions_survive_an_api_restart(staff: httpx.AsyncClient) -> None
     assert texts(events)[-1] == ASK_EXPECTED
 
 
+def test_a_guessed_tool_holds_the_card_until_the_person_names_it() -> None:
+    # Found by the conversation checks: "the system keeps crashing" got a card while Sig was still
+    # asking which tool, because its question didn't end with "?".
+    from types import SimpleNamespace
+
+    from app.api.chat import _tool_unconfirmed as held
+
+    rake = SimpleNamespace(name="RAKE Agent", slug="rake-agent", aliases=["rake"], keywords=[])
+    assert held({"user_text": "the system keeps crashing\nBlocking my work"}, "rake-agent", rake)
+    assert not held({"user_text": "the system keeps crashing\nRAKE Agent"}, "rake-agent", rake)  # the chip
+    assert not held({"user_text": "it keeps crashing", "project_hint": "rake-agent"}, "rake-agent", rake)  # page link
+    flipbook = SimpleNamespace(name="Flipbook", slug="flipbook", aliases=[], keywords=[])
+    assert not held({"user_text": "Flipbook的页面是空白的"}, "flipbook", flipbook)  # no space before Chinese text
+    # "general" is for someone who doesn't know the tool, or ran out of questions; earlier it is a guess.
+    assert held({"user_text": "the system keeps crashing\nBlocking my work", "questions": 1}, "general", None)
+    assert not held({"user_text": "the system keeps crashing\nNot sure", "questions": 1}, "general", None)
+    assert not held({"user_text": "rake\nrake\nrake", "questions": 3}, "general", None)
+
+
 def test_a_message_that_lists_the_card_fields_is_cut_back_to_the_lead_in() -> None:
     listed = f"Looks like someone raised this.\n\n{SHOW_SUMMARY}\n\n**Title:** Blank answer\n**Priority:** P2"
     assert _without_card_fields(listed) == f"Looks like someone raised this.\n\n{SHOW_SUMMARY}"

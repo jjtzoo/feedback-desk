@@ -229,6 +229,20 @@ def _without_card_fields(text: str) -> str:
     return text if at < 0 else text[:at] + SHOW_SUMMARY
 
 
+def _tool_unconfirmed(state: dict[str, Any], slug: str | None, project: Any) -> bool:
+    """Whether the draft's tool is still the agent's guess, so the card waits for the person's answer
+    however the question is worded (the "?" check alone let a card through mid-question).
+
+    A named tool counts once the page passed it or the person said it. "general" counts once they
+    said they don't know, or the questions ran out: set any earlier, it is a guess too.
+    """
+    said = str(state.get("user_text") or "")
+    if slug == GENERAL:
+        unsure = catalog.UNSURE_RE.search(said.lower()) is not None
+        return not unsure and int(state.get("questions") or 0) < get_settings().max_questions
+    return project is not None and slug != state.get("project_hint") and not catalog.named_in(said, project)
+
+
 def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False, default=str)}
 
@@ -269,13 +283,14 @@ async def _stream(
     asking = bool(said) and said[-1].rstrip().endswith("?")
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
-    if is_complete(draft) and not asking:
-        async with session_scope() as db:
-            slug = draft.get("project_slug")
-            project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
+    slug = draft.get("project_slug")
+    async with session_scope() as db:
+        project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
+    guessed = _tool_unconfirmed(state, slug, project)
+    if is_complete(draft) and not asking and not guessed:
         yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": draft_hash(draft)})
     else:
-        if not draft.get("project_slug"):
+        if not slug or guessed:
             async with session_scope() as db:
                 projects = await catalog.list_projects(db)
             options = [{"label": p.name, "value": p.name} for p in projects] + [

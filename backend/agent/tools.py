@@ -5,7 +5,6 @@ user from session state, which only the API writes (D12).
 """
 
 import logging
-import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -20,7 +19,6 @@ from app.services.actors import User
 from app.services.drafts import GENERAL, apply_update, missing
 
 log = logging.getLogger(__name__)
-UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
 
 
 async def list_projects() -> dict[str, Any]:
@@ -120,8 +118,8 @@ async def update_draft(
     slug = draft.get("project_slug")
     chosen = next((p for p in projects if p.slug == slug), None)
     said = str(tool_context.state.get("user_text") or "")
-    if chosen and slug != tool_context.state.get("project_hint") and not _names(said, chosen):
-        if UNSURE_RE.search(said.lower()):
+    if chosen and slug != tool_context.state.get("project_hint") and not catalog.named_in(said, chosen):
+        if catalog.UNSURE_RE.search(said.lower()):
             # They were asked and don't know: the Digital team checks it (needs review), no more questions.
             draft["project_slug"] = GENERAL
             draft.setdefault("confidence", {})["project"] = 0.3
@@ -135,14 +133,15 @@ async def update_draft(
     tool_context.state["draft"] = draft
     # Any edit means the person has not confirmed this version (D12).
     tool_context.state["draft_confirmed"] = False
-    return {"draft": draft, "missing": missing(draft), "errors": errors, **result}
-
-
-def _names(said: str, project: Any) -> bool:
-    """Whether the person's words name the project: its name, an alias or a keyword, as whole words."""
-    low = said.lower()
-    words = [project.name, project.slug.replace("-", " "), *project.aliases, *project.keywords]
-    return any(re.search(rf"\b{re.escape(w.lower())}\b", low) for w in words if w)
+    gaps = missing(draft)
+    if gaps:
+        # The page shows the card only once nothing is missing; telling the person to press Confirm
+        # before then leaves them looking for a button that isn't there.
+        result["card"] = (
+            f"No confirm card yet: {', '.join(gaps)} still empty. "
+            "Don't say \"Here's what I'll send\" until they are set."
+        )
+    return {"draft": draft, "missing": gaps, "errors": errors, **result}
 
 
 async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str, Any]:
