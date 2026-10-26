@@ -76,7 +76,8 @@ function events(body: string): { name: string; data: Record<string, unknown> }[]
 
 /**
  * Raise feedback as the signed-in person without the screen, to set up what a test then looks at.
- * Answers any question the stub asks until the card shows, then confirms. Returns the reference.
+ * Answers any question the stub asks until the card shows (a yes to "Want me to send that to the team?"
+ * for praise and questions, D64), then confirms. Returns the reference.
  */
 export async function raise(page: Page, message: string, answers: string[] = [], project: string | null = null) {
   const api = page.request;
@@ -99,6 +100,7 @@ export async function raise(page: Page, message: string, answers: string[] = [],
     if (evs.some((e) => e.name === "draft")) break;
     evs = await say(a);
   }
+  if (evs.some((e) => e.name === "message" && String(e.data.text).includes(SEND_CHECK))) evs = await say("Yes, send it to the team");
   const draft = evs.find((e) => e.name === "draft");
   if (!draft) throw new Error(`No confirm card for: ${message}\n${seen.join("\n")}`);
   const done = events(
@@ -107,6 +109,9 @@ export async function raise(page: Page, message: string, answers: string[] = [],
   if (!done) throw new Error(`Not saved: ${message}`);
   return done.data.reference as string;
 }
+
+/** Sig's check before the card for praise and questions (D64). */
+export const SEND_CHECK = "Want me to send that to the team?";
 
 /** The phrase from the manual checklist that steers the model to a plain bug. */
 export const BUG = "The Training Portal shows an error when I open my certificate";
@@ -186,12 +191,14 @@ export async function reachBackupForm(page: Page) {
   await expect(page.getByText("Sorry, this is taking longer than it should.")).toBeVisible({ timeout: 20_000 });
 }
 
-/** Answer Sig's questions (impact chip, then expected and actual) until the confirm card shows. */
+/** Answer Sig's questions (impact chip or Yes, send it, then expected and actual) until the confirm card shows. */
 export async function answerUntilCard(page: Page) {
   for (let i = 0; i < 5; i++) {
     if (await page.getByRole("button", { name: "Confirm" }).isVisible()) return;
     const impact = page.getByRole("button", { name: "Slower, but I get there" });
+    const send = page.getByRole("button", { name: "Yes, send it" });
     if (await impact.isVisible()) await impact.click();
+    else if (await send.isVisible()) await send.click();
     else await chatSay(page, "I expected it to work but got a blank screen");
     await expect(page.getByText("Sig is writing…")).toHaveCount(0, { timeout: 20_000 });
   }

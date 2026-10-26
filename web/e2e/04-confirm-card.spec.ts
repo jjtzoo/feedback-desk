@@ -168,6 +168,7 @@ test("S04.10 Praise is confirmed without approval and its tracker ends on Acknow
   await signIn("Mei");
   await openChat(page);
   await chatSay(page, "Thanks for the Training Portal update, works great");
+  await page.getByRole("button", { name: "Yes, send it" }).click();
   await expect(card(page)).toBeVisible();
   const ref = await confirm(page);
   await expect(page.getByText(/It's with Marc\./)).toBeVisible();
@@ -235,4 +236,15 @@ test("S04.14 The card shows what happened and what Sig couldn't find out; what y
   await expect(chat(page).getByText("You: Open My courses, then press Start on any course")).toBeVisible();
   await expect(card(page)).toBeVisible();
   await expect(card(page).getByRole("form", { name: "We don't know yet" })).toHaveCount(0);
+});
+
+test("S04.15 A how-to question asks 'Want me to send that to the team?' first; No thanks sends nothing", async ({ page, signIn }) => {
+  await signIn("Liam");
+  await openChat(page);
+  await chatSay(page, "How do I export my CPD points from the CPD Tracker?");
+  await expect(page.getByText("Want me to send that to the team?")).toBeVisible();
+  await expect(card(page)).toHaveCount(0);
+  await page.getByRole("button", { name: "No thanks" }).click();
+  await expect(page.getByText("No worries, I won't send it.", { exact: false })).toBeVisible();
+  await expect(card(page)).toHaveCount(0);
 });

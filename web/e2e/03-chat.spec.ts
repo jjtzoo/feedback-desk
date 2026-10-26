@@ -246,3 +246,28 @@ test("S03.19 With no tool named, the tool chips show the tools you've reported o
   await expect(chips.getByText("Your usual tools", { exact: true }).locator("..").getByRole("button")).toHaveText(["RAKE Agent"]);
   await expect(chips.getByRole("button").last()).toHaveText("Not sure");
 });
+
+test("S03.20 'My app is slow' gets the tool chips under the tool question and never an impact question", async ({ page, signIn }) => {
+  await signIn("Aisha");
+  await page.goto("/chat");
+  await chatSay(page, "My app is slow");
+  await expect(page.getByText("Which tool is this about?")).toBeVisible();
+  const chips = page.getByRole("listitem", { name: "Quick answers" });
+  await expect(chips.getByRole("button").last()).toHaveText("Not sure");
+  await expect(chips.getByRole("button", { name: "Slower, but I get there" })).toHaveCount(0);
+  await chips.getByRole("button", { name: "AFSS Portal" }).click();
+  const summary = page.getByRole("region", { name: "Your feedback" });
+  await expect(summary).toContainText("P2");
+  await expect(page.getByText("How much is this affecting your work?")).toHaveCount(0);
+});
+
+test("S03.21 A question about Sig gets a short answer, with no chips and no card", async ({ page, signIn }) => {
+  await signIn("Aisha");
+  await page.goto("/chat");
+  await chatSay(page, "what is your role");
+  await expect(page.getByText(/^I'm Sig\./)).toBeVisible();
+  await chatSay(page, "why do we need you when we already have rake rgent");
+  await expect(page.getByText(/^I'm Sig\./)).toHaveCount(2);
+  await expect(page.getByRole("listitem", { name: "Quick answers" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Your feedback" })).toHaveCount(0);
+});
