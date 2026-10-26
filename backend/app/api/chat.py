@@ -284,17 +284,20 @@ async def _stream(
         return
 
     # The page follows the conversation, not the draft (review item 20): the card and the chips
-    # appear for the step Sig signalled this turn. With no step Sig is just chatting.
+    # appear for the step Sig signalled this turn. With no step Sig is just chatting, and a card
+    # already up stays while its draft is unchanged ("yes" at the card, a side question).
     draft = state.get("draft") or {}
     step = state.get("step")
     replies = state.get("replies") or []
+    shown = draft_hash(draft) if is_complete(draft) else None
+    keep = step == "show_card" or (step is None and shown is not None and state.get("card_hash") == shown)
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
-    if step == "show_card" and is_complete(draft):
+    if keep and shown:
         async with session_scope() as db:
             slug = draft.get("project_slug")
             project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
-        yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": draft_hash(draft)})
+        yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": shown})
     elif step == "ask_tool":
         yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
     elif step == "ask_impact" and not draft.get("priority"):
@@ -303,7 +306,9 @@ async def _stream(
         yield _sse("chips", {"kind": "reply", "options": CHECK_SEND_CHIPS})
     elif step and replies:
         yield _sse("chips", {"kind": "reply", "options": [{"label": r, "value": r} for r in replies]})
+    after: dict[str, Any] = {"card_hash": shown if keep else None}
     if step and step.startswith("ask_"):
         # Only intake questions count towards the 3 (brief §4.1.3); chat about Sig does not.
-        await runtime.update_state(user, session_id, {"questions": int(state.get("questions") or 0) + 1})
+        after["questions"] = int(state.get("questions") or 0) + 1
+    await runtime.update_state(user, session_id, after)
     yield _sse("end", {})

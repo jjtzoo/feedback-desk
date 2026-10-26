@@ -159,8 +159,9 @@ IMPACT_IDEA = [
 
 # What Sig's next message does, signalled through update_draft's next_step (review item 20): the page
 # shows the card and the chips for that step only, never because the draft happens to be complete.
-# Chat with no step (a question about Sig, small talk) gets neither.
-NEXT_STEPS = ("ask_tool", "ask_details", "ask_impact", "ask_work_type", "check_send", "show_card")
+# Chat with no step (a question about Sig, small talk) gets neither; a card already up stays while its
+# draft is unchanged, until a step replaces it ("chat" when they don't want to send it after all).
+NEXT_STEPS = ("ask_tool", "ask_details", "ask_impact", "ask_work_type", "check_send", "show_card", "chat")
 # "Want me to send that to the team?" before the card for a question or praise (review item 18).
 CHECK_SEND_CHIPS = [
     {"label": "Yes, send it", "value": "Yes, send it to the team"},

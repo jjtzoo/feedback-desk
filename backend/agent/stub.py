@@ -251,6 +251,8 @@ def _describe(contents: list[types.Content], projects: list[dict[str, Any]]) -> 
     if asked.startswith((SHOW_SUMMARY, PRESS_CONFIRM)) or "Here's what I'll send" in asked:
         if any(low == w or low.startswith(w + " ") for w in CONFIRM_WORDS) or "submit" in low:
             return _say(PRESS_CONFIRM)
+        if DECLINE_RE.search(low) or "never mind" in low:
+            return _call("update_draft", {"next_step": "chat"})
         return _call("update_draft", _correction(text, projects, draft))
 
     # A new description, unless it is about Sig or an item that already exists.
@@ -299,6 +301,8 @@ def _next_step(contents: list[types.Content], data: dict[str, Any]) -> LlmRespon
     if data.get("errors"):
         return _say("Sorry, I couldn't use that: " + " ".join(data["errors"]))
     draft: dict[str, Any] = data.get("draft", {})
+    if data.get("next_step") == "chat":
+        return _say(NOT_SENT)
     step, line = None, SHOW_SUMMARY
     if _questions_asked(contents) < 3:
         brief = draft.get("brief", {})

@@ -507,3 +507,18 @@ async def test_a_tool_name_alone_starts_no_report(staff: httpx.AsyncClient) -> N
     events = await say(staff, sid, "why do we need you when we already have rake rgent")
     assert texts(events) == [ABOUT_SIG] and first(events, "draft") is None
     assert await count() == 0
+
+
+async def test_the_card_stays_up_for_a_yes_and_goes_when_they_change_their_mind(staff: httpx.AsyncClient) -> None:
+    """Review item 20: a card already up stays while its draft is unchanged; "never mind" takes it away."""
+    sid = await start_chat(staff, project="flipbook")
+    events = await say(staff, sid, "Flipbook crashes when I open the brochure, it's blocking my work")
+    events = await say(staff, sid, "I expected the brochure but got a white screen")
+    shown = first(events, "draft")
+    assert shown is not None
+    events = await say(staff, sid, "yes")
+    assert texts(events) == ["Press Confirm on the summary to send it, or tell me what to change."]
+    assert first(events, "draft") == shown
+    events = await say(staff, sid, "never mind")
+    assert texts(events) == [NOT_SENT] and first(events, "draft") is None
+    assert await count() == 0

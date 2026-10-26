@@ -23,7 +23,6 @@ async function raiseSeparately(mike: Page, text: string) {
   await mike.goto("/chat");
   await expect(mike.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(mike, text);
-  await mike.getByRole("button", { name: "Slower, but I get there" }).click();
   await expect(mike.getByText("Someone may have raised this already", { exact: true })).toBeVisible();
   await mike.getByRole("button", { name: "Confirm" }).click();
   const heading = mike.getByRole("heading", { name: /Sent\. Your reference is FB-\d{4}/ });

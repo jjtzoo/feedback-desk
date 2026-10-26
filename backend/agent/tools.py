@@ -123,8 +123,9 @@ async def update_draft(
         next_step: what your next message does, so the page shows the right chips or the card:
             ask_tool (which tool), ask_details (what happened or what they'd like), ask_impact (how
             much it affects their work), ask_work_type (broken or new), check_send ("Want me to send
-            that to the team?") or show_card (the summary card). Set it on every call. Leave it
-            out only when you are just chatting.
+            that to the team?"), show_card (the summary card) or chat (they don't want to send it
+            after all: the card goes). Set it on every call. Leave it out only when you are just
+            chatting.
 
     Returns:
         draft, missing (required fields still empty), errors (rejected values) and next_step.

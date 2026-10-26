@@ -257,7 +257,7 @@ test("S03.20 'My app is slow' gets the tool chips under the tool question and ne
   await expect(chips.getByRole("button", { name: "Slower, but I get there" })).toHaveCount(0);
   await chips.getByRole("button", { name: "AFSS Portal" }).click();
   const summary = page.getByRole("region", { name: "Your feedback" });
-  await expect(summary).toContainText("P2");
+  await expect(summary).toContainText("Major");
   await expect(page.getByText("How much is this affecting your work?")).toHaveCount(0);
 });
 
@@ -265,9 +265,10 @@ test("S03.21 A question about Sig gets a short answer, with no chips and no card
   await signIn("Aisha");
   await page.goto("/chat");
   await chatSay(page, "what is your role");
-  await expect(page.getByText(/^I'm Sig\./)).toBeVisible();
+  const answer = page.getByText("I'm Sig. I pass what you tell me about our intranet tools to the Digital team");
+  await expect(answer).toBeVisible();
   await chatSay(page, "why do we need you when we already have rake rgent");
-  await expect(page.getByText(/^I'm Sig\./)).toHaveCount(2);
+  await expect(answer).toHaveCount(2);
   await expect(page.getByRole("listitem", { name: "Quick answers" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Your feedback" })).toHaveCount(0);
 });
