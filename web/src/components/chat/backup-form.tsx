@@ -3,6 +3,7 @@
 import { CircleAlert, Loader2, Send, TriangleAlert } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 
+import { DISCLOSURE } from "@/components/chat/disclosure";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -154,6 +155,7 @@ export function BackupForm({
         <Button type="submit" className="h-11 rounded-xl px-6 text-base" disabled={busy}>
           {busy ? <Loader2 className="animate-spin" /> : <Send />} Send feedback
         </Button>
+        <p className="mt-2 text-xs text-muted-foreground">{DISCLOSURE}</p>
       </div>
     </form>
   );
