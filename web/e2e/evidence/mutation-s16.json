@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T00:43:37.885Z",
-  "commit": "8858e8f",
-  "uncommitted": true,
+  "ran": "2026-10-26T05:26:12.808Z",
+  "commit": "e2737c6",
+  "uncommitted": false,
   "spec": "16-merge-duplicates.spec.ts",
-  "fingerprint": "f4cd01677045c61f",
+  "fingerprint": "15bd018f34ed382f",
   "caught": {
     "S16.01": true,
     "S16.02": true,
