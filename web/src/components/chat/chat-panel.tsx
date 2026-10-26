@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { BackupForm } from "@/components/chat/backup-form";
 import { ConfirmCard } from "@/components/chat/confirm-card";
 import { DoneView } from "@/components/chat/done-view";
-import { SigAvatar, type SigState } from "@/components/chat/sig-avatar";
+import { SigAvatar, type SigReaction, type SigState } from "@/components/chat/sig-avatar";
 import { UsageMeter } from "@/components/chat/usage-meter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +49,13 @@ function captureContext(): Record<string, string> {
   };
 }
 
+/** Sig's one-off reaction, played over any held pose and cleared when its animation ends. */
+function useSigReaction(held: SigReaction | null) {
+  const [once, setOnce] = useState<SigReaction | null>(null);
+  const end = useCallback(() => setOnce(null), []);
+  return { reaction: once ?? held, play: setOnce, end };
+}
+
 export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | null; starterText?: string }) {
   const [mode, setMode] = useState<Mode>("starting");
   const [start, setStart] = useState<ChatStart | null>(null);
@@ -69,10 +76,14 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const [allowance, setAllowance] = useState<Allowance | null>(null);
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [typing, setTyping] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLOListElement>(null);
   const started = useRef<string | null>(null);
+
+  const held: SigReaction | null = mode === "fallback" ? "slump" : dragging ? "wow" : card ? "lean" : typing ? "look-down" : null;
+  const { reaction, play, end } = useSigReaction(held);
 
   const refreshAllowance = useCallback(() => {
     api.get<Allowance>("/usage/me").then(setAllowance).catch(() => undefined);
@@ -103,12 +114,13 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         }
         setTurns([{ role: "agent", text: s.greeting ?? "What's on your mind?" }]);
         setMode("chat");
+        play("pop");
       })
       .catch((e: unknown) => {
         if (e instanceof ApiError && e.status === 429) setError(e.message);
         setMode("fallback");
       });
-  }, [project, round, refreshAllowance]);
+  }, [project, round, refreshAllowance, play]);
 
   useEffect(() => {
     // Scroll the message list only, never the page.
@@ -121,6 +133,13 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     if (mode === "chat" && starterText) input.current?.focus();
   }, [mode, starterText]);
 
+  // Sig looks down at the box while the person types, and back up a second after they stop.
+  useEffect(() => {
+    if (!typing) return;
+    const t = setTimeout(() => setTyping(false), 1000);
+    return () => clearTimeout(t);
+  }, [text, typing]);
+
   // When the confirm card appears, move focus to it so keyboard and screen-reader users land on it.
   useEffect(() => {
     if (card) document.getElementById("confirm-title")?.focus();
@@ -128,6 +147,15 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
 
   const sid = start?.session_id ?? null;
   const userTyped = turns.filter((t) => t.role === "user").map((t) => t.text).join("\n\n");
+
+  const finish = useCallback(
+    (s: Saved, plusOne: boolean) => {
+      setSaved({ saved: s, plusOne });
+      setMode("done");
+      play(plusOne ? "double-hop" : "hop-puff");
+    },
+    [play],
+  );
 
   const run = useCallback(
     async (path: string, body: unknown) => {
@@ -141,7 +169,10 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         await streamChat(path, body, (e) => {
           if (e.type === "message") setTurns((t) => [...t, { role: "agent", text: e.text }]);
           else if (e.type === "chips") setChips(e.options);
-          else if (e.type === "duplicates") setDuplicates(e.candidates);
+          else if (e.type === "duplicates") {
+            setDuplicates(e.candidates);
+            if (e.candidates.length > 0) play("tilt");
+          }
           else if (e.type === "draft") {
             drafted = true;
             setCard({ card: e.card, hash: e.hash });
@@ -154,30 +185,32 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
         });
       } catch (e) {
         setError(errorText(e));
+        play("glitch");
       } finally {
         setBusy(false);
         refreshAllowance();
       }
       if (done) {
-        setSaved({ saved: done, plusOne: false });
-        setMode("done");
+        finish(done, false);
       } else if (fallback) {
         setMode("fallback");
       } else if (!drafted) {
         input.current?.focus();
       }
     },
-    [refreshAllowance],
+    [refreshAllowance, play, finish],
   );
 
   async function send(message: string) {
     const clean = message.trim();
     if (!clean || busy || !sid) return;
     setText("");
+    setTyping(false);
     setCard(null);
     const attached = files;
     setFiles([]);
     setTurns((t) => [...t, { role: "user", text: clean, files: attached.map((f) => f.file_name) }]);
+    play("nod");
     await run(`/chat/sessions/${sid}/messages`, { text: clean, attachment_ids: attached.map((f) => f.id) });
   }
 
@@ -201,8 +234,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     setBusy(true);
     try {
       const s = await api.post<Saved>(`/chat/sessions/${sid}/plus-one`, { reference, comment: userTyped });
-      setSaved({ saved: s, plusOne: true });
-      setMode("done");
+      finish(s, true);
     } catch (e) {
       setError(errorText(e));
     } finally {
@@ -256,7 +288,13 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   return (
     <section aria-label="Chat with Sig, the feedback assistant" className="min-w-0 overflow-hidden rounded-3xl border bg-card shadow-card">
       <header className="flex items-center gap-3 border-b px-5 py-4">
-        <SigAvatar state={sig} className="size-12" />
+        <SigAvatar
+          state={sig}
+          reaction={reaction}
+          onReactionEnd={end}
+          onClick={sig === "offline" ? undefined : () => play("wink")}
+          className="size-12"
+        />
         <div>
           <p className="flex items-center gap-2 font-bold">
             Sig <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">AI</span>
@@ -283,10 +321,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
             reason={fallbackReason}
             sessionId={sid}
             context={context}
-            onSaved={(s) => {
-              setSaved({ saved: s, plusOne: false });
-              setMode("done");
-            }}
+            onSaved={(s) => finish(s, false)}
           />
         </>
       )}
@@ -428,7 +463,10 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                 readOnly={busy}
                 aria-busy={busy}
                 placeholder={firstMessage ? "Describe it in your own words" : "Type your reply"}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  setTyping(true);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();

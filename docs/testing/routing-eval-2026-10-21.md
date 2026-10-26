@@ -55,6 +55,12 @@ Misses:
 - Work type: wanted `improvement`, got `new_feature` for "RAKE answers would be better if they linked to the policy page."
 - Work type: wanted `improvement`, got `new_feature` for "It would help if the helpers platform remembered my last question."
 
+### Later runs
+
+| Date | Change under test | Project | Work type | Assignee | Incomplete briefs | Result | Misses |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-26 | Greeting now says Sig is Smoke Signal's AI assistant (`ui/smoke-signal-brand`); same model, setup and wrapper (database `fd_eval`) | 97.5 % (39 / 40) | 100 % (40 / 40) | 100 % (40 / 40) | 0 | PASS | Project: the Flipbook tile item, as above |
+
 ## The labelled set
 
 - 40 items across 16 projects: 20 fix, 8 no_change, 7 improvement, 5 new_feature.
