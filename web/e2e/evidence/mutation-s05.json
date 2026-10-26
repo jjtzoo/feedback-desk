@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T05:24:45.538Z",
-  "commit": "c45ce25",
+  "ran": "2026-10-26T07:31:53.650Z",
+  "commit": "66237d6",
   "uncommitted": false,
   "spec": "05-duplicates.spec.ts",
-  "fingerprint": "68d5fdee4f25a849",
+  "fingerprint": "b75de600ff4e9961",
   "caught": {
     "S05.01": true,
     "S05.02": true,
