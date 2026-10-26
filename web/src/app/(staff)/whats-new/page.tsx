@@ -3,13 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { api, errorText, type Release, type WorkType } from "@/lib/api";
+import { api, errorText, type Release, type ReleaseItem } from "@/lib/api";
 import { day } from "@/lib/format";
 
-const SECTIONS: { key: WorkType; title: string }[] = [
-  { key: "fix", title: "Fixed" },
-  { key: "improvement", title: "Improved" },
-  { key: "new_feature", title: "New" },
+// A progress update isn't shipped yet, so it sits under In progress whatever its work type.
+const SECTIONS: { key: string; title: string; match: (i: ReleaseItem) => boolean }[] = [
+  ...([
+    ["fix", "Fixed"],
+    ["improvement", "Improved"],
+    ["new_feature", "New"],
+  ] as const).map(([key, title]) => ({ key, title, match: (i: ReleaseItem) => i.source_type !== "progress" && i.work_type === key })),
+  { key: "progress", title: "In progress", match: (i) => i.source_type === "progress" },
 ];
 
 /** Fixes and updates (brief §4.8.4, D46): published Friday releases per project, newest first, fixes first. */
@@ -61,8 +65,8 @@ export default function WhatsNewPage() {
               <h2 className="text-xl font-bold">{r.project.name}</h2>
               <p className="text-sm text-muted-foreground">Week ending {day(r.week_ending)}</p>
             </header>
-            {SECTIONS.map(({ key, title }) => {
-              const items = r.items.filter((i) => i.work_type === key);
+            {SECTIONS.map(({ key, title, match }) => {
+              const items = r.items.filter(match);
               if (!items.length) return null;
               return (
                 <section key={key} className="mt-5">
@@ -83,10 +87,10 @@ export default function WhatsNewPage() {
                 </section>
               );
             })}
-            {r.items.some((i) => !i.work_type) && (
+            {r.items.some((i) => !SECTIONS.some((s) => s.match(i))) && (
               <ul className="mt-5 grid gap-2">
                 {r.items
-                  .filter((i) => !i.work_type)
+                  .filter((i) => !SECTIONS.some((s) => s.match(i)))
                   .map((i) => (
                     <li key={i.id} className="text-sm">
                       <span className="font-semibold">{i.title}</span> {i.body}

@@ -120,12 +120,16 @@ def draft_hash(draft: Draft) -> str:
 
 
 def card(draft: Draft, project_name: str | None) -> dict[str, Any]:
-    """What the confirm card shows: project, type, summary, priority (brief §4.1 step 6)."""
+    """What the confirm card shows: project, type, summary, priority (brief §4.1 step 6).
+
+    Praise is thanks, not a request (D50): staff see "Praise" alone, with no work type or priority.
+    """
+    praise = draft.get("category") == "praise"
     return {
         "project": project_name or "Not sure yet (the Digital team will check)",
-        "work_type": WORK_TYPE_LABEL.get(draft.get("work_type", ""), ""),
+        "work_type": "" if praise else WORK_TYPE_LABEL.get(draft.get("work_type", ""), ""),
         "category": CATEGORY_LABEL.get(draft.get("category", ""), ""),
-        "priority": draft.get("priority", ""),
+        "priority": "" if praise else draft.get("priority", ""),
         "title": draft.get("title", ""),
         "summary": draft.get("summary", ""),
     }
