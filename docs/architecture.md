@@ -112,6 +112,8 @@ Every chat turn and embedding call writes an `app.model_usage` row (tokens, esti
 
 ## Key data flows
 
+The whole journey on one page: [smoke-signal-workflow.svg](design/smoke-signal-workflow.svg) (lanes for staff, Sig, system, Admin and Digital Staff, the five tracker stages, and the Friday release).
+
 1. **Submitting:** chat message (PII masked) → agent classifies and fills the draft → confirm card → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications.
 2. **Approving and working:** Admin approves or declines → owner starts work, posts updates and an Expected by date, resolves with a public note → every public change is an event the tracker shows, and a notification in the app and by email.
 3. **Friday release:** drafter collects the week's resolved items, public progress and channel notes → owner ticks and edits → publishes → Fixes and updates, contributors notified.
