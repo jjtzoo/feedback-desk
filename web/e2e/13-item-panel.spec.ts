@@ -27,6 +27,7 @@ const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 type Detail = {
   reference: string;
+  assignee: { name: string } | null;
   ai_confidence: Record<string, number>;
   messages: { is_internal: boolean; message_type: string }[];
   events: { actor_name: string | null; is_public: boolean; public_text: string | null }[];
@@ -221,7 +222,7 @@ test("S13.04 Classification shows the agent's confidence as a % for project, wor
   await expect(labels.filter({ hasText: /^Priority/ })).toContainText(`Priority (${percent("priority")})`);
 });
 
-test("S13.05 Changing project, work type, category and priority saves each, and History shows each 'corrected … → …' marked (internal)", async ({ page, signIn, team }) => {
+test("S13.05 Changing project, work type, category and priority saves each, and History says each change in words, marked (internal)", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const ref = await raiseBug(await team.as("Mei"), "rake-agent", "RAKE Agent export page shows an error when I click save");
   await openItem(page, ref);
@@ -246,10 +247,10 @@ test("S13.05 Changing project, work type, category and priority saves each, and 
   await openActivity(panelOf(page), "History");
   const entries = panelOf(page).getByRole("tabpanel").getByRole("listitem");
   for (const change of [
-    "corrected project rake-agent → project training-portal",
-    "corrected work_type fix → work_type improvement",
-    "corrected category bug → category performance",
-    "corrected priority P2 → priority P1",
+    "Changed the tool from RAKE Agent to Training Portal",
+    "Changed the work type from Fix to Improvement",
+    "Changed the category from Bug to Performance",
+    "Changed the priority from P2 · Major to P1 · Blocking",
   ]) {
     const entry = entries.filter({ hasText: change });
     await expect(entry, change).toHaveCount(1);
@@ -258,7 +259,7 @@ test("S13.05 Changing project, work type, category and priority saves each, and 
   }
 });
 
-test("S13.06 Reassigning to Mario notifies him and the tracker shows the new assignee; away people show (away) in the list", async ({ page, signIn, team }) => {
+test("S13.06 The holder hands it over to Mario: he is notified, the tracker shows Now with Mario, and away people show (away) in the list", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const liam = await team.as("Liam");
   const chris = await team.as("Chris");
@@ -270,13 +271,16 @@ test("S13.06 Reassigning to Mario notifies him and the tracker shows the new ass
   const setAway = async (away: boolean) => expect((await chris.request.patch(`/api/admin/digital-staff/${mike.id}`, { data: { is_away: away } })).ok()).toBeTruthy();
   await setAway(true);
   try {
-    await openItem(page, ref);
-    await expect(classField(page, /^Assignee/)).toHaveText("Darlene");
-    await classField(page, /^Assignee/).click();
+    const panel = await openItem(page, ref);
+    const who = panel.getByRole("region", { name: "Who has it" });
+    await expect(who).toContainText("Darlene");
+    await panel.getByRole("button", { name: "Hand over to…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Hand over" });
+    await dialog.getByRole("combobox", { name: "Hand over to" }).click();
     await expect(page.getByRole("option", { name: "Mike (away)", exact: true })).toBeVisible();
-    await expect(page.getByRole("option", { name: "Mario", exact: true })).toBeVisible();
     await page.getByRole("option", { name: "Mario", exact: true }).click();
-    await expect(classField(page, /^Assignee/)).toHaveText("Mario");
+    await dialog.getByRole("button", { name: "Hand over", exact: true }).click();
+    await expect(who).toHaveText(/With Mario/);
   } finally {
     await setAway(false);
   }
@@ -286,11 +290,10 @@ test("S13.06 Reassigning to Mario notifies him and the tracker shows the new ass
   await mario.getByRole("button", { name: /^Notifications/ }).click();
   await expect(mario.getByRole("link", { name: new RegExp(`${ref} assigned to you`) })).toBeVisible();
 
-  // The checklist says "Assigned to Mario"; the tracker's entry reads "Reassigned to Mario".
   await liam.goto(`/track/${ref}`);
   await expect(liam.getByRole("region", { name: "Who has it" })).toContainText("Mario");
   const history = await expandHistory(liam);
-  await expect(history.getByRole("listitem").first()).toContainText("Reassigned to Mario");
+  await expect(history.getByRole("listitem").first()).toContainText("Now with Mario");
 });
 
 test("S13.07 The assignee opening an item for the first time adds 'Darlene opened your feedback' to the tracker, once only", async ({ page, signIn, team }) => {
@@ -397,7 +400,7 @@ test("S13.09 The Files tab previews images inline, and PDF, Word and Excel files
   }
 });
 
-test("S13.10 The History tab lists every event with who and when, internal ones marked (internal)", async ({ page, signIn, team }) => {
+test("S13.10 The History tab lists every event in plain words with who and when, internal ones marked (internal), and no raw values", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const ref = await raiseBug(await team.as("Rafael"), "rake-agent", "RAKE Agent logs me out when I switch tabs");
   await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
@@ -415,12 +418,17 @@ test("S13.10 The History tab lists every event with who and when, internal ones 
   await expect(entries.filter({ hasText: "(internal)" })).toHaveCount(events.filter((e) => !e.is_public).length);
 
   // Who and what, public ones plain, internal ones marked.
-  for (const text of ["Rafael Santos · Received via chat", "Chris · Planned (Chris accepted it)", "Darlene · Darlene started work"]) {
+  for (const text of ["Rafael Santos · Received via chat", "Chris · Approved", "Darlene · Darlene started work"]) {
     const entry = entries.filter({ hasText: text });
     await expect(entry, text).toHaveCount(1);
     await expect(entry).not.toContainText("(internal)");
   }
-  const correction = entries.filter({ hasText: "Darlene · corrected priority P2 → priority P1" });
+  // Routing and the move to approval are the system's, in words (D56, D57).
+  await expect(entries.filter({ hasText: "System · Assigned to Darlene by routing (tool owner)" })).toHaveCount(1);
+  await expect(entries.filter({ hasText: "System · Sent for approval" })).toHaveCount(1);
+  // No status keys, field names or snake_case anywhere in the list.
+  await expect(panel.getByRole("tabpanel")).not.toContainText(/\b[a-z]+_[a-z]+\b|→/);
+  const correction = entries.filter({ hasText: "Darlene · Changed the priority from P2 · Major to P1 · Blocking" });
   await expect(correction).toHaveCount(1);
   await expect(correction).toContainText("(internal)");
 
@@ -437,4 +445,87 @@ test("S13.11 Darlene opening an Awaiting approval item sees 'Waiting for an Admi
   await expect(panel.getByText("Awaiting approval", { exact: true })).toBeVisible();
   await expect(panel.getByText("Waiting for an Admin to approve. Work starts once it's approved.")).toBeVisible();
   await expect(panel.getByRole("button", { name: "Start work" })).toHaveCount(0);
+});
+
+test("S13.12 Mario opening an item Darlene has sees Take over, but no Start work, Post update or Resolve", async ({ page, signIn, team }) => {
+  const ref = await raiseBug(await team.as("Liam"), "rake-agent", "RAKE Agent loses my filters when I go back");
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+  await signIn("Mario");
+  const panel = await openItem(page, ref);
+  await expect(panel.getByRole("region", { name: "Who has it" })).toContainText("Darlene");
+  await expect(panel.getByRole("button", { name: "Take over", exact: true })).toBeVisible();
+  for (const name of ["Start work", "Post update", "Resolve", "Hand over to…"]) await expect(panel.getByRole("button", { name, exact: true })).toHaveCount(0);
+});
+
+test("S13.13 Take over names whose it is and their latest step; Darlene is told, the tracker says Now with Mario, the submitter gets no notification", async ({ page, signIn, team }) => {
+  const liam = await team.as("Liam");
+  const ref = await raiseBug(liam, "rake-agent", "RAKE Agent hides the save button on small screens");
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+  const darlene = await team.as("Darlene");
+  await postJson(darlene, `/console/items/${ref}/update`, { body: "Looking at the layout" });
+  await postJson(liam, "/notifications/read");
+
+  await signIn("Mario");
+  const panel = await openItem(page, ref);
+  await panel.getByRole("button", { name: "Take over", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: `Take ${ref} over from Darlene?` });
+  await expect(dialog).toContainText(/Darlene posted an update (just now|\d+ m ago)\./);
+  await dialog.getByLabel("Reason (optional)").fill("I know this screen");
+  await dialog.getByRole("button", { name: "Take over", exact: true }).click();
+  await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/With Mario/);
+
+  await darlene.goto("/console");
+  await darlene.getByRole("button", { name: /^Notifications/ }).click();
+  await expect(darlene.getByRole("link", { name: new RegExp(`Mario took over ${ref}`) })).toBeVisible();
+
+  await liam.goto(`/track/${ref}`);
+  // The panel reloads for its new holder, so "Mario opened your feedback" lands just after it.
+  const history = await expandHistory(liam);
+  await expect(history.getByRole("listitem").filter({ hasText: "Now with Mario" })).toHaveCount(1);
+  await expect(liam.getByRole("button", { name: "Notifications", exact: true })).toBeVisible(); // no unread count
+});
+
+test("S13.14 When Mario and Chris both open Take over and Mario confirms first, Chris is told 'Mario has just taken this over.' and nothing changes", async ({ page, signIn, team }) => {
+  const ref = await raiseBug(await team.as("Liam"), "rake-agent", "RAKE Agent shows the wrong week on the report");
+  await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
+  await signIn("Chris");
+  const mario = await team.as("Mario");
+  const chrisPanel = await openItem(page, ref);
+  const marioPanel = await openItem(mario, ref);
+  await chrisPanel.getByRole("button", { name: "Take over", exact: true }).click();
+  await marioPanel.getByRole("button", { name: "Take over", exact: true }).click();
+  await mario.getByRole("dialog", { name: `Take ${ref} over from Darlene?` }).getByRole("button", { name: "Take over", exact: true }).click();
+  await expect(marioPanel.getByRole("region", { name: "Who has it" })).toHaveText(/With Mario/);
+
+  await page.getByRole("dialog", { name: `Take ${ref} over from Darlene?` }).getByRole("button", { name: "Take over", exact: true }).click();
+  await expect(page.getByText("Mario has just taken this over.")).toBeVisible();
+  const detail = await getJson<Detail>(page, `/console/items/${ref}`);
+  expect(detail.assignee?.name).toBe("Mario");
+});
+
+test("S13.15 On an item nobody has, Assign to me makes it yours and History reads 'Mario took this on'", async ({ page, signIn, team }) => {
+  // The abuse phrase is routed to nobody (flagged for the Admins), so it starts without a holder.
+  const ref = await raise(await team.as("Grace"), "Darlene is useless, the RAKE agent keeps crashing", ["Slowing me down", "I expected it to stay up but it crashed"]);
+  await signIn("Mario");
+  const panel = await openItem(page, ref);
+  await expect(panel.getByRole("region", { name: "Who has it" })).toContainText("Nobody has it yet");
+  await panel.getByRole("button", { name: "Assign to me", exact: true }).click();
+  await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/With Mario/);
+  await openActivity(panel, "History");
+  await expect(panel.getByRole("tabpanel").getByRole("listitem").filter({ hasText: "Mario · Mario took this on" })).toHaveCount(1);
+});
+
+test("S13.16 A newly routed item says 'Auto-assigned to Darlene · owner of RAKE Agent' with an Auto marker on its card, both gone once approved", async ({ page, signIn, team }) => {
+  const ref = await raiseBug(await team.as("Liam"), "rake-agent", "RAKE Agent forgets my language setting");
+  await signIn("Chris");
+  await page.goto("/console?inbox=open");
+  const card = page.locator('[aria-roledescription^="Draggable card"]').filter({ hasText: new RegExp(`${ref}(?!\d)`) });
+  await expect(card).toContainText("Auto");
+  const panel = await openItem(page, ref);
+  await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/Auto-assigned to Darlene · owner of RAKE Agent/);
+
+  await panel.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/^Who has itWith Darlene$/);
+  await page.keyboard.press("Escape");
+  await expect(card).not.toContainText("Auto");
 });
