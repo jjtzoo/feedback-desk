@@ -12,6 +12,7 @@ import { useMe } from "@/components/me";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserMenu } from "@/components/user-menu";
 import { defaultInbox } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; exact?: boolean; adm
 /** The queues worth a shortcut under Work: what is mine, what nobody has looked at, what is late. */
 const QUEUES: { inbox: "mine" | "needs_review" | "overdue"; label: string }[] = [
   { inbox: "mine", label: "Assigned to me" },
-  { inbox: "needs_review", label: "Unassigned / needs review" },
+  { inbox: "needs_review", label: "Triage" },
   { inbox: "overdue", label: "Overdue" },
 ];
 
@@ -128,14 +129,21 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
               </SheetContent>
             </Sheet>
             <Brand href="/console" tone="dark" />
-            <span className="hidden text-sm text-band-muted sm:inline">Console</span>
+            <span className="hidden items-center gap-3 sm:inline-flex">
+              <span className="h-6 w-px bg-white/20" aria-hidden="true" />
+              <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold tracking-wide text-primary-foreground uppercase">Console</span>
+            </span>
             <div className="ml-auto flex items-center gap-1">
-              <Button asChild variant="ghost" className="h-11 gap-1.5 rounded-full px-3 text-band-foreground hover:bg-white/10 hover:text-band-foreground">
-                <Link href="/" data-tour="nav-home">
-                  <House className="size-5" aria-hidden="true" />
-                  <span className="sr-only sm:not-sr-only">Smoke Signal home</span>
-                </Link>
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button asChild variant="ghost" size="icon" className="size-11 rounded-full text-band-foreground hover:bg-white/10 hover:text-band-foreground">
+                    <Link href="/" data-tour="nav-home" aria-label="Smoke Signal home">
+                      <House className="size-5" aria-hidden="true" />
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Smoke Signal home</TooltipContent>
+              </Tooltip>
               <GuideButton area="console" tone="dark" />
               <NotificationBell tone="dark" />
               <UserMenu tone="dark" />

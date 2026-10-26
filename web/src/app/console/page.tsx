@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 const INBOXES = [
   { key: "mine", label: "Assigned to me" },
-  { key: "needs_review", label: "Unassigned / needs review" },
+  { key: "needs_review", label: "Triage" },
   { key: "open", label: "All open" },
   { key: "overdue", label: "Overdue" },
   { key: "archive", label: "Archive" },
@@ -61,7 +61,6 @@ const GROUPS: Group[] = [
   { title: "Approved", match: (c) => c.status === "approved" },
   { title: "In progress", match: (c) => c.status === "in_progress" },
   { title: "Resolved", match: (c) => c.status === "resolved" },
-  { title: "Fixed", match: (c) => c.status === "closed" },
 ];
 
 /** The Archive groups by how each item ended. */
@@ -70,7 +69,7 @@ const ARCHIVE_GROUPS: Group[] = [
   { title: "Praise", match: (c) => c.status === "acknowledged" },
 ];
 
-type Pending = { ref: string; kind: "resolve" | "fix" | "update"; column?: "resolved" | "fixed" };
+type Pending = { ref: string; kind: "resolve" | "update" };
 
 function Work() {
   const router = useRouter();
@@ -154,15 +153,8 @@ function Work() {
   }
 
   async function move(ref: string, column: string) {
-    if (column === "fixed") {
-      const status = [...(board?.columns.flatMap((c) => c.items) ?? []), ...(list?.items ?? [])].find((c) => c.reference === ref)?.status;
-      if (status !== "resolved") {
-        toast.error("Only resolved items can move to Fixed. Use Close on the item to say why it ends.");
-        return;
-      }
-    }
-    if (column === "resolved" || column === "fixed") {
-      setPending({ ref, kind: column === "resolved" ? "resolve" : "fix", column });
+    if (column === "resolved") {
+      setPending({ ref, kind: "resolve" });
       return;
     }
     try {
@@ -191,8 +183,8 @@ function Work() {
         await api.post(`/console/items/${pending.ref}/update`, { body: r.text, expected_by: r.expectedBy ?? null });
         toast.success("Saved");
       } else {
-        await api.post(`/console/items/${pending.ref}/move`, { column: pending.column, note: r.text });
-        toast.success(pending.column === "fixed" ? `${pending.ref} closed as fixed` : `${pending.ref} resolved`);
+        await api.post(`/console/items/${pending.ref}/move`, { column: "resolved", note: r.text });
+        toast.success(`${pending.ref} resolved`);
       }
       reload();
       return true;

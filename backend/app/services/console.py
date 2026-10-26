@@ -27,6 +27,7 @@ from app.models import (
 from app.models.enums import (
     CATEGORIES,
     CLOSED_STATUSES,
+    DUE_STATUSES,
     ENDINGS,
     OPEN_STATUSES,
     PRIORITIES,
@@ -37,7 +38,7 @@ from app.models.enums import (
 from app.services import embeddings, events, notifications
 from app.services.actors import User
 from app.services.drafts import CATEGORY_LABEL, WORK_TYPE_LABEL
-from app.services.feedback import day_text, load
+from app.services.feedback import ENDING_TEXT, day_text, load
 
 log = logging.getLogger(__name__)
 
@@ -49,10 +50,10 @@ BOARD_COLUMNS = (
     ("approved", "Approved", ("approved",)),
     ("in_progress", "In progress", ("in_progress",)),
     ("resolved", "Resolved", ("resolved",)),
-    ("fixed", "Fixed", ("closed",)),
 )
-# The board's last column shows only Fixed items, for this many days; every other ending goes to the Archive (D47).
-FIXED_SHOWN_DAYS = 7
+# The board ends at Resolved; every ended item, Fixed included, goes to the Archive (D47, D52), whose
+# board has one column per ending, like its list.
+ARCHIVE_COLUMNS = (*((e, ENDING_TEXT[e]) for e in ENDINGS), ("acknowledged", "Praise"))
 
 
 def _now() -> datetime:
@@ -100,17 +101,13 @@ class Filters:
     ending: str | None = None  # in the Archive: an ending, or "acknowledged" for praise
 
 
-def _recently_fixed() -> Any:
-    return and_(Feedback.ending == "fixed", Feedback.updated_at >= _now() - timedelta(days=FIXED_SHOWN_DAYS))
-
-
 def _filtered(user: User, f: Filters) -> Select[Feedback]:
     query = select(Feedback).options(selectinload(Feedback.project), selectinload(Feedback.assignee))
     conds: list[Any] = []
     today = _now().date()
     if f.inbox == "mine":
         conds.append(Feedback.assignee_id == user.staff_id)
-        conds.append(or_(Feedback.status.in_(OPEN_STATUSES), _recently_fixed()))
+        conds.append(Feedback.status.in_(OPEN_STATUSES))
     elif f.inbox == "needs_review":
         conds.append(
             or_(
@@ -123,7 +120,7 @@ def _filtered(user: User, f: Filters) -> Select[Feedback]:
     elif f.inbox == "archive":
         conds.append(Feedback.status.in_(CLOSED_STATUSES))
     elif f.inbox == "overdue":
-        conds.append(and_(Feedback.expected_by < today, Feedback.status.in_(OPEN_STATUSES)))
+        conds.append(and_(Feedback.expected_by < today, Feedback.status.in_(DUE_STATUSES)))
     if f.ending == "acknowledged":
         conds.append(Feedback.status == "acknowledged")
     elif f.ending in ENDINGS:
@@ -200,13 +197,17 @@ class Column:
 async def board(db: AsyncSession, user: User, f: Filters) -> list[Column]:
     require_digital(user)
     cols = []
+    if f.inbox == "archive":
+        for key, title in ARCHIVE_COLUMNS:
+            ended = Feedback.status == "acknowledged" if key == "acknowledged" else Feedback.ending == key
+            items = list(await db.scalars(_ordered(_filtered(user, f).where(ended), f.sort).limit(100)))
+            cols.append(Column(key, title, items, len(items), 0))
+        return cols
     today = _now().date()
     for key, title, statuses in visible_columns(user):
         query = _ordered(_filtered(user, f).where(Feedback.status.in_(statuses)), f.sort)
-        if key == "fixed":
-            query = query.where(_recently_fixed())
         items = list(await db.scalars(query.limit(100)))
-        overdue = sum(1 for i in items if i.expected_by and i.expected_by < today and i.status in OPEN_STATUSES)
+        overdue = sum(1 for i in items if i.expected_by and i.expected_by < today and i.status in DUE_STATUSES)
         cols.append(Column(key, title, items, len(items), overdue))
     return cols
 
@@ -219,10 +220,7 @@ async def counts(db: AsyncSession, user: User) -> dict[str, int]:
     require_digital(user)
     out: dict[str, int] = {}
     for inbox in INBOXES:
-        query = _filtered(user, Filters(inbox=inbox))
-        if inbox == "mine":
-            query = query.where(Feedback.status.in_(OPEN_STATUSES))  # recently fixed items show, but aren't to do
-        ids = query.with_only_columns(Feedback.id).subquery()
+        ids = _filtered(user, Filters(inbox=inbox)).with_only_columns(Feedback.id).subquery()
         out[inbox] = int(await db.scalar(select(func.count()).select_from(ids)) or 0)
     waiting = select(func.count()).where(Feedback.status.in_(APPROVAL_STATUSES))
     out["approvals"] = int(await db.scalar(waiting) or 0) if user.is_admin else 0
@@ -630,10 +628,6 @@ async def move(db: AsyncSession, user: User, ref_no: str, column: str, note: str
         return await start_work(db, user, ref_no)
     if column == "resolved":
         return await resolve(db, user, ref_no, note)
-    if column == "fixed":
-        if fb.status != "resolved":
-            raise Conflict("bad_move", "Only resolved items can move to Fixed. Use Close to say why it ends.")
-        return await close(db, user, ref_no, "", "fixed")
     raise Conflict("bad_move", "Cards can't be moved there.")
 
 
