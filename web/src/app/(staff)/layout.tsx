@@ -4,9 +4,10 @@ import { StaffFooter, StaffHeader } from "@/components/staff-header";
 export default function StaffLayout({ children }: LayoutProps<"/">) {
   return (
     <MeProvider>
-      <div className="flex min-h-dvh flex-col">
+      {/* A page marked data-page="fill" (the chat) takes exactly the screen and scrolls inside itself. */}
+      <div className="group/staff flex min-h-dvh flex-col has-data-[page=fill]:h-dvh">
         <StaffHeader />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 has-data-[page=fill]:flex has-data-[page=fill]:min-h-0 has-data-[page=fill]:flex-col">{children}</main>
         <StaffFooter />
       </div>
     </MeProvider>
