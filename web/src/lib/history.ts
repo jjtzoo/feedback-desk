@@ -46,7 +46,10 @@ export function historyLine(e: FeedbackEvent, projects: Project[]): string {
   const projectName = (slug: unknown) => (slug === "general" || !slug ? "General" : (projects.find((p) => p.slug === slug)?.name ?? String(slug)));
   switch (e.event_type) {
     case "status":
-      return STATUS_STEP[after.status as Status] ?? STATUS_LABEL[after.status as Status] ?? "Changed the stage";
+      // Public moves already read plainly and carry their reason ("Declined: …", "Resolved: …"); the console
+      // says Approved where staff read Planned (D43). Internal moves get the step's words.
+      if (after.status === "approved") return "Approved";
+      return e.public_text ?? STATUS_STEP[after.status as Status] ?? STATUS_LABEL[after.status as Status] ?? "Changed the stage";
     case "assigned":
       if (after.reason) return `Assigned to ${name(after)} by routing (${routingReason(String(after.reason), null)})`;
       if (e.actor_type !== "system" && e.actor_type !== "agent" && name(after) === e.actor_name) return `${e.actor_name} took this on`;
