@@ -168,7 +168,7 @@ test("S20.03 Each draft item is labelled with its source and channel items start
   for (const row of await withSource(SOURCE.feedback).all()) await expect(ticked(row)).toBeChecked();
 
   await expect(withSource(SOURCE.progress)).toHaveCount(1);
-  await expect(withSource(SOURCE.progress).getByLabel("Title")).toHaveValue(`In progress: ${IN_PROGRESS_ITEM}`);
+  await expect(withSource(SOURCE.progress).getByLabel("Title")).toHaveValue(IN_PROGRESS_ITEM);
   await expect(ticked(withSource(SOURCE.progress))).not.toBeChecked();
 
   await expect(withSource(SOURCE.channel)).toHaveCount(1);
