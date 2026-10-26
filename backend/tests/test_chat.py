@@ -82,7 +82,7 @@ async def test_bug_conversation_routes_to_the_owner_and_waits_for_approval(staff
                 )
             )
         )
-        assert public == ["Received via chat", "Classified: Bug, P1, RAKE Agent", "Assigned to Darlene"]
+        assert public == ["Received via chat", "Classified: Bug, Blocking, RAKE Agent", "Assigned to Darlene"]
         turns = list(await db.scalars(select(FeedbackMessage).where(FeedbackMessage.feedback_id == fb.id)))
         assert turns[0].author_type == "agent" and any("blank answer" in t.body for t in turns)
         kinds = {n.type for n in await db.scalars(select(Notification))}

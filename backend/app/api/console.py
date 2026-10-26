@@ -43,7 +43,7 @@ from app.services import console, usage
 router = APIRouter(prefix="/console", tags=["console"])
 
 
-def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) -> CardOut:
+def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int], unread: set[uuid.UUID]) -> CardOut:
     today = datetime.now(UTC).date()
     count = reporters.get(fb.id, 1)
     return CardOut(
@@ -64,9 +64,7 @@ def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) 
         expected_by=fb.expected_by,
         overdue=bool(fb.expected_by and fb.expected_by < today and fb.status in DUE_STATUSES),
         has_files=fb.id in files,
-        unread_reply=bool(
-            fb.submitter_replied_at and (fb.assignee_read_at is None or fb.submitter_replied_at > fb.assignee_read_at)
-        ),
+        unread=fb.id in unread,
         flagged=fb.flagged,
         channel=fb.channel,
         reporters=count,
@@ -112,6 +110,7 @@ async def board(
     ids = [i.id for c in cols for i in c.items]
     files = await console.has_files(db, ids)
     reporters = await console.reporter_counts(db, ids)
+    unread = await console.unread_items(db, user, [i for c in cols for i in c.items])
     return BoardOut(
         columns=[
             ColumnOut(
@@ -119,7 +118,7 @@ async def board(
                 title=c.title,
                 count=c.count,
                 overdue=c.overdue,
-                items=[_card(i, files, reporters) for i in c.items],
+                items=[_card(i, files, reporters, unread) for i in c.items],
             )
             for c in cols
         ],
@@ -151,8 +150,9 @@ async def items(
     rows, total = await console.list_items(db, user, f)
     files = await console.has_files(db, [r.id for r in rows])
     reporters = await console.reporter_counts(db, [r.id for r in rows])
+    unread = await console.unread_items(db, user, rows)
     return ListOut(
-        items=[_card(r, files, reporters) for r in rows],
+        items=[_card(r, files, reporters, unread) for r in rows],
         total=total,
         page=page,
         page_size=console.PAGE_SIZE,
@@ -176,7 +176,7 @@ async def _detail(db: Db, user: DigitalUser, ref: str) -> DetailOut:
     fb = d.feedback
     files = {fb.id} if d.attachments else set()
     return DetailOut(
-        **_card(fb, files, {fb.id: 1 + len(d.followers)}).model_dump(),
+        **_card(fb, files, {fb.id: 1 + len(d.followers)}, set()).model_dump(),
         submitter_email=fb.submitter_email,
         target_type=fb.target_type,
         area=fb.area,
@@ -204,6 +204,7 @@ async def _detail(db: Db, user: DigitalUser, ref: str) -> DetailOut:
         holder_activity=ActivityOut(text=d.holder_activity.text, at=d.holder_activity.at)
         if d.holder_activity
         else None,
+        last_read_at=d.last_read_at,
     )
 
 
@@ -238,7 +239,7 @@ async def hand_over(ref: str, body: HandOverIn, db: Db, user: DigitalUser) -> De
 
 @router.post("/items/{ref}/update", response_model=DetailOut)
 async def post_update(ref: str, body: UpdateIn, db: Db, user: DigitalUser) -> DetailOut:
-    await console.post_update(db, user, ref, body.body, body.expected_by)
+    await console.post_update(db, user, ref, body.body, body.expected_by, body.asks_check)
     return await _detail(db, user, ref)
 
 

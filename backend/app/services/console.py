@@ -21,6 +21,7 @@ from app.models import (
     FeedbackEvent,
     FeedbackFollower,
     FeedbackMessage,
+    ItemRead,
     Project,
     UserPreference,
 )
@@ -247,6 +248,29 @@ async def reporter_counts(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.U
     return {i: 1 + extra.get(i, 0) for i in ids}
 
 
+async def unread_items(db: AsyncSession, user: User, items: list[Feedback]) -> set[uuid.UUID]:
+    """Items with a reply, note or update from someone else since this person last opened them (D82).
+    An item they have never opened counts only when it is theirs: everything on it is new to them."""
+    if not items:
+        return set()
+    mine = [i.id for i in items if i.assignee_id is not None and i.assignee_id == user.staff_id]
+    last = (
+        select(ItemRead.read_at)
+        .where(ItemRead.email == user.email, ItemRead.feedback_id == FeedbackMessage.feedback_id)
+        .scalar_subquery()
+    )
+    query = select(FeedbackMessage.feedback_id).where(
+        FeedbackMessage.feedback_id.in_([i.id for i in items]),
+        FeedbackMessage.message_type != "chat",
+        or_(FeedbackMessage.author_email.is_(None), FeedbackMessage.author_email != user.email),
+        or_(
+            FeedbackMessage.created_at > last,
+            and_(last.is_(None), FeedbackMessage.feedback_id.in_(mine)),
+        ),
+    )
+    return set(await db.scalars(query.distinct()))
+
+
 def needs_detail(fb: Feedback) -> bool:
     """Saved with open gaps and not yet added to by the person: the owner asks for info first (D63)."""
     gaps = (fb.dev_brief or {}).get("open_gaps")
@@ -287,6 +311,8 @@ class Detail:
     merged_into: str | None
     staff: list[DigitalStaff] = field(default_factory=list)
     holder_activity: "Activity | None" = None
+    # When this person last opened it before now: what came after shows as New (D82).
+    last_read_at: datetime | None = None
 
 
 @dataclass
@@ -327,20 +353,29 @@ def holder_activity(fb: Feedback, messages: list[FeedbackMessage], evs: list[Fee
 async def detail(db: AsyncSession, user: User, ref_no: str) -> Detail:
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
-    if fb.assignee_id is not None and fb.assignee_id == user.staff_id:
-        now = _now()
-        if fb.assignee_opened_at is None:
-            fb.assignee_opened_at = now
-            events.log(db, fb.id, user.actor, "opened", public_text=f"{user.name} opened your feedback")
-        fb.assignee_read_at = now
+    now = _now()
+    if fb.assignee_id is not None and fb.assignee_id == user.staff_id and fb.assignee_opened_at is None:
+        fb.assignee_opened_at = now
+        events.log(db, fb.id, user.actor, "opened", public_text=f"{user.name} opened your feedback")
+    read = await db.get(ItemRead, (user.email, fb.id))
+    last_read_at = read.read_at if read else None
+    if read is None:
+        db.add(ItemRead(email=user.email, feedback_id=fb.id, read_at=now))
+    else:
+        read.read_at = now
     messages = list(
         await db.scalars(
-            select(FeedbackMessage).where(FeedbackMessage.feedback_id == fb.id).order_by(FeedbackMessage.created_at)
+            select(FeedbackMessage)
+            .where(FeedbackMessage.feedback_id == fb.id)
+            .order_by(FeedbackMessage.created_at, FeedbackMessage.id)
         )
     )
+    # Newest first, as the History list says; the id keeps rows stamped at the same moment in one order (D77).
     evs = list(
         await db.scalars(
-            select(FeedbackEvent).where(FeedbackEvent.feedback_id == fb.id).order_by(FeedbackEvent.created_at.desc())
+            select(FeedbackEvent)
+            .where(FeedbackEvent.feedback_id == fb.id)
+            .order_by(FeedbackEvent.created_at.desc(), FeedbackEvent.id.desc())
         )
     )
     files = list(
@@ -362,7 +397,8 @@ async def detail(db: AsyncSession, user: User, ref_no: str) -> Detail:
     staff = list(
         await db.scalars(select(DigitalStaff).where(DigitalStaff.active.is_(True)).order_by(DigitalStaff.name))
     )
-    return Detail(fb, messages, evs, files, followers, dups, linked, merged, staff, holder_activity(fb, messages, evs))
+    activity = holder_activity(fb, messages, evs)
+    return Detail(fb, messages, evs, files, followers, dups, linked, merged, staff, activity, last_read_at)
 
 
 # --- actions --------------------------------------------------------------------------
@@ -511,17 +547,23 @@ async def start_work(db: AsyncSession, user: User, ref_no: str) -> Feedback:
     fb.resolved_at = None
     _first_response(fb)
     await notifications.notify_submitters(
-        db, fb, type="stage", title=f"{fb.ref_no} is being worked on", actor_email=user.email
+        db, fb, type="stage", title=f"{fb.ref_no} is being worked on", actor_email=user.email, step="In progress"
     )
     return await load(db, feedback_id=fb.id)
 
 
-async def post_update(db: AsyncSession, user: User, ref_no: str, body: str, expected_by: date | None) -> Feedback:
+async def post_update(
+    db: AsyncSession, user: User, ref_no: str, body: str, expected_by: date | None, asks_check: bool = False
+) -> Feedback:
+    """News for the person who raised it: on their tracker, in the app and by email. asks_check marks
+    an update that asks them to try it; their tracker then asks whether it's fixed (D80)."""
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
     require_holder(fb, user)
     if not body.strip() and expected_by is None:
         raise ServiceError("empty", "Write an update or set an Expected by date.")
+    if asks_check and not body.strip():
+        raise ServiceError("empty", "Say what to check.")
     if expected_by is not None and expected_by != fb.expected_by:
         events.log(
             db,
@@ -543,14 +585,25 @@ async def post_update(db: AsyncSession, user: User, ref_no: str, body: str, expe
                 message_type="progress",
                 body=body.strip()[:4000],
                 expected_by=expected_by,
+                asks_check=asks_check,
             )
         )
     fb.updated_at = _now()
     _first_response(fb)
     await _answered(db, fb, user)
-    title = f"Update on {fb.ref_no}" + (f", expected by {day_text(expected_by)}" if expected_by else "")
+    if asks_check:
+        title = f"{user.name} asked you to check {fb.ref_no}"
+    else:
+        title = f"Update on {fb.ref_no}" + (f", expected by {day_text(expected_by)}" if expected_by else "")
     await notifications.notify_submitters(
-        db, fb, type="progress", title=title, body=body.strip(), actor_email=user.email
+        db,
+        fb,
+        type="progress",
+        title=title,
+        body=body.strip(),
+        actor_email=user.email,
+        step="Asked to check" if asks_check else None,
+        latest=True,
     )
     return await load(db, feedback_id=fb.id)
 
@@ -571,6 +624,8 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
             author_name=user.name,
             message_type="progress",
             body=note.strip()[:4000],
+            # Resolved is the step that asks them to try it (D80).
+            asks_check=True,
             # Stamped just before the status event below, so the tracker lists "Resolved: ..." as the newest entry.
             created_at=datetime.now(UTC) - timedelta(milliseconds=1),
         )
@@ -579,7 +634,17 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
     fb.resolved_at = _now()
     _first_response(fb)
     await notifications.notify_submitters(
-        db, fb, type="stage", title=f"{fb.ref_no} is resolved", body=note.strip(), actor_email=user.email
+        db,
+        fb,
+        type="stage",
+        title=f"{fb.ref_no} is resolved: {user.name} asked you to check it",
+        body=note.strip(),
+        actor_email=user.email,
+        step="Resolved",
+        latest=True,
+    )
+    await notifications.notify_fixed(
+        db, fb, step="Resolved", title=f"Resolved: {fb.ref_no} · {fb.title}", actor_email=user.email
     )
     return await load(db, feedback_id=fb.id)
 
@@ -625,7 +690,12 @@ async def close(db: AsyncSession, user: User, ref_no: str, reason: str, ending: 
         title=CLOSE_TITLE[ending].format(ref=fb.ref_no),
         body=fb.close_reason or "",
         actor_email=user.email,
+        step=CLOSE_TEXT[ending],
     )
+    if ending == "fixed":
+        await notifications.notify_fixed(
+            db, fb, step="Fixed", title=f"Fixed: {fb.ref_no} · {fb.title}", actor_email=user.email
+        )
     return await load(db, feedback_id=fb.id)
 
 
@@ -654,6 +724,7 @@ async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedbac
         title=f"{user.name} replied on {fb.ref_no}",
         body=body.strip(),
         actor_email=user.email,
+        latest=True,
     )
     return await load(db, feedback_id=fb.id)
 
@@ -727,7 +798,7 @@ async def merge(db: AsyncSession, user: User, ref_no: str, into_ref: str) -> Fee
         FeedbackMessage(
             feedback_id=target.id,
             author_type="system",
-            author_name="Feedback",
+            author_name="System",
             message_type="follow_up",
             body=f"Merged from {fb.ref_no}: {fb.summary}",
         )
@@ -751,6 +822,7 @@ async def merge(db: AsyncSession, user: User, ref_no: str, into_ref: str) -> Fee
         title=f"{fb.ref_no} is a duplicate of {target.ref_no}",
         body="Follow the original item for updates.",
         actor_email=user.email,
+        step="Duplicate",
     )
     await db.flush()
     return await load(db, feedback_id=fb.id)
@@ -823,6 +895,7 @@ async def approve(db: AsyncSession, user: User, ref_no: str) -> Feedback:
         title=f"{fb.ref_no} is planned",
         body="The team will start on it.",
         actor_email=user.email,
+        step="Planned",
     )
     await notifications.notify_assignee(
         db, fb, type="approved", title=f"Approved, ready to start: {fb.ref_no} · {fb.title}", actor_email=user.email
@@ -842,7 +915,13 @@ async def decline(db: AsyncSession, user: User, ref_no: str, reason: str) -> Fee
     _first_response(fb)
     await _ended(db, fb, f"{fb.ref_no} declined by {user.name}")
     await notifications.notify_submitters(
-        db, fb, type="stage", title=f"{fb.ref_no} was declined", body=reason.strip(), actor_email=user.email
+        db,
+        fb,
+        type="stage",
+        title=f"{fb.ref_no} was declined",
+        body=reason.strip(),
+        actor_email=user.email,
+        step="Declined",
     )
     return await load(db, feedback_id=fb.id)
 
@@ -853,9 +932,11 @@ async def ask_info(db: AsyncSession, user: User, ref_no: str, question: str, ask
     if not question.strip():
         raise ServiceError("empty", "Write the question first.")
     fb = await load(db, ref_no=ref_no)
+    message_id = uuid.uuid4()
     if ask == "submitter":
         db.add(
             FeedbackMessage(
+                id=message_id,
                 feedback_id=fb.id,
                 author_type="digital",
                 author_email=user.email,
@@ -871,10 +952,12 @@ async def ask_info(db: AsyncSession, user: User, ref_no: str, question: str, ask
             title=f"A question about {fb.ref_no}",
             body=question.strip(),
             actor_email=user.email,
+            latest=True,
         )
     else:
         db.add(
             FeedbackMessage(
+                id=message_id,
                 feedback_id=fb.id,
                 author_type="digital",
                 author_email=user.email,
@@ -891,6 +974,7 @@ async def ask_info(db: AsyncSession, user: User, ref_no: str, question: str, ask
             title=f"{user.name} asked about {fb.ref_no}",
             body=question.strip(),
             actor_email=user.email,
+            message_id=message_id,
         )
     events.log(db, fb.id, user.actor, "asked_for_info", after={"ask": ask})
     fb.updated_at = _now()
