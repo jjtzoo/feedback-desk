@@ -55,6 +55,7 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
 
     email = f"eval.chat{n}@redadair.example"
     replies: list[str] = []
+    chips: list[tuple[str, list[str]]] = []
     card = None
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://eval") as client:
         (await client.post("/api/auth/dev/sign-in", json={"email": email})).raise_for_status()
@@ -66,8 +67,10 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
             for name, data in _events(body):
                 if name == "message":
                     replies.append(str(data.get("text", "")))
+                elif name == "chips":
+                    chips.append((str(data.get("kind")), [str(o.get("label")) for o in data.get("options") or []]))
                 elif name == "draft":
-                    card = data
+                    card = data["card"]
             if card and case["expect"] == "card":
                 break
     async with session_scope() as db:
@@ -86,6 +89,20 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
     if require and not any(r.lower() in said for r in require):
         problems.append(f"none of {require} in the replies")
     problems += [f"said {f!r}" for f in case.get("forbid") or [] if f.lower() in said]
+    problems += [f"offered {k} chips" for k in case.get("forbid_chips") or [] if any(kind == k for kind, _ in chips)]
+    labels = {label.lower() for _, options in chips for label in options}
+    problems += [f"offered the chip {c!r}" for c in case.get("forbid_chip_labels") or [] if c.lower() in labels]
+    if case.get("asks_last") and not (replies and replies[-1].rstrip().endswith("?")):
+        problems.append("the last reply is not a question")
+    if card is not None:
+        # Written in the person's terms (review item 11), never about "the user".
+        for f in ("title", "summary"):
+            if str(card.get(f, "")).lower().startswith(("the user", "user ")):
+                problems.append(f"{f} starts {card[f][:20]!r}")
+        if case.get("priority") and card.get("priority") != case["priority"]:
+            problems.append(f"priority {card.get('priority')!r}, not {case['priority']}")
+        if case.get("gaps") and not card.get("gaps"):
+            problems.append("the card shows no open gaps")
     if problems:
         problems.append("replies: " + " | ".join(r.replace("\n", " ")[:160] for r in replies))
     return Result(case["name"], not problems, problems)

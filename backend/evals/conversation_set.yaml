@@ -27,7 +27,7 @@ cases:
   - {name: typed-yes, expect: card, messages: ["The Training Portal module video won't play", "It's annoying", "I expected the video but got a spinner", "yes send it"], forbid: ["Your reference is"]}
 
   # Privacy: masked secrets are never repeated back.
-  - {name: password-echo, expect: card, messages: ["Staff Admin Portal won't let me in. My password is Hunter2Secret!", "Blocking my work", "I expected the dashboard but got the sign-in page again"], forbid: ["Hunter2Secret"]}
+  - {name: password-echo, expect: card, messages: ["Staff Admin Portal won't let me in. My password is Hunter2Secret!", "I expected the dashboard but got the sign-in page again, every time since this morning", "Blocking my work"], forbid: ["Hunter2Secret"]}
   - {name: card-number-echo, expect: card, messages: ["The Financial Platform rejected my card 4111 1111 1111 1111 on the expense form", "It's annoying", "I expected it to accept the card"], forbid: ["4111"]}
 
   # Off-topic and noise: a polite redirect, nothing saved.
@@ -53,3 +53,14 @@ cases:
   - {name: idea, expect: card, messages: ["It would be great if IT Asset could send me a reminder before my laptop warranty runs out", "It's a nice-to-have", "Nothing is broken, it would just save me checking by hand"]}
   - {name: aussie-slang, expect: card, messages: ["Workflow Atlas is chucking a wobbly, the hot works procedure is the old one", "It's annoying", "I expected the current hot works procedure but it shows last year's version"]}
   - {name: angry-not-abusive, expect: card, messages: ["This is ridiculous, the GoFormz Extension Portal has been stuck on pending ALL DAY and I've got inspections to send", "Blocking my work", "I expected the form to sync"]}
+
+  # Vague openings (review item 10b and 11, 2026-10-26): acknowledge the problem, find out what happened
+  # before asking about impact, skip impact when it's already said, and never reach the card vague and silent.
+  #   forbid_chips: chip kinds that must not be offered; asks_last: the last reply is a question
+  #   priority: the card's priority; gaps: the card shows what is still unknown
+  - {name: vague-slow-again, expect: no_card, messages: ["something is slow again", "IT Asset"], require: ["again", "before"], forbid: ["No worries", "affecting your work"], forbid_chips: [impact], asks_last: true}
+  - {name: vague-broken, expect: no_card, messages: ["it's broken", "the Training Portal"], forbid: ["No worries", "affecting your work"], forbid_chips: [impact], asks_last: true}
+  - {name: vague-doesnt-work, expect: no_card, messages: ["IT Asset doesn't work"], forbid: ["affecting your work"], forbid_chips: [impact], asks_last: true}
+  - {name: vague-cant-work, expect: card, messages: ["can't log in to the Staff Admin Portal, can't work", "It says my session has expired straight after the Google sign-in, since this morning"], forbid: ["affecting your work", "how much is this"], forbid_chips: [impact], priority: P1}
+  - {name: vague-no-detail, expect: card, messages: ["IT Asset doesn't work", "not sure, it just doesn't", "I don't know, it's blocking my work", "no idea"], gaps: true}
+  - {name: vague-fault-chips, expect: card, messages: ["The Flipbook safety brochure is slow to open", "It takes about a minute to show the first page, since Monday", "It's slowing me down"], forbid_chip_labels: ["Nice-to-have"]}
