@@ -17,7 +17,7 @@ from app.db import session_scope
 from app.services import catalog, embeddings
 from app.services import feedback as feedback_service
 from app.services.actors import User
-from app.services.drafts import GENERAL, apply_update, missing, quick_replies
+from app.services.drafts import GENERAL, NEXT_STEPS, apply_update, missing, quick_replies
 
 log = logging.getLogger(__name__)
 UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
@@ -83,8 +83,10 @@ async def update_draft(
     open_gaps: list[str] | None = None,
     flag_abuse: bool | None = None,
     replies: list[str] | None = None,
+    next_step: str | None = None,
 ) -> dict[str, Any]:
-    """Save what you know into the draft. Pass only the fields you are setting.
+    """Save what you know into the draft, and say what your next message does. Pass only the
+    fields you are setting.
 
     Args:
         project_slug: a slug from list_projects, or "general".
@@ -118,11 +120,16 @@ async def update_draft(
         replies: up to 3 short answers the person might tap for the question you are about to ask,
             in their words (e.g. "Every time", "Since this morning"). Leave out for a question that
             needs their own words, like what happened.
+        next_step: what your next message does, so the page shows the right chips or the card:
+            ask_tool (which tool), ask_details (what happened or what they'd like), ask_impact (how
+            much it affects their work), ask_work_type (broken or new), check_send ("Want me to send
+            that to the team?") or show_card (the summary card). Set it on every call. Leave it
+            out only when you are just chatting.
 
     Returns:
-        draft, missing (required fields still empty) and errors (rejected values).
+        draft, missing (required fields still empty), errors (rejected values) and next_step.
     """
-    updates = {k: v for k, v in locals().items() if k not in ("tool_context", "replies")}
+    updates = {k: v for k, v in locals().items() if k not in ("tool_context", "replies", "next_step")}
     async with session_scope() as db:
         projects = await catalog.list_projects(db)
         staff = await catalog.list_staff(db)
@@ -146,10 +153,19 @@ async def update_draft(
                 f"They have not named {chosen.name} or anything that identifies it. Ask "
                 "'Which tool is this about?' before the summary, unless you already asked."
             )
+    if next_step is not None:
+        if next_step not in NEXT_STEPS:
+            errors.append(f"next_step must be one of: {', '.join(NEXT_STEPS)}.")
+        else:
+            # The page reads it after this turn; the API clears it before the next one.
+            tool_context.state["step"] = next_step
+            if next_step == "show_card" and missing(draft):
+                result["note"] = f"The card can't show yet: {', '.join(missing(draft))} still empty."
     tool_context.state["draft"] = draft
     # Any edit means the person has not confirmed this version (D12).
     tool_context.state["draft_confirmed"] = False
-    return {"draft": draft, "missing": missing(draft), "errors": errors, **result}
+    step = tool_context.state.get("step")
+    return {"draft": draft, "missing": missing(draft), "errors": errors, "next_step": step, **result}
 
 
 async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str, Any]:

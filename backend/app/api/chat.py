@@ -5,7 +5,7 @@ Messages stream back as server-sent events:
   message    {"text"}                               something the agent says
   chips      {"kind", "options"}                    quick picks (project, impact, reply)
   duplicates {"candidates"}                         likely duplicates, for "+1 and comment"
-  draft      {"card", "hash"}                       the confirm card, once the draft is complete
+  draft      {"card", "hash"}                       the confirm card, when Sig is at that step
   done       {"reference", "assigned_to", "status"} saved
   fallback   {"reason"}                             switch to the backup form, keep the text
   end        {}
@@ -44,8 +44,8 @@ from app.services import catalog, files, usage
 from app.services import feedback as feedback_service
 from app.services.actors import User
 from app.services.drafts import (
+    CHECK_SEND_CHIPS,
     GENERAL,
-    IMPACT_QUESTION,
     card,
     draft_hash,
     first_sentence,
@@ -111,8 +111,9 @@ async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> Ev
         "user_turns": int(state.get("user_turns") or 0) + 1,
         # The person's own words (masked), so update_draft can tell whether they named the tool.
         "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
-        # Suggested answers belong to one question: update_draft sets them again for the next one.
+        # Suggested answers and the step belong to one turn: update_draft sets them again for the next.
         "replies": [],
+        "step": None,
     }
     return EventSourceResponse(_stream(user, session_id, parts, delta), headers=STREAM_HEADERS)
 
@@ -125,7 +126,8 @@ async def confirm(session_id: str, body: ConfirmIn, user: StreamUser) -> EventSo
     if not is_complete(draft) or draft_hash(draft) != body.draft_hash:
         raise Conflict("draft_changed", "The summary changed. Please check it again.")
     return EventSourceResponse(
-        _stream(user, session_id, [types.Part(text="Confirmed")], {"draft_confirmed": True}), headers=STREAM_HEADERS
+        _stream(user, session_id, [types.Part(text="Confirmed")], {"draft_confirmed": True, "step": None}),
+        headers=STREAM_HEADERS,
     )
 
 
@@ -255,13 +257,10 @@ def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
 async def _stream(
     user: User, session_id: str, parts: list[types.Part], delta: dict[str, Any]
 ) -> AsyncIterator[dict[str, str]]:
-    said: list[str] = []
     try:
         async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
             async for raw in runtime.run_turn(user, session_id, parts, delta):
-                text = _without_card_fields(raw)
-                said.append(text)
-                yield _sse("message", {"text": text})
+                yield _sse("message", {"text": _without_card_fields(raw)})
     except TimeoutError:
         log.warning("agent turn timed out session=%s", session_id)
         yield _sse("fallback", {"reason": "timeout"})
@@ -284,23 +283,27 @@ async def _stream(
         yield _sse("end", {})
         return
 
+    # The page follows the conversation, not the draft (review item 20): the card and the chips
+    # appear for the step Sig signalled this turn. With no step Sig is just chatting.
     draft = state.get("draft") or {}
-    asking = bool(said) and said[-1].rstrip().endswith("?")
+    step = state.get("step")
+    replies = state.get("replies") or []
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
-    if is_complete(draft) and not asking:
+    if step == "show_card" and is_complete(draft):
         async with session_scope() as db:
             slug = draft.get("project_slug")
             project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
         yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": draft_hash(draft)})
-    else:
-        replies = state.get("replies") or []
-        if not draft.get("project_slug"):
-            yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
-        elif asking and replies:
-            yield _sse("chips", {"kind": "reply", "options": [{"label": r, "value": r} for r in replies]})
-        elif asking and not draft.get("priority") and IMPACT_QUESTION.search(said[-1]):
-            yield _sse("chips", {"kind": "impact", "options": impact_chips(draft)})
-    if asking:
+    elif step == "ask_tool":
+        yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
+    elif step == "ask_impact" and not draft.get("priority"):
+        yield _sse("chips", {"kind": "impact", "options": impact_chips(draft)})
+    elif step == "check_send":
+        yield _sse("chips", {"kind": "reply", "options": CHECK_SEND_CHIPS})
+    elif step and replies:
+        yield _sse("chips", {"kind": "reply", "options": [{"label": r, "value": r} for r in replies]})
+    if step and step.startswith("ask_"):
+        # Only intake questions count towards the 3 (brief §4.1.3); chat about Sig does not.
         await runtime.update_state(user, session_id, {"questions": int(state.get("questions") or 0) + 1})
     yield _sse("end", {})

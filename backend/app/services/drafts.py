@@ -156,7 +156,16 @@ IMPACT_IDEA = [
     {"label": "Would save me time daily", "value": "It would save me time every day"},
     {"label": "Nice to have", "value": "It's a nice-to-have"},
 ]
-IMPACT_QUESTION = re.compile(r"\b(affect\w*|impact\w*|how much|blocking)\b", re.IGNORECASE)
+
+# What Sig's next message does, signalled through update_draft's next_step (review item 20): the page
+# shows the card and the chips for that step only, never because the draft happens to be complete.
+# Chat with no step (a question about Sig, small talk) gets neither.
+NEXT_STEPS = ("ask_tool", "ask_details", "ask_impact", "ask_work_type", "check_send", "show_card")
+# "Want me to send that to the team?" before the card for a question or praise (review item 18).
+CHECK_SEND_CHIPS = [
+    {"label": "Yes, send it", "value": "Yes, send it to the team"},
+    {"label": "No thanks", "value": "No thanks"},
+]
 
 
 def impact_chips(draft: Draft) -> list[dict[str, str]]:

@@ -6,7 +6,17 @@ import httpx
 import pytest
 from sqlalchemy import func, select
 
-from agent.stub import ASK_EXPECTED, ASK_IMPACT, ASK_PROJECT, EXISTING, NOISE, SHOW_SUMMARY
+from agent.stub import (
+    ABOUT_SIG,
+    ASK_EXPECTED,
+    ASK_IMPACT,
+    ASK_PROJECT,
+    CHECK_SEND,
+    EXISTING,
+    NOISE,
+    NOT_SENT,
+    SHOW_SUMMARY,
+)
 from app import agent_runtime
 from app.api.chat import _without_card_fields
 from app.config import get_settings
@@ -14,6 +24,7 @@ from app.db import session_scope
 from app.models import Attachment, Feedback, FeedbackEvent, FeedbackMessage, Notification
 from app.services import auth
 from app.services import feedback as feedback_service
+from app.services.drafts import is_complete
 from tests.conftest import STAFF, STAFF2, first, parse_sse, say, signed_in, start_chat, submit_via_chat, texts
 from tests.test_units import PNG, _docx
 
@@ -119,8 +130,12 @@ async def test_access_requests_route_by_rule(staff: httpx.AsyncClient) -> None:
     assert done["assigned_to"] == "Chris"
 
 
-async def test_praise_is_acknowledged_without_approval(staff: httpx.AsyncClient) -> None:
-    done = await submit_via_chat(staff, "Thanks for the new RAKE search, awesome work")
+async def test_praise_is_checked_once_then_acknowledged_without_approval(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "Thanks for the new RAKE search, awesome work")
+    assert texts(events)[-1] == CHECK_SEND and first(events, "draft") is None
+    assert [o["label"] for o in first(events, "chips")["options"]] == ["Yes, send it", "No thanks"]  # type: ignore[index]
+    done = await submit_via_chat(staff, "Thanks for the new RAKE search, awesome work", ["Yes, send it"])
     assert done["status"] == "acknowledged" and done["assigned_to"] == "Darlene"
 
 
@@ -374,3 +389,110 @@ async def test_impact_chips_only_follow_an_impact_question(staff: httpx.AsyncCli
     ]
     events = await say(staff, sid, "I can't work at all")
     assert texts(events)[-1] == ASK_EXPECTED and first(events, "chips") is None  # an open question: no chips
+
+
+async def test_slow_names_the_impact_so_only_the_tool_is_asked(staff: httpx.AsyncClient) -> None:
+    """Review item 15: "My app is slow" gets tool chips under the tool question, and no impact question."""
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "My app is slow")
+    assert texts(events)[-1] == ASK_PROJECT
+    chips = first(events, "chips")
+    assert chips is not None and chips["kind"] == "project" and chips["options"][-1]["label"] == "Not sure"
+    events = await say(staff, sid, "AFSS Portal")
+    assert ASK_IMPACT not in texts(events)
+    card = first(events, "draft")
+    assert card is not None and card["card"]["project"] == "AFSS Portal" and card["card"]["priority"] == "P2"
+
+
+async def test_the_impact_question_is_never_repeated_after_pushback(staff: httpx.AsyncClient) -> None:
+    """Review item 16: "I already told you" moves on; the question is asked once in the whole chat."""
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "RAKE gives a blank answer when I ask about leave.")
+    assert texts(events)[-1] == ASK_IMPACT
+    events = await say(staff, sid, "I already told you")
+    assert ASK_IMPACT not in texts(events) and texts(events)[-1] == ASK_EXPECTED
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "what is your role",
+        "are you a bot?",
+        "who made you?",
+        "why do we need you when we already have rake rgent",
+    ],
+)
+async def test_a_question_about_sig_is_chat_not_a_card(staff: httpx.AsyncClient, message: str) -> None:
+    """Review item 18: asking about Sig gets a short answer, no chips, no card, and uses no question."""
+    sid = await start_chat(staff)
+    events = await say(staff, sid, message)
+    assert texts(events) == [ABOUT_SIG]
+    assert len(ABOUT_SIG.splitlines()) <= 2
+    assert first(events, "draft") is None and first(events, "chips") is None
+    state = await agent_runtime.get_state(auth.User(email=STAFF, name="", role="staff"), sid)
+    assert state is not None and not state.get("draft") and int(state.get("questions") or 0) == 0
+    assert await count() == 0
+
+
+async def test_a_complete_question_waits_for_a_yes_and_no_sends_nothing(staff: httpx.AsyncClient) -> None:
+    """Review items 18 and 20: a complete draft alone never shows the card; Sig checks first."""
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "How do I export my CPD points from the CPD Tracker?")
+    assert texts(events)[-1] == CHECK_SEND and first(events, "draft") is None
+    state = await agent_runtime.get_state(auth.User(email=STAFF, name="", role="staff"), sid)
+    assert state is not None and is_complete(state["draft"]) and state["step"] == "check_send"
+    events = await say(staff, sid, "No thanks")
+    assert texts(events) == [NOT_SENT] and first(events, "draft") is None and first(events, "chips") is None
+    assert await count() == 0
+
+
+def _model_says(reply: str, state: dict[str, Any]) -> Any:
+    """A model turn that says `reply` and leaves `state`, as Gemini did in the 26 Oct chats."""
+
+    async def turn(user: Any, session_id: str, parts: Any, delta: dict[str, Any]) -> Any:
+        await agent_runtime.update_state(user, session_id, delta | state)
+        yield reply
+
+    return turn
+
+
+COMPLETE = {
+    "project_slug": "rake-agent",
+    "work_type": "no_change",
+    "category": "question",
+    "priority": "P3",
+    "summary": "Purpose of feedback channel vs RAKE Agent",
+    "title": "Purpose of feedback channel vs RAKE Agent",
+}
+
+
+async def test_an_answer_with_a_complete_draft_shows_no_card_without_the_card_step(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review item 18: the draft was complete and the reply didn't end in "?", so a card appeared."""
+    sid = await start_chat(staff)
+    answer = "RAKE answers policy questions. I pass your feedback on our tools to the Digital team."
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(answer, {"draft": COMPLETE}))
+    events = await say(staff, sid, "why do we need you when we already have rake rgent")
+    assert first(events, "draft") is None and first(events, "chips") is None
+
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(SHOW_SUMMARY, {"draft": COMPLETE, "step": "show_card"}))
+    assert first(await say(staff, sid, "Yes, send it to the team"), "draft") is not None
+
+
+async def test_the_tool_question_gets_tool_chips_even_with_a_guessed_project(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review item 15: a low-confidence guess in the draft fell through to the impact chips."""
+    sid = await start_chat(staff)
+    guess = {"project_slug": "general", "confidence": {"project": 0.3}, "category": "performance"}
+    question = "Which tool are you using when it's running slow?"
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(question, {"draft": guess, "step": "ask_tool"}))
+    chips = first(await say(staff, sid, "My app is slow"), "chips")
+    assert chips is not None and chips["kind"] == "project"
+
+    # The impact chips need the impact step, not a word in the question.
+    monkeypatch.setattr(
+        agent_runtime, "run_turn", _model_says("How much is this affecting your work?", {"draft": guess})
+    )
+    assert first(await say(staff, sid, "AFSS Portal"), "chips") is None
