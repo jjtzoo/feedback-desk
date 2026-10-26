@@ -101,7 +101,7 @@ test("S01.05 From a bare /sign-in, Mario and Chris land on the console (Work) an
   await expect(page).toHaveURL(/\/sign-in$/); // nothing left over in ?next=
   await pick(page, "Liam Carter");
   await expect(page).toHaveURL(/\/chat$/);
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
 });
 
 test("S01.06 /sign-in?error=domain shows a red alert that Smoke Signal is only for REDADAIR Google accounts", async ({ page }) => {

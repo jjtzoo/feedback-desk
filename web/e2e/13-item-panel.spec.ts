@@ -332,7 +332,7 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   // It sits in its own read-only container, word for word in quotes, with the speaker named plainly.
   const transcript = panel.getByRole("region", { name: "Intake transcript" });
   await expect(transcript.getByRole("listitem")).toHaveCount(messages.filter((m) => m.message_type === "chat").length);
-  await expect(lines.filter({ hasText: "G'day, I'm Sig." })).toContainText("Assistant");
+  await expect(lines.filter({ hasText: "G'day, I'm Sig, Smoke Signal's AI assistant." })).toContainText("Assistant");
   await expect(lines.filter({ hasText: words })).toContainText("Aisha Rahman");
   await expect(lines.filter({ hasText: words })).toContainText("Staff member");
   await expect(lines.filter({ hasText: words }).locator("blockquote")).toHaveClass(/italic/);

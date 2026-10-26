@@ -311,7 +311,7 @@ test("S02.09 The 'I need access' card opens /chat?start=access with 'I need acce
   await page.getByRole("link", { name: /I need access/ }).click();
 
   await expect(page).toHaveURL(/\/chat\?start=access$/);
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   const box = page.getByLabel("Your message");
   await expect(box).toHaveValue("I need access to ");
   await expect(box).toBeFocused();
@@ -342,7 +342,7 @@ test("S02.11 Choosing RAKE Agent there opens /chat?project=rake-agent with RAKE 
   await page.getByRole("option", { name: "RAKE Agent", exact: true }).click();
 
   await expect(page).toHaveURL(/\/chat\?project=rake-agent$/);
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   // The chat shows the chosen tool as an "About ..." chip beside the message box.
   await expect(page.getByText("About RAKE Agent", { exact: true })).toBeVisible();
 });

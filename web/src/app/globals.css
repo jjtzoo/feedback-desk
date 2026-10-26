@@ -215,10 +215,199 @@
   }
 }
 
-/* Sig's idle swell (D37): the only new looping motion. It stops under reduced motion. */
+/* Sig's idle swell (D37): one 5 s cycle each time Sig turns Ready, then rest. Nothing loops (WCAG 2.2.2). */
 @utility animate-breathe {
-  animation: breathe 5s ease-in-out infinite;
+  animation: breathe 5s ease-in-out;
   transform-origin: 50% 90%;
+}
+
+/* Sig's reactions (sig-motion-interactions.md): SigAvatar sets data-reaction and --sig-d; each plays once.
+   Held poses (look-down, wow, lean, slump) end on the pose and stay until the chat clears them. */
+[data-sig-body] {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
+[data-reaction="pop"] {
+  animation: sig-pop var(--sig-d) var(--ease-spring);
+}
+[data-reaction="nod"] {
+  animation: sig-nod var(--sig-d) ease-out;
+}
+[data-reaction="wow"] {
+  animation: sig-wow var(--sig-d) ease-out forwards;
+}
+[data-reaction="tilt"] {
+  animation: sig-tilt var(--sig-d) ease-in-out;
+}
+[data-reaction="lean"] {
+  animation: sig-lean var(--sig-d) var(--ease-spring) forwards;
+}
+[data-reaction="hop-puff"] {
+  animation: sig-hop var(--sig-d) ease-out;
+}
+[data-reaction="double-hop"] {
+  animation: sig-double-hop var(--sig-d) ease-out;
+}
+[data-reaction="slump"] {
+  animation: sig-slump var(--sig-d) ease-in forwards;
+}
+[data-reaction="glitch"],
+[data-reaction="wink"] {
+  animation: sig-still var(--sig-d);
+}
+
+/* The face parts: a blink at the end of the pop, and static that clears to a worried face. Opacity only. */
+[data-reaction="pop"] [data-sig-part="eyes"] {
+  animation: sig-blink-open var(--sig-d);
+}
+[data-reaction="pop"] [data-sig-part="lids"] {
+  animation: sig-blink-shut var(--sig-d);
+}
+[data-sig-part="static"] {
+  animation: sig-static var(--sig-d) linear forwards;
+}
+[data-sig-part="worried"] {
+  animation: sig-worried var(--sig-d) linear;
+}
+
+/* The smoke signal: Puff rises 24 px from the nozzle and fades. */
+[data-sig-puff] {
+  animation: sig-puff var(--sig-d) ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes sig-pop {
+  from {
+    transform: translateY(10px) scale(0.85);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sig-nod {
+  40% {
+    transform: translateY(2px) rotate(4deg);
+  }
+}
+@keyframes sig-wow {
+  to {
+    transform: translateY(-1.5px) scale(1.04);
+  }
+}
+@keyframes sig-tilt {
+  30%,
+  70% {
+    transform: rotate(-9deg);
+  }
+}
+@keyframes sig-lean {
+  to {
+    transform: translateY(-1px) scale(1.05);
+  }
+}
+@keyframes sig-hop {
+  15% {
+    transform: translateY(-6px);
+  }
+  30%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes sig-double-hop {
+  20%,
+  60% {
+    transform: translateY(-4px);
+  }
+  40%,
+  80%,
+  100% {
+    transform: none;
+  }
+}
+@keyframes sig-slump {
+  to {
+    transform: translateY(3px);
+  }
+}
+@keyframes sig-still {
+  to {
+    transform: none;
+  }
+}
+@keyframes sig-blink-open {
+  0%,
+  77%,
+  91%,
+  100% {
+    opacity: 1;
+  }
+  78%,
+  90% {
+    opacity: 0;
+  }
+}
+@keyframes sig-blink-shut {
+  0%,
+  77%,
+  91%,
+  100% {
+    opacity: 0;
+  }
+  78%,
+  90% {
+    opacity: 1;
+  }
+}
+@keyframes sig-static {
+  0% {
+    opacity: 0.75;
+    transform: translateX(-1px);
+  }
+  20% {
+    transform: translateX(1px);
+  }
+  41% {
+    opacity: 0.75;
+    transform: translateX(-1px);
+  }
+  42%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes sig-worried {
+  0%,
+  41% {
+    opacity: 0;
+  }
+  42%,
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes sig-puff {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.6);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-24px);
+  }
+}
+@keyframes sig-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -242,5 +431,26 @@
   .animate-pulse,
   .animate-breathe {
     animation: none !important;
+  }
+
+  /* Sig's reactions become face swaps: the body keeps still for the reaction's length, so the
+     new face is seen and animationend still clears it; the puff only fades; the static is skipped. */
+  [data-reaction] {
+    animation-name: sig-still !important;
+    animation-duration: var(--sig-d) !important;
+  }
+  [data-sig-part="eyes"],
+  [data-sig-part="lids"] {
+    animation-duration: var(--sig-d) !important;
+  }
+  [data-sig-part="static"] {
+    display: none;
+  }
+  [data-sig-part="worried"] {
+    animation: none !important;
+  }
+  [data-sig-puff] {
+    animation-name: sig-fade !important;
+    animation-duration: var(--sig-d) !important;
   }
 }

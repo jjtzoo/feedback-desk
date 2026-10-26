@@ -1,0 +1,10 @@
+{
+  "ran": "2026-10-26T02:08:26.463Z",
+  "commit": "aa49c21",
+  "uncommitted": true,
+  "spec": "30-reduced-motion.spec.ts",
+  "fingerprint": "f777b82098975a8d",
+  "caught": {
+    "S30.02": true
+  }
+}

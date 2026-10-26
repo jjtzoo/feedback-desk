@@ -16,7 +16,7 @@ const field = (page: Page, label: string) => card(page).locator(`dt:text-is("${l
 /** Describe it, choose how much it affects the person, say what was expected: the confirm card shows. */
 async function reachCard(page: Page, description: string, impact = "Slowing me down") {
   await page.goto("/chat");
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(page, description);
   await page.getByRole("button", { name: impact, exact: true }).click();
   await expect(page.getByText("What did you expect to happen")).toBeVisible();

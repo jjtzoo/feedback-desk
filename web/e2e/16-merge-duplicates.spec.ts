@@ -21,7 +21,7 @@ type Item = { reference: string; status: string; close_reason: string | null; me
 /** Mike describes the same problem in a new chat, ignores the duplicate box and confirms; returns the new reference. */
 async function raiseSeparately(mike: Page, text: string) {
   await mike.goto("/chat");
-  await expect(mike.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(mike.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(mike, text);
   await mike.getByRole("button", { name: "Slowing me down" }).click();
   await expect(mike.getByText("Someone may have raised this already", { exact: true })).toBeVisible();

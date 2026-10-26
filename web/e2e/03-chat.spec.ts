@@ -32,12 +32,12 @@ function chip(page: Page, name: string) {
 test.beforeEach(async ({ page, signIn }) => {
   await signIn("Liam");
   await page.goto("/chat");
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
 });
 
 test("S03.01 Sig greets and offers a free-text box, no form first", async ({ page }) => {
   await expect(
-    page.getByText("G'day, I'm Sig. Spotted something? Tell me what's not working, or what would make one of our tools better."),
+    page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant. Spotted something?"),
   ).toBeVisible();
   await expect(page.getByLabel("Your message")).toBeVisible();
   await expect(page.getByLabel(/What happened, or what would you like/)).toHaveCount(0);
@@ -200,7 +200,7 @@ test("S03.16 pressing F5 mid-chat loses the conversation and starts a new one", 
   await chatSay(page, "hi");
   await expect(page.getByText("I'm here for feedback on our intranet tools")).toBeVisible();
   await page.reload();
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await expect(page.getByText("I'm here for feedback on our intranet tools")).toHaveCount(0);
   await expect(page.getByText("You: hi")).toHaveCount(0);
 });

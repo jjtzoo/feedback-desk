@@ -62,7 +62,7 @@ async function inboxCards(page: Page, inbox: string) {
 
 async function openChat(page: Page) {
   await page.goto("/chat");
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
 }
 
 /** Describe it in the chat and answer Sig's questions until the confirm card shows. */

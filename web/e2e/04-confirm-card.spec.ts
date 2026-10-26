@@ -20,7 +20,7 @@ const chat = (page: Page) => page.getByRole("region", { name: /Chat with Sig/ })
 
 async function openChat(page: Page) {
   await page.goto("/chat");
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
 }
 
 /** Describe it, choose how much it affects the person, say what was expected: the confirm card shows. */
@@ -156,7 +156,7 @@ test("S04.09 'Track it' opens that reference's tracker; coming back, 'Give more 
   // Back to the chat: the sent screen may or may not still be there; either way the next step is a fresh chat.
   await page.goBack();
   const again = page.getByRole("button", { name: "Give more feedback" });
-  const fresh = page.getByText("G'day, I'm Sig.");
+  const fresh = page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.");
   await expect(again.or(fresh)).toBeVisible();
   if (await again.isVisible()) await again.click();
   await expect(fresh).toBeVisible();

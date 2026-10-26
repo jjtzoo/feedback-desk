@@ -50,7 +50,7 @@ test("S22.01 Open /chat: under the box, 'Today's assistant allowance: N% used' w
   await signIn("Aisha");
   const allowance = page.waitForResponse((r) => r.url().includes("/api/usage/me"));
   await page.goto("/chat");
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   // The person has an allowance to show (a limit above 0), and the answer has arrived, so what is checked is the screen.
   const mine = await (await allowance).json();
   expect(mine.limit_tokens).toBeGreaterThan(0);
@@ -95,7 +95,7 @@ test("S22.03 At the personal limit a new chat opens the backup form with \"You'v
     await expect(chat(page).getByText("You've used today's allowance with Sig. It resets tomorrow.", { exact: true })).toBeVisible();
     await expect(chat(page).getByText("Not available right now", { exact: true })).toBeVisible();
     await expect(chat(page).getByLabel(DETAILS)).toBeVisible();
-    await expect(page.getByText("G'day, I'm Sig.")).toHaveCount(0);
+    await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toHaveCount(0);
   } finally {
     clearUsage();
   }

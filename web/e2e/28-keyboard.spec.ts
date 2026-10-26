@@ -92,7 +92,7 @@ const card = (page: Page) => page.getByRole("region", { name: "Your feedback" })
 
 async function openChat(page: Page) {
   await page.goto("/chat");
-  await expect(page.getByText("G'day, I'm Sig.")).toBeVisible();
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
 }
 
 /** Describe it, choose how much it affects the person, say what was expected: the confirm card shows. */

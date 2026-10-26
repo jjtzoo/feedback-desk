@@ -153,7 +153,7 @@ test.describe("the API restarted with no model", () => {
     // A form already open stays a form; the chat is back on the next visit.
     await page.goto("/chat");
     // The first chat after a restart builds the agent; a cold start once took over 10 s (S01.05).
-    await expect(page.getByText("G'day, I'm Sig. Spotted something?")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant. Spotted something?")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("Smoke Signal's feedback assistant")).toBeVisible();
     await expect(page.getByLabel(DETAILS)).toHaveCount(0);
     await chatSay(page, BUG);
