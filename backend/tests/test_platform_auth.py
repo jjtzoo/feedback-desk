@@ -43,7 +43,7 @@ TABLES = {
 
 async def test_health(anon: httpx.AsyncClient) -> None:
     body = (await anon.get("/api/health")).json()
-    assert body["database"] == "ok" and body["migration"] == "0003"
+    assert body["database"] == "ok" and body["migration"] == "0004"
     assert body["model"]["provider"] == "stub" and body["environment"] == "test"
 
 
@@ -202,9 +202,11 @@ async def test_admin_adds_a_project_the_agent_sees_at_once(marc: httpx.AsyncClie
     )
     assert r.status_code == 201, r.text
     assert r.json()["keywords"] == ["leave", "roster"]
+    from types import SimpleNamespace
+
     from agent.tools import list_projects
 
-    slugs = {p["slug"] for p in (await list_projects())["projects"]}
+    slugs = {p["slug"] for p in (await list_projects(SimpleNamespace(state={})))["projects"]}  # type: ignore[arg-type]
     assert "leave-planner" in slugs
 
 

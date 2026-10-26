@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import type { Staff } from "@/lib/api";
 
-export type ActionKind = "update" | "resolve" | "fix" | "close" | "decline" | "ask" | "merge";
+export type ActionKind = "update" | "resolve" | "fix" | "close" | "decline" | "ask" | "merge" | "take_over" | "hand_over";
 
 /** How an open item can end by hand (D45). Fixed comes from a resolved item; duplicate and declined have their own actions. */
 export type CloseEnding = "wont_fix" | "no_longer_needed";
@@ -69,6 +71,21 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
     button: "Merge",
     required: true,
   },
+  // The title and description come from the item: whose it is and what they last did (D53).
+  take_over: {
+    title: "Take it over",
+    description: "",
+    field: "Reason (optional)",
+    button: "Take over",
+    required: false,
+  },
+  hand_over: {
+    title: "Hand over",
+    description: "They are told in the app and by email. The person who raised it sees who has it now.",
+    field: "Note for them (optional)",
+    button: "Hand over",
+    required: false,
+  },
 };
 
 export interface ActionResult {
@@ -76,18 +93,28 @@ export interface ActionResult {
   expectedBy?: string;
   ending?: CloseEnding;
   ask?: "submitter" | "owner";
+  /** Hand over: who takes it. */
+  to?: string;
 }
 
-/** One dialog for every action that needs words (update, resolve, close, decline, ask, merge). */
+/** One dialog for every action that needs words or a choice (update, resolve, close, decline, ask, merge, take over, hand over). */
 export function ActionDialog({
   kind,
   initialText = "",
+  title,
+  description,
+  people = [],
   onClose,
   onSubmit,
 }: {
   kind: ActionKind | null;
   /** Pre-fills the text, such as the original's reference when merging a suggested duplicate. */
   initialText?: string;
+  /** Replace the kind's own words, such as "Take FB-0002 over from Mario?". */
+  title?: string;
+  description?: string;
+  /** Hand over: the people who can take it. */
+  people?: Staff[];
   onClose: () => void;
   onSubmit: (kind: ActionKind, result: ActionResult) => Promise<boolean>;
 }) {
@@ -95,6 +122,7 @@ export function ActionDialog({
   const [expectedBy, setExpectedBy] = useState("");
   const [ending, setEnding] = useState<CloseEnding | null>(null);
   const [ask, setAsk] = useState<"submitter" | "owner">("submitter");
+  const [to, setTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The dialog opens from a controlled prop, so Radix has no trigger to give focus back to.
@@ -110,6 +138,10 @@ export function ActionDialog({
       setError("Choose how it ends.");
       return;
     }
+    if (kind === "hand_over" && !to) {
+      setError("Choose who takes it.");
+      return;
+    }
     if (copy.required && !text.trim()) {
       setError(`${copy.field} is needed.`);
       return;
@@ -119,7 +151,7 @@ export function ActionDialog({
       return;
     }
     setBusy(true);
-    const ok = await onSubmit(kind, { text: text.trim(), expectedBy: expectedBy || undefined, ending: ending ?? undefined, ask });
+    const ok = await onSubmit(kind, { text: text.trim(), expectedBy: expectedBy || undefined, ending: ending ?? undefined, ask, to: to || undefined });
     setBusy(false);
     if (ok) {
       setText("");
@@ -153,6 +185,25 @@ export function ActionDialog({
         ))}
       </fieldset>
     );
+  } else if (kind === "hand_over") {
+    extra = (
+      <div className="grid gap-2">
+        <Label htmlFor="hand-over-to">Hand over to</Label>
+        <Select value={to || undefined} onValueChange={setTo}>
+          <SelectTrigger id="hand-over-to" className="h-11 w-full rounded-xl">
+            <SelectValue placeholder="Choose a person" />
+          </SelectTrigger>
+          <SelectContent>
+            {people.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name}
+                {s.is_away && " (away)"}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
   } else if (kind === "ask") {
     extra = (
       <fieldset className="flex gap-4 text-sm">
@@ -183,8 +234,8 @@ export function ActionDialog({
       >
         <form onSubmit={submit} className="grid gap-4">
           <DialogHeader>
-            <DialogTitle>{copy.title}</DialogTitle>
-            <DialogDescription>{copy.description}</DialogDescription>
+            <DialogTitle>{title ?? copy.title}</DialogTitle>
+            <DialogDescription>{description ?? copy.description}</DialogDescription>
           </DialogHeader>
           {extra}
           {kind === "fix" ? null : (

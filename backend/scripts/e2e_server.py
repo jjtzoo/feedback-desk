@@ -26,8 +26,9 @@ from pathlib import Path
 from scripts.local_db import start
 
 E2E_DATABASE = "fd_e2e"
-E2E_PORT = 8002
-CONTROL_PORT = 8012
+# The defaults; E2E_API_PORT and E2E_CONTROL_PORT move them, so a second worktree can run its own servers.
+E2E_PORT = int(os.environ.get("E2E_API_PORT", "8002"))
+CONTROL_PORT = int(os.environ.get("E2E_CONTROL_PORT", "8012"))
 PROVIDERS = ("stub", "none")
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 # Never a system proxy for 127.0.0.1 (urllib reads the Windows registry one).

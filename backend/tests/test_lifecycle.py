@@ -214,7 +214,7 @@ async def test_corrections_are_logged_and_reassignment_notifies(
         assert {next(iter(c.after)) for c in corrections} == {"project", "work_type", "priority"}
     assert "assigned" in await notes_for(MARIO)
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
-    assert "Reassigned to Mario" in [h["text"] for h in t["history"]]
+    assert "Now with Mario" in [h["text"] for h in t["history"]]  # a change of hands, named (D53)
 
 
 async def test_merge_moves_the_submitter_to_the_original(

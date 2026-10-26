@@ -3,9 +3,9 @@ card, "+1 and comment", and the backup form when the model is down (F10).
 
 Messages stream back as server-sent events:
   message    {"text"}                               something the agent says
-  chips      {"kind", "options"}                    quick picks (project, impact)
+  chips      {"kind", "options"}                    quick picks (project, impact, reply)
   duplicates {"candidates"}                         likely duplicates, for "+1 and comment"
-  draft      {"card", "hash"}                       the confirm card, once the draft is complete
+  draft      {"card", "hash"}                       the confirm card, when Sig is at that step
   done       {"reference", "assigned_to", "status"} saved
   fallback   {"reason"}                             switch to the backup form, keep the text
   end        {}
@@ -43,7 +43,15 @@ from app.schemas import (
 from app.services import catalog, files, usage
 from app.services import feedback as feedback_service
 from app.services.actors import User
-from app.services.drafts import GENERAL, card, draft_hash, first_sentence, is_complete
+from app.services.drafts import (
+    CHECK_SEND_CHIPS,
+    GENERAL,
+    card,
+    draft_hash,
+    first_sentence,
+    impact_chips,
+    is_complete,
+)
 from app.services.privacy import mask
 from app.services.ratelimit import RateLimiter
 
@@ -53,11 +61,6 @@ session_limiter = RateLimiter(get_settings().chat_sessions_per_user_per_hour, 36
 
 SHOW_SUMMARY_LEAD = "Here's what I'll send"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
-IMPACT_CHIPS = [
-    {"label": "Blocking my work", "value": "It's blocking my work"},
-    {"label": "Slowing me down", "value": "It's slowing me down"},
-    {"label": "Nice-to-have", "value": "It's a nice-to-have"},
-]
 
 
 @router.post("/chat/sessions", response_model=ChatStartOut)
@@ -108,6 +111,9 @@ async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> Ev
         "user_turns": int(state.get("user_turns") or 0) + 1,
         # The person's own words (masked), so update_draft can tell whether they named the tool.
         "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
+        # Suggested answers and the step belong to one turn: update_draft sets them again for the next.
+        "replies": [],
+        "step": None,
     }
     return EventSourceResponse(_stream(user, session_id, parts, delta), headers=STREAM_HEADERS)
 
@@ -120,7 +126,8 @@ async def confirm(session_id: str, body: ConfirmIn, user: StreamUser) -> EventSo
     if not is_complete(draft) or draft_hash(draft) != body.draft_hash:
         raise Conflict("draft_changed", "The summary changed. Please check it again.")
     return EventSourceResponse(
-        _stream(user, session_id, [types.Part(text="Confirmed")], {"draft_confirmed": True}), headers=STREAM_HEADERS
+        _stream(user, session_id, [types.Part(text="Confirmed")], {"draft_confirmed": True, "step": None}),
+        headers=STREAM_HEADERS,
     )
 
 
@@ -229,6 +236,20 @@ def _without_card_fields(text: str) -> str:
     return text if at < 0 else text[:at] + SHOW_SUMMARY
 
 
+async def _project_chips(user: User, state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every tool, the person's likely ones first and marked usual (D60), then "Not sure"."""
+    async with session_scope() as db:
+        projects = await catalog.list_projects(db)
+        source = str((state.get("context") or {}).get("source") or "")
+        usual = await catalog.likely_projects(db, user.email, source, projects)
+    rest = [p for p in projects if p not in usual]
+    return [
+        *({"label": p.name, "value": p.name, "usual": True} for p in usual),
+        *({"label": p.name, "value": p.name} for p in rest),
+        {"label": "Not sure", "value": "Not sure"},
+    ]
+
+
 def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False, default=str)}
 
@@ -236,13 +257,10 @@ def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
 async def _stream(
     user: User, session_id: str, parts: list[types.Part], delta: dict[str, Any]
 ) -> AsyncIterator[dict[str, str]]:
-    said: list[str] = []
     try:
         async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
             async for raw in runtime.run_turn(user, session_id, parts, delta):
-                text = _without_card_fields(raw)
-                said.append(text)
-                yield _sse("message", {"text": text})
+                yield _sse("message", {"text": _without_card_fields(raw)})
     except TimeoutError:
         log.warning("agent turn timed out session=%s", session_id)
         yield _sse("fallback", {"reason": "timeout"})
@@ -265,25 +283,32 @@ async def _stream(
         yield _sse("end", {})
         return
 
+    # The page follows the conversation, not the draft (review item 20): the card and the chips
+    # appear for the step Sig signalled this turn. With no step Sig is just chatting, and a card
+    # already up stays while its draft is unchanged ("yes" at the card, a side question).
     draft = state.get("draft") or {}
-    asking = bool(said) and said[-1].rstrip().endswith("?")
+    step = state.get("step")
+    replies = state.get("replies") or []
+    shown = draft_hash(draft) if is_complete(draft) else None
+    keep = step == "show_card" or (step is None and shown is not None and state.get("card_hash") == shown)
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
-    if is_complete(draft) and not asking:
+    if keep and shown:
         async with session_scope() as db:
             slug = draft.get("project_slug")
             project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
-        yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": draft_hash(draft)})
-    else:
-        if not draft.get("project_slug"):
-            async with session_scope() as db:
-                projects = await catalog.list_projects(db)
-            options = [{"label": p.name, "value": p.name} for p in projects] + [
-                {"label": "Not sure", "value": "Not sure"}
-            ]
-            yield _sse("chips", {"kind": "project", "options": options})
-        elif not draft.get("priority"):
-            yield _sse("chips", {"kind": "impact", "options": IMPACT_CHIPS})
-    if asking:
-        await runtime.update_state(user, session_id, {"questions": int(state.get("questions") or 0) + 1})
+        yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": shown})
+    elif step == "ask_tool":
+        yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
+    elif step == "ask_impact" and not draft.get("priority"):
+        yield _sse("chips", {"kind": "impact", "options": impact_chips(draft)})
+    elif step == "check_send":
+        yield _sse("chips", {"kind": "reply", "options": CHECK_SEND_CHIPS})
+    elif step and replies:
+        yield _sse("chips", {"kind": "reply", "options": [{"label": r, "value": r} for r in replies]})
+    after: dict[str, Any] = {"card_hash": shown if keep else None}
+    if step and step.startswith("ask_"):
+        # Only intake questions count towards the 3 (brief §4.1.3); chat about Sig does not.
+        after["questions"] = int(state.get("questions") or 0) + 1
+    await runtime.update_state(user, session_id, after)
     yield _sse("end", {})

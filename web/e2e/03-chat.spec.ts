@@ -1,10 +1,10 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { BUG, chatSay, dropOnChat, getJson, pdf, postJson, reachBackupForm } from "./helpers";
+import { BUG, chatSay, dropOnChat, getJson, pdf, postJson, raiseBug, reachBackupForm } from "./helpers";
 
 // Manual checklist section 3: the staff chat, with the scripted stub model (its fixed phrases are in backend/agent/stub.py).
 
@@ -55,25 +55,25 @@ test("S03.03 an off-topic question is redirected, pointing to RAKE for policy qu
   await expect(page.getByText("RAKE is your best bet")).toBeVisible();
 });
 
-test("S03.04 a bug with a known tool asks how much it affects work, with three chips", async ({ page }) => {
+test("S03.04 a bug with a known tool asks how much it affects work, with three chips that fit a fault", async ({ page }) => {
   await chatSay(page, BUG);
   await expect(page.getByText("How much is this affecting your work")).toBeVisible();
-  for (const label of ["Blocking my work", "Slowing me down", "Nice-to-have"]) {
+  for (const label of ["Can't work at all", "Slower, but I get there", "Minor, I can live with it"]) {
     await expect(page.getByRole("listitem", { name: "Quick answers" }).getByRole("button", { name: label })).toBeVisible();
   }
 });
 
-test("S03.05 clicking Slowing me down sends it as the reply, then Sig asks what was expected", async ({ page }) => {
+test("S03.05 clicking Slower, but I get there sends it as the reply, then Sig asks what was expected", async ({ page }) => {
   await chatSay(page, BUG);
-  await page.getByRole("button", { name: "Slowing me down" }).click();
-  await expect(page.getByText("It's slowing me down")).toBeVisible();
+  await page.getByRole("button", { name: "Slower, but I get there" }).click();
+  await expect(page.getByText("It slows me down, but I get there")).toBeVisible();
   // The stub always asks next; the checklist also allows going straight to the summary.
   await expect(page.getByText("What did you expect to happen, and what happened instead?")).toBeVisible();
 });
 
 test("S03.06 the expected-versus-actual reply leads to one short line and the Your feedback card", async ({ page }) => {
   await chatSay(page, BUG);
-  await page.getByRole("button", { name: "Slowing me down" }).click();
+  await page.getByRole("button", { name: "Slower, but I get there" }).click();
   await expect(page.getByText("What did you expect to happen")).toBeVisible();
   await chatSay(page, "I expected my certificate to open but got a blank screen");
   const lead = page.getByText("Here's what I'll send. Check it and press Confirm, or tell me what to change.");
@@ -212,4 +212,63 @@ test("S03.17 thirteen messages without confirming switch to the backup form with
   await expect(page.locator("strong", { hasText: "Sorry, this is taking longer than it should." })).toBeVisible();
   await expect(page.getByText("What you typed is kept below.")).toBeVisible();
   await expect(page.getByLabel(/What happened, or what would you like/)).toHaveValue(/typed note number 1/);
+});
+
+test("S03.18 The Gemini and privacy line sits under the chat box and under the backup form's Send feedback; no other staff page has a footer", async ({ page }) => {
+  // Thirteen round trips to the stub to reach the backup form.
+  test.setTimeout(150_000);
+  const line = (where: Page) => where.getByText(/chats are processed by Google's Gemini model\. Passwords, card numbers and tax file numbers are removed before anything is saved\./);
+  const below = async (upper: Locator, lower: Locator) => {
+    const [a, b] = [(await upper.boundingBox())!, (await lower.boundingBox())!];
+    expect(b.y).toBeGreaterThanOrEqual(a.y + a.height);
+  };
+
+  await below(page.getByLabel("Your message"), line(page));
+  await reachBackupForm(page);
+  await below(page.getByRole("button", { name: "Send feedback" }), line(page));
+
+  for (const [path, heading] of [["/", "What can we help you with?"], ["/my", "My feedback"], ["/whats-new", "Fixes and updates"]]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(page.getByRole("contentinfo")).toHaveCount(0);
+    await expect(line(page)).toHaveCount(0);
+  }
+});
+
+test("S03.19 With no tool named, the tool chips show the tools you've reported on before first, under 'Your usual tools'", async ({ page, signIn }) => {
+  await signIn("Rafael");
+  await raiseBug(page, "rake-agent", "RAKE Agent shows a blank answer when I ask about rosters");
+  await page.goto("/chat");
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
+  await chatSay(page, "The export button is broken");
+  const chips = page.getByRole("listitem", { name: "Quick answers" });
+  await expect(chips.getByRole("button").first()).toHaveText("RAKE Agent");
+  await expect(chips.getByText("Your usual tools", { exact: true }).locator("..").getByRole("button")).toHaveText(["RAKE Agent"]);
+  await expect(chips.getByRole("button").last()).toHaveText("Not sure");
+});
+
+test("S03.20 'My app is slow' gets the tool chips under the tool question and never an impact question", async ({ page, signIn }) => {
+  await signIn("Aisha");
+  await page.goto("/chat");
+  await chatSay(page, "My app is slow");
+  await expect(page.getByText("Which tool is this about?")).toBeVisible();
+  const chips = page.getByRole("listitem", { name: "Quick answers" });
+  await expect(chips.getByRole("button").last()).toHaveText("Not sure");
+  await expect(chips.getByRole("button", { name: "Slower, but I get there" })).toHaveCount(0);
+  await chips.getByRole("button", { name: "AFSS Portal" }).click();
+  const summary = page.getByRole("region", { name: "Your feedback" });
+  await expect(summary).toContainText("Major");
+  await expect(page.getByText("How much is this affecting your work?")).toHaveCount(0);
+});
+
+test("S03.21 A question about Sig gets a short answer, with no chips and no card", async ({ page, signIn }) => {
+  await signIn("Aisha");
+  await page.goto("/chat");
+  await chatSay(page, "what is your role");
+  const answer = page.getByText("I'm Sig. I pass what you tell me about our intranet tools to the Digital team");
+  await expect(answer).toBeVisible();
+  await chatSay(page, "why do we need you when we already have rake rgent");
+  await expect(answer).toHaveCount(2);
+  await expect(page.getByRole("listitem", { name: "Quick answers" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Your feedback" })).toHaveCount(0);
 });

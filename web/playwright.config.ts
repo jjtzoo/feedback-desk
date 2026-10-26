@@ -1,10 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-import { API, TOUR_SEEN, WEB } from "./e2e/env";
+import { API, TOUR_SEEN, WEB, WEB_PORT } from "./e2e/env";
 
 /**
  * Browser tests for the staff area and the console, against a throwaway API and database:
- * its own ports (API 8002, web 3100), its own database (fd_e2e, recreated on start and reset
+ * its own ports (API 8002, web 3100; E2E_API_PORT and E2E_WEB_PORT move them), its own database (fd_e2e, recreated on start and reset
  * before each spec file), the scripted stub model, no email. Rules: e2e/CLAUDE.md.
  *
  *   npm run test:e2e                  build, start both servers, run everything
@@ -39,7 +39,7 @@ export default defineConfig({
       env: { E2E_WEB_URL: WEB },
     },
     {
-      command: "npm run build && npm run start -- --port 3100",
+      command: `npm run build && npm run start -- --port ${WEB_PORT}`,
       url: WEB,
       timeout: 360_000,
       reuseExistingServer: Boolean(process.env.E2E_REUSE),

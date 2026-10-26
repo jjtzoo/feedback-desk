@@ -109,6 +109,8 @@ const STEPS: Record<Area, Step[]> = {
 };
 
 const PAD = 6;
+/** The `data-tour` value of the "Open menu" button that holds the console's links below 1024 px. */
+const MENU = "menu";
 const seenKey = (area: Area) => `feedback-guide-seen:${area}:v2`;
 
 function hasSeen(area: Area): boolean {
@@ -193,6 +195,8 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
   const acting = phase === "act" && Boolean(step.action);
   const trying = phase === "try";
   const [rect, setRect] = useState<DOMRect | null>(null);
+  // The control is in the closed menu, so the highlight is on "Open menu" until the menu opens.
+  const [inMenu, setInMenu] = useState(false);
   const card = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
 
@@ -210,10 +214,13 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
     if (phase === "intro" && step.path && step.path !== path) router.push(step.path);
   }, [phase, step.path, path, router]);
 
-  // Find the control, bring it into view, and follow it on scroll and resize.
+  // Find the control, bring it into view, and follow it on scroll and resize. A control hidden in
+  // the closed menu is reached through "Open menu".
   const measure = useCallback(() => {
     const el = findTarget(step.target);
-    setRect(el ? el.getBoundingClientRect() : null);
+    const menu = el || !step.target ? null : findTarget(MENU);
+    setRect((el ?? menu)?.getBoundingClientRect() ?? null);
+    setInMenu(Boolean(menu));
   }, [step.target]);
 
   useLayoutEffect(() => {
@@ -221,13 +228,17 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
     const frame = window.requestAnimationFrame(measure);
     // After a route change or a smooth scroll the control moves: measure again shortly.
     const retry = window.setTimeout(measure, 400);
+    // The menu slides in and out: measure again once it has.
+    const settled = () => window.requestAnimationFrame(measure);
     window.addEventListener("resize", measure);
     window.addEventListener("scroll", measure, true);
+    document.addEventListener("animationend", settled, true);
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(retry);
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
+      document.removeEventListener("animationend", settled, true);
     };
   }, [measure, step.target, path]);
 
@@ -246,13 +257,15 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
   }, [onEnd, trying]);
 
   // While waiting for the click, only the highlighted control works. Pressing it lets the control
-  // do its job (open the page or menu) and frees the page to try it; Next moves on.
+  // do its job (open the page or menu) and frees the page to try it; Next moves on. "Open menu"
+  // works too while the control is inside the menu, and opening it is not yet the step's click.
   useEffect(() => {
     if (!acting) return;
-    const where = (e: Event): "card" | "target" | "outside" => {
+    const where = (e: Event): "card" | "target" | "menu" | "outside" => {
       const node = e.target instanceof Node ? e.target : null;
       if (node && card.current?.contains(node)) return "card";
       if (node && findTarget(step.target)?.contains(node)) return "target";
+      if (node && findTarget(MENU)?.contains(node)) return "menu";
       return "outside";
     };
     const onPointerDown = (e: PointerEvent) => {
@@ -305,7 +318,7 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
 
   if (trying) {
     return (
-      <div className="pointer-events-none fixed inset-0 z-50">
+      <div className="pointer-events-none fixed inset-0 z-60">
         <div
           role="status"
           className={cn(
@@ -338,7 +351,7 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50" onKeyDown={onKeyDown}>
+    <div className="pointer-events-none fixed inset-0 z-60" onKeyDown={onKeyDown}>
       {/* Blocks the page while a card is open; while waiting for a click only the control is live. */}
       {!acting && <div className="pointer-events-auto absolute inset-0" aria-hidden="true" />}
       {rect ? (
@@ -360,22 +373,26 @@ function Tour({ steps, index, onIndex, onEnd }: { steps: Step[]; index: number; 
         <div className="absolute inset-0 bg-black/55" aria-hidden="true" />
       )}
       {acting ? (
+        // aria-live keeps the card readable while the console menu, a modal, is open on top of the page.
         <div
           ref={card}
           role="status"
+          aria-live="polite"
           className="pointer-events-auto absolute w-[min(22rem,calc(100vw-2rem))] rounded-2xl bg-popover p-4 text-popover-foreground shadow-card ring-1 ring-foreground/10"
           style={cardPosition(rect)}
         >
           <p className="text-base font-bold">{step.action}</p>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Step {index + 1} of {steps.length}. {rect ? "Click the highlighted control to try it." : "That control isn't showing on this screen."}
+            Step {index + 1} of {steps.length}.{" "}
+            {!rect ? `${step.body} That control isn't on this screen.` : inMenu ? "Open the highlighted menu first." : "Click the highlighted control to try it."}
           </p>
           <div className="mt-3 flex items-center gap-2">
             <Button variant="ghost" className="-ml-2 h-11 rounded-xl text-muted-foreground" onClick={onEnd}>
               Skip tour
             </Button>
-            <Button variant="outline" className="ml-auto h-11 rounded-xl" onClick={() => go(index + 1)}>
-              Skip this step
+            {/* Never a dead end: without the control the step is read, and Next carries on. */}
+            <Button variant="outline" className="ml-auto h-11 rounded-xl" onClick={() => (last ? onEnd() : go(index + 1))}>
+              {!rect ? (last ? "Done" : "Next") : "Skip this step"}
             </Button>
           </div>
         </div>

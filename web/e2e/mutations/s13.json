@@ -3,11 +3,17 @@
   "S13.02": ["header.getByText(\"P2 · Major\")", "header.getByText(\"P1 · Major\")"],
   "S13.03": ["Raised by staff; see the brief.", "Raised by staffx; see the brief."],
   "S13.04": ["Work type (${percent", "Work typex (${percent"],
-  "S13.05": ["priority P2 → priority P1", "priority P2 → priority P3"],
-  "S13.06": ["Reassigned to Mario", "Reassigned to Mariox", 2],
+  "S13.05": ["from P2 · Major to P1 · Blocking\"", "from P2 · Major to P3 · Minor\""],
+  "S13.06": ["toContainText(\"Now with Mario\")", "toContainText(\"Now with Mariox\")"],
   "S13.07": ["toHaveCount(1)", "toHaveCount(2)"],
   "S13.08": ["lucide-lock\"]", "lucide-lockx\"]"],
   "S13.09": [".toBe(file.buffer.length)", ".toBe(file.buffer.length + 1)"],
   "S13.10": ["toHaveCount(events.length)", "toHaveCount(events.length + 1)"],
-  "S13.11": ["Waiting for an Admin to approve.", "Waiting for an Adminx to approve."]
+  "S13.11": ["Waiting for an Admin to approve.", "Waiting for an Adminx to approve."],
+  "S13.12": ["for (const name of [\"Start work\"", "for (const name of [\"Take over\""],
+  "S13.13": ["Mario took over ${ref}", "Mario took overx ${ref}"],
+  "S13.14": ["\"Mario has just taken this over.\"", "\"Mario has just taken this overx.\""],
+  "S13.15": ["Mario · Mario took this on", "Mario · Mario took this onx"],
+  "S13.16": ["owner of RAKE Agent/", "owner of Flipbook/"],
+  "S13.17": ["\"Needs detail: ask for info first\"", "\"Needs detail: ask for info firstx\""]
 }

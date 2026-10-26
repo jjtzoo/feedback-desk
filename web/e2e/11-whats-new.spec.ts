@@ -1,10 +1,11 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, postJson, raise, raiseBug } from "./helpers";
+import { getJson, holderOf, postJson, raise, raiseBug } from "./helpers";
 
 // Manual checklist section 11 (Staff: What's new). Releases come from the Friday drafter, set up
-// through the API as Chris (an Admin, who can publish for any project); the checks are on /whats-new.
+// through the API as Chris (an Admin, who can publish for any project) and each item's holder; the
+// checks are on /whats-new.
 
 test.beforeAll(resetDatabase);
 
@@ -42,9 +43,10 @@ function publishReleases(team: Team) {
   published ??= (async () => {
     const [liam, aisha, chris] = await Promise.all([team.as("Liam"), team.as("Aisha"), team.as("Chris")]);
     const approve = (ref: string) => postJson(chris, `/console/items/${ref}/approve`);
+    const holder = async (ref: string) => team.as(await holderOf(chris, ref));
     const resolve = async (ref: string) => {
       await approve(ref);
-      await postJson(chris, `/console/items/${ref}/resolve`, { body: "Done in this week's update" });
+      await postJson(await holder(ref), `/console/items/${ref}/resolve`, { body: "Done in this week's update" });
     };
 
     await resolve(await raise(liam, NEW_ITEM, IMPACT, "rake-agent"));
@@ -55,8 +57,9 @@ function publishReleases(team: Team) {
     await resolve(await raiseBug(aisha, "rake-agent", UNTICKED_ITEM));
     const working = await raiseBug(aisha, "rake-agent", IN_PROGRESS_ITEM);
     await approve(working);
-    await postJson(chris, `/console/items/${working}/start`);
-    await postJson(chris, `/console/items/${working}/update`, { body: PROGRESS_UPDATE });
+    const worker = await holder(working);
+    await postJson(worker, `/console/items/${working}/start`);
+    await postJson(worker, `/console/items/${working}/update`, { body: PROGRESS_UPDATE });
     await postJson(chris, "/console/channels/rake-agent", { body: CHANNEL_NOTE });
     await resolve(await raiseBug(aisha, "training-portal", PORTAL_ITEM));
 

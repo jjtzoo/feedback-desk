@@ -1,8 +1,9 @@
 "use client";
 
-import { Flag, Paperclip, TrendingUp, Users } from "lucide-react";
+import { CircleHelp, Flag, Paperclip, TrendingUp, Users } from "lucide-react";
 
 import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
+import { AutoMarker } from "@/components/console/routing-line";
 import type { Card } from "@/lib/api";
 import { age, day, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -35,6 +36,11 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
             <TrendingUp className="size-3" aria-hidden="true" /> Review priority
           </span>
         )}
+        {card.needs_detail && (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+            <CircleHelp className="size-3" aria-hidden="true" /> Needs detail
+          </span>
+        )}
       </span>
       <span className="line-clamp-2 font-semibold leading-snug">{card.title}</span>
       <span className="text-sm text-muted-foreground">
@@ -64,7 +70,12 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
             <span className="sr-only"> people reported this</span>
           </span>
         )}
-        {card.assignee && <span className="ml-auto truncate">{card.assignee.name}</span>}
+        {card.assignee && (
+          <span className="ml-auto flex min-w-0 items-center gap-1.5">
+            <AutoMarker card={card} />
+            <span className="truncate">{card.assignee.name}</span>
+          </span>
+        )}
       </span>
     </button>
   );

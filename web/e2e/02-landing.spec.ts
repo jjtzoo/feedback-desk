@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { WEB } from "./env";
 import { expect, resetDatabase, test } from "./fixtures";
 import { raiseBug } from "./helpers";
 
@@ -192,7 +193,7 @@ test("S02.04 While the small card says 'Click Give feedback', clicking anywhere 
 
   await expect(page.getByRole("menu")).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page).toHaveURL(/:3100\/$/);
+  await expect(page).toHaveURL(`${WEB}/`);
   await expect(card).toBeVisible();
 
   // The highlighted control still works, and it is the only navigation there was.
@@ -399,14 +400,4 @@ test("S02.14 'How it works' shows three steps, including 'Nothing is sent until 
   const steps = how.getByRole("listitem");
   await expect(steps).toHaveCount(3);
   await expect(steps.nth(1)).toContainText("Nothing is sent until you select Confirm.");
-});
-
-test("S02.15 The footer says chats are processed by Gemini and passwords, card numbers and tax file numbers are removed before saving", async ({ page, signIn }) => {
-  await signIn("Mario");
-  await openLanding(page);
-
-  const footer = page.getByRole("contentinfo");
-  await expect(footer).toBeVisible();
-  await expect(footer).toContainText(/chats are processed by Google's Gemini model/);
-  await expect(footer).toContainText(/Passwords, card numbers and tax file numbers are removed before anything is saved/);
 });

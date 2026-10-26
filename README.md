@@ -17,7 +17,7 @@ A chat-style agent where any REDADAIR staff member gives feedback on the intrane
 | --- | --- |
 | Web app | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS 4, shadcn/ui, Lucide icons |
 | API | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async), Alembic, uv |
-| Agent | Google ADK 2.12 with Gemini 3.1 Flash-Lite, 2.5 Flash as fallback (AI Studio key, or Vertex AI by config); a scripted stub model until the key arrives |
+| Agent | Google ADK 2.12 with Gemini 3.8 Flash, 3.1 Flash-Lite as the cheaper fallback (AI Studio key, or Vertex AI by config); a scripted stub model until the key arrives |
 | Data | PostgreSQL + pgvector (Docker locally, Cloud SQL in the cloud) |
 | Cloud | Google Cloud australia-southeast1: Cloud Run, Cloud SQL, Cloud Storage, Secret Manager, Artifact Registry, Cloud Scheduler |
 | Not used | Redis, Prisma, RAG Engine, Cloud Spanner, MCP servers |

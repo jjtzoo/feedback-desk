@@ -11,5 +11,7 @@
   "S04.10": ["Acknowledged, thank you", "Acknowledgedx, thank you"],
   "S04.11": ["It's with Chris", "It's with Chrisx"],
   "S04.12": ["Needs review", "Needs reviewx"],
-  "S04.13": ["P1 needs approval:", "P1 needs approvalx:"]
+  "S04.13": ["P1 needs approval:", "P1 needs approvalx:"],
+  "S04.14": ["\"got a blank screen\"", "\"got a blank screenx\""],
+  "S04.15": ["await expect(card(page)).toHaveCount(0)", "await expect(card(page)).toHaveCount(1)"]
 }

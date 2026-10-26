@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T00:19:26.354Z",
-  "commit": "8858e8f",
-  "uncommitted": true,
+  "ran": "2026-10-26T07:30:28.225Z",
+  "commit": "e2273d0",
+  "uncommitted": false,
   "spec": "04-confirm-card.spec.ts",
-  "fingerprint": "957cc22a97428e5c",
+  "fingerprint": "a7e1b0bd09cf689e",
   "caught": {
     "S04.01": true,
     "S04.02": true,
@@ -17,6 +17,8 @@
     "S04.10": true,
     "S04.11": true,
     "S04.12": true,
-    "S04.13": true
+    "S04.13": true,
+    "S04.14": true,
+    "S04.15": true
   }
 }

@@ -12,7 +12,7 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 ## Stack
 
 - Backend `backend/`: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async) + Alembic, PostgreSQL + pgvector (version per D31), uv. Business rules in `app/services/`; routers in `app/api/` stay thin.
-- Agent `backend/agent/`: Google ADK, one LlmAgent with tools `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`; Gemini 3.1 Flash-Lite (2.5 Flash fallback, D36) via AI Studio key, Vertex AI by config; a scripted stub model until the key arrives (D8, D23). Separate package so it can deploy to Agent Engine; never import FastAPI there.
+- Agent `backend/agent/`: Google ADK, one LlmAgent with tools `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`; Gemini 3.8 Flash (3.1 Flash-Lite fallback, D36) via AI Studio key, Vertex AI by config; a scripted stub model until the key arrives (D8, D23). Separate package so it can deploy to Agent Engine; never import FastAPI there.
 - Frontend `web/`: Next.js (App Router) + React + TypeScript + Tailwind + shadcn/ui (D16). Staff area `/` (landing) and `/chat`, console `/console`. Calls the API only.
 - Not used: Redis, Prisma, RAG Engine, Cloud Spanner, MCP servers (D26, D34).
 - Google Cloud australia-southeast1: Cloud Run (services for api and web, a job for the worker), Cloud SQL, Cloud Storage, Secret Manager, Artifact Registry, Cloud Scheduler (D29, D30, D33).
@@ -22,7 +22,7 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 - Docker: `cp .env.example .env`, `docker compose --profile dev up --build`, `docker compose exec api python -m app.seed`.
 - Without Docker: `.\dev.ps1` (Windows) or `./dev.sh` starts both in one terminal, Ctrl+C stops both; separately: `cd backend && uv run python -m scripts.dev_server` (API on 8001, dev sign-in on, stub model), `cd web && npm run dev`. Port 8000 belongs to another local app; don't kill it.
 - Checks before any merge: `cd backend && uv run ruff check . && uv run mypy && uv run pytest`; `cd web && npm run build`.
-- Browser tests: `cd web && npm run test:e2e` (Playwright, own ports 8002/3100, own database, stub model). Their rules are in `web/e2e/CLAUDE.md`; app bugs they find go in `web/e2e/FINDINGS.md`, never fixed inside a test change. Agent changes also run `uv run python -m evals.run_routing` (gate 85 % project, 85 % work type, 80 % assignee on Gemini).
+- Browser tests: `cd web && npm run test:e2e` (Playwright, own ports 8002/3100, or `E2E_API_PORT`/`E2E_WEB_PORT`/`E2E_CONTROL_PORT` in a second worktree; own database, stub model). Their rules are in `web/e2e/CLAUDE.md`; app bugs they find go in `web/e2e/FINDINGS.md`, never fixed inside a test change. Agent changes also run `uv run python -m evals.run_routing` (gate 85 % project, 85 % work type, 80 % assignee on Gemini).
 
 ## Rules for every change
 

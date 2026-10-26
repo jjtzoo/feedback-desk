@@ -1,8 +1,13 @@
-/** Where the browser tests run; shared by playwright.config.ts and the fixtures. */
-export const API = "http://localhost:8002";
-export const WEB = "http://localhost:3100";
+/**
+ * Where the browser tests run; shared by playwright.config.ts and the fixtures. E2E_API_PORT,
+ * E2E_WEB_PORT and E2E_CONTROL_PORT move them, so a second worktree can run its own servers.
+ */
+export const API_PORT = process.env.E2E_API_PORT ?? "8002";
+export const WEB_PORT = process.env.E2E_WEB_PORT ?? "3100";
+export const API = `http://localhost:${API_PORT}`;
+export const WEB = `http://localhost:${WEB_PORT}`;
 /** The test API's supervisor (backend/scripts/e2e_server.py), which restarts it with another model. */
-export const API_CONTROL = "http://127.0.0.1:8012";
+export const API_CONTROL = `http://127.0.0.1:${process.env.E2E_CONTROL_PORT ?? "8012"}`;
 
 /** The first-visit tour is switched off for every test except the ones about the tour itself. */
 export const TOUR_SEEN = {

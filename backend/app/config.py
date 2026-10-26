@@ -36,9 +36,10 @@ class Settings(BaseSettings):
 
     # Model (D8)
     model_provider: Literal["auto", "gemini", "vertex", "stub", "none"] = "auto"
-    # The cheapest Gemini model open to new keys that passes the routing gate (D36);
-    # gemini-2.5-flash is the fallback. (2.5 Flash-Lite is closed to new users.)
-    model_name: str = "gemini-3.1-flash-lite"
+    # The newest generally available full Flash model (D36, review item 17): Sig has to pick up nuance,
+    # which the Lite tier is weakest at. gemini-3.1-flash-lite is the cheaper fallback by config.
+    # (2.5 Flash was retired on 2026-10-20; 2.5 Flash-Lite is closed to new users.)
+    model_name: str = "gemini-3.8-flash"
     embedding_model: str = "gemini-embedding-001"
     agent_turn_timeout_seconds: float = 20.0
     google_api_key: str = ""
@@ -51,9 +52,10 @@ class Settings(BaseSettings):
     # Different people reporting the same open item before the console suggests a priority review (D38).
     priority_review_reporters: int = 3
     # For the cost log (brief §8: under AUD 0.05 per item). AUD per million tokens for model_name;
-    # check current prices (3.1 Flash-Lite USD 0.25 / 1.50 on 2026-10-21; 2.5 Flash USD 0.30 / 2.50).
-    model_price_input_aud_per_m: float = 0.38
-    model_price_output_aud_per_m: float = 2.28
+    # check current prices (3.8 Flash USD 0.75 / 3.75 on 2026-10-26, introductory, reported to rise to
+    # 1.50 / 7.50 on 2027-01-01; 3.1 Flash-Lite USD 0.25 / 1.50, i.e. AUD 0.38 / 2.28). At USD 1 = AUD 1.52.
+    model_price_input_aud_per_m: float = 1.14
+    model_price_output_aud_per_m: float = 5.70
     # Caps on each model call (D36): a short reply, no hidden "thinking" tokens (billed as output).
     model_max_output_tokens: int = 1024
     model_thinking_budget: int = 0

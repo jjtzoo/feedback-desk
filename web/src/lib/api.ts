@@ -91,11 +91,17 @@ export interface ChatCard {
   priority: string;
   title: string;
   summary: string;
+  /** For a fix: what they saw, so they can correct it (D63). */
+  what_happened: string;
+  /** What Sig couldn't find out; the card offers a box to add it (D63). */
+  gaps: string[];
 }
 
 export interface Chip {
   label: string;
   value: string;
+  /** One of the person's likely tools (D60): shown first. */
+  usual?: boolean;
 }
 
 export interface Duplicate {
@@ -199,6 +205,10 @@ export interface Card {
   reporters: number;
   /** Enough people reported it that a priority review is suggested (never applied by itself). */
   priority_review: boolean;
+  /** Saved with open gaps the person hasn't added to yet: ask for info first (D63). */
+  needs_detail: boolean;
+  /** Routing's reason ("project owner", "routing rule", "project unclear", ...) while its choice still stands (D56). */
+  routed: string | null;
 }
 
 export interface Column {
@@ -277,6 +287,9 @@ export interface Detail extends Card {
   followers: string[];
   duplicates: { reference: string; title: string; status: string; similarity: number }[];
   linked: string[];
+  /** For the Take over dialog (D53): whether the holder is away, and their latest step on the item. */
+  assignee_away: boolean;
+  holder_activity: { text: string; at: string } | null;
 }
 
 export interface Notification {
@@ -287,6 +300,11 @@ export interface Notification {
   link: string;
   read_at: string | null;
   created_at: string;
+  /** What happened once anyone acted on it ("FB-0003 approved by Chris"), and the item as it is now (D54). */
+  outcome: string | null;
+  item_status: Status | null;
+  item_stage: Stage | null;
+  item_ending: Ending | null;
 }
 
 export interface ChannelMessage {

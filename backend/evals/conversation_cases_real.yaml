@@ -1,0 +1,697 @@
+# Conversation cases written from how staff really chat: they push back, change the subject,
+# answer a different question, mistype, vent, joke, and come back after the card. They try to
+# break Sig, not confirm it. Same format as conversation_set.yaml; run on real Gemini only,
+# never the stub.
+#
+# messages: what the person types, in order (the harness stops early once a card shows when
+#   expect is card)
+# expect:   card    (a confirm card appears) | no_card (no card, nothing saved)
+# require:  at least one of these appears in the agent's replies (case-insensitive)
+# forbid:   none of these appears in the agent's replies (case-insensitive)
+#
+# Extra keys for a per-turn code rubric (run_conversations.py does not read them yet):
+# good:         what a good support person would do in this chat
+# card:         the card a good support person would show (project, kind, impact); absent for no_card
+# chips:        one entry per message: the chips expected under Sig's reply to it
+#                 tools     the catalogue tools plus "Not sure"
+#                 no_impact any chips, or none, but never Blocking my work / Slowing me down / Nice-to-have
+#                 none      no chips
+#                 card      the confirm card shows here
+#                 after     the card is already up; Sig updates it, no new chips
+# never_ask:    questions that must never be asked in this chat
+# never_repeat: questions that may be asked once but must never be asked again
+# after_card:   true when the later messages come after the card; the harness must keep sending
+#               them instead of stopping at the first card
+#
+# Checked on every reply of every case:
+#   1. no question asked twice (same meaning, any wording)
+#   2. chips match the question just asked (tool question: tools; yes/no: yes/no; no question: none)
+#   3. at most 2 lines per reply
+#   4. no dashes as punctuation (— or –, or " - " between clauses)
+#   5. no card unless the person reported something (a problem, idea, access need or praise)
+#   6. impact never asked when the person already said it (slow, down, can't work, not urgent)
+cases:
+
+  # The three real failures from the product owner's review notes, 26 Oct
+
+  - name: real-15-chips-match-tool-question
+    source: |
+      ### 15. Chat chips don't match Sig's question
+      "My app is slow" -> Sig: "which tool are you using when it's running slow?" -> chips **Blocking my work / Slowing me down / Nice-to-have**.
+      - Sig asked for the tool, so the chips should be the tools (apps), plus "Not sure". Impact chips under a tool question make no sense.
+      - The person already said "slow", so the impact is known (slowing them down). The impact question and its chips should not come up at all; infer it and let the confirm card show it.
+    messages:
+      - "My app is slow"
+      - "AFSS Portal"
+      - "the statement list takes ages to load"
+    expect: card
+    require: []
+    forbid: ["nice-to-have", "stopping you", "nuisance", "—"]
+    good: Ask which tool with the tools as chips, ask what is slow, then show the card with Slowing me down already filled in.
+    card: {project: AFSS Portal, kind: problem, impact: Slowing me down}
+    chips: [tools, no_impact, card]
+    never_ask: [how much it affects their work]
+    never_repeat: [which tool]
+
+  - name: real-16-already-said-slow
+    source: |
+      ### 16. Sig asks again after the person says they already answered
+      Same chat, continued: "AFSS Portal" -> "Is it stopping you from getting your work done, or is it just a bit of a nuisance?" -> "I already said it's slow" -> a four-line reply that apologises, explains why it needs to know, and asks the same thing again, with the same three chips.
+      - When someone pushes back ("I already said", "I told you"), Sig takes what they said, doesn't ask again, and moves on: "Got it, slowing you down." Never repeat a question.
+      - "Slow" means "Slowing me down" (major). Replies stay short (two lines), no dashes as punctuation. "Nice-to-have" for a slow tool doesn't make sense.
+    messages:
+      - "My app is slow"
+      - "AFSS Portal"
+      - "I already said it's slow"
+      - "the statement list takes ages to load"
+    expect: card
+    require: []
+    forbid: ["nice-to-have", "stopping you", "nuisance", "need to know", "—"]
+    good: Take the pushback as the answer, say "Got it, slowing you down." and move on; no apology speech, no repeated question.
+    card: {project: AFSS Portal, kind: problem, impact: Slowing me down}
+    chips: [tools, no_impact, no_impact, card]
+    never_ask: [how much it affects their work]
+    never_repeat: [which tool, what is slow]
+
+  - name: real-18-question-about-sig-is-not-feedback
+    source: |
+      ### 18. A question about Sig itself becomes a feedback card
+      Seen 26 Oct (Aisha): "what is your role" -> a good answer. "RAKE Agent" -> "What's happening with RAKE Agent?" -> "why do we need you when we already have rake rgent" -> a sensible answer, then straight on "Here's what I'll send" and a card: RAKE Agent · No change · Question · "Purpose of feedback channel vs RAKE Agent" · Minor.
+      - Nobody reported anything. Asking about Sig, Smoke Signal or how it differs from RAKE is chat, not feedback; it must never produce a card. Answer in two lines at most, then "Anything you'd like to tell the team about?".
+      - Also: "are you a bot?" and "who made you?" end with no card.
+    messages:
+      - "what is your role"
+      - "RAKE Agent"
+      - "why do we need you when we already have rake rgent"
+    expect: no_card
+    require: ["anything you'd like to tell the team"]
+    forbid: ["here's what i'll send", "—"]
+    good: Answer what Sig is, then how it differs from RAKE (RAKE answers policy questions, Sig passes feedback to the team), two lines each, then "Anything you'd like to tell the team about?".
+    chips: [none, no_impact, none]
+    never_ask: [how much it affects their work, which tool]
+    never_repeat: [what's happening with RAKE Agent]
+
+  # Questions about Sig
+
+  - name: sig-are-you-a-bot
+    messages: ["are you a bot?"]
+    expect: no_card
+    require: ["anything you'd like to tell the team"]
+    forbid: ["here's what i'll send", "—"]
+    good: Say yes, a chat assistant that passes feedback to the digital team, then invite feedback.
+    chips: [none]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  - name: sig-who-made-you
+    messages: ["who made you?"]
+    expect: no_card
+    require: ["anything you'd like to tell the team"]
+    forbid: ["here's what i'll send", "—"]
+    good: Say REDADAIR's digital team built it to collect feedback on intranet tools, then invite feedback.
+    chips: [none]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  - name: sig-is-this-chatgpt-then-nothing
+    messages: ["is this chatgpt", "lol ok", "nah all good"]
+    expect: no_card
+    require: []
+    forbid: ["here's what i'll send", "—"]
+    good: Answer in one line, take "lol ok" lightly, and close politely on "nah all good"; no card, no chasing.
+    chips: [none, none, none]
+    never_ask: [which tool, what's wrong]
+    never_repeat: [anything you'd like to tell the team]
+
+  - name: sig-real-person-then-real-issue
+    messages:
+      - "are you a real person"
+      - "ok whatever. training portal won't let me finish the fire warden module, it freezes at 90%"
+    expect: card
+    require: []
+    forbid: ["which tool", "—"]
+    good: One line answer, then take the report as given; tool, problem and point of failure are already there.
+    card: {project: Training Portal, kind: problem, impact: Blocking my work}
+    chips: [none, card]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  - name: sig-who-reads-this
+    messages:
+      - "who actually reads this?"
+      - "will I get in trouble for complaining about how my manager runs things"
+    expect: no_card
+    require: []
+    forbid: ["here's what i'll send", "—"]
+    good: Say the digital team and the tool owner read it; explain it is for intranet tools, not people or managers, and point to the right channel. No card.
+    chips: [none, none]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: sig-rake-difference-then-rake-bug
+    messages:
+      - "what's the difference between you and rake"
+      - "ok well rake told me 4 weeks notice for leave yesterday, it's 2 weeks"
+    expect: card
+    require: []
+    forbid: ["which tool", "—"]
+    good: Two line answer on the difference, then treat the wrong policy answer as a RAKE Agent problem; no card for the first question.
+    card: {project: RAKE Agent, kind: problem, impact: Slowing me down}
+    chips: [none, card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: sig-can-you-fix-it
+    messages:
+      - "can you just fix the CPD tracker for me"
+      - "my points from the March course aren't showing"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Say it can't fix it but will pass it to the team, ask what is wrong, then card.
+    card: {project: CPD Tracker, kind: problem}
+    chips: [none, card]
+    never_ask: [which tool]
+    never_repeat: [what's wrong]
+
+  # Pushback
+
+  - name: pushback-i-just-told-you
+    messages:
+      - "the training portal keeps logging me out every 5 min"
+      - "every time, I just told you"
+      - "chrome"
+    expect: card
+    require: []
+    forbid: ["sorry for", "—"]
+    good: Don't ask how often after "every 5 min"; if Sig asked, take the pushback and move on without apologising at length.
+    card: {project: Training Portal, kind: problem, impact: Slowing me down}
+    chips: [no_impact, no_impact, card]
+    never_ask: [which tool, how often]
+    never_repeat: [which browser]
+
+  - name: pushback-i-said-i-cant-work
+    messages:
+      - "can't do any work, staff admin portal won't load at all"
+      - "i said i can't work"
+      - "since this morning"
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "—"]
+    good: Impact is Blocking from the first line; ask at most one detail (since when, any error) and card.
+    card: {project: Staff Admin Portal, kind: problem, impact: Blocking my work}
+    chips: [no_impact, no_impact, card]
+    never_ask: [how much it affects their work, which tool]
+    never_repeat: [when it started]
+
+  - name: pushback-stop-asking-just-send-it
+    messages:
+      - "goformz forms won't sync on my ipad"
+      - "why so many questions just send it"
+    expect: card
+    require: []
+    forbid: ["need to know", "—"]
+    good: Show the card straight away with what it has; no defence of the questions.
+    card: {project: GoFormz Extension Portal, kind: problem}
+    chips: [no_impact, card]
+    never_ask: [which tool]
+    never_repeat: [any question asked before the pushback]
+
+  - name: pushback-card-got-it-wrong
+    after_card: true
+    messages:
+      - "financial platform expense upload fails for pdfs over 5mb"
+      - "no that's not what I said, it fails over 5mb not under"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Fix the summary on the card in one line and show it again; no apology paragraph, no new questions.
+    card: {project: Financial Platform, kind: problem}
+    chips: [card, after]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: [what's wrong]
+
+  # Changing the subject halfway
+
+  - name: switch-to-a-different-tool
+    messages:
+      - "the AFSS portal is slow when exporting"
+      - "actually forget that, the bigger problem is I can't get into FPOWS at all"
+      - "it says access denied"
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "—"]
+    good: Drop AFSS, follow FPOWS; can't get in means blocking. Card for FPOWS only.
+    card: {project: FPOWS Portal, kind: access, impact: Blocking my work}
+    chips: [no_impact, no_impact, card]
+    never_ask: [how much it affects their work, which tool]
+    never_repeat: []
+
+  - name: switch-to-a-question-and-back
+    messages:
+      - "the flipbook pages are blurry on mobile"
+      - "wait, do you save this chat somewhere?"
+      - "ok. the blurry thing, it's the safety brochure"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Answer the privacy question in one line, then pick the flipbook report back up without restarting.
+    card: {project: Flipbook, kind: problem}
+    chips: [no_impact, none, card]
+    never_ask: [which tool]
+    never_repeat: [what's blurry]
+
+  - name: switch-to-small-talk-and-back
+    messages:
+      - "the intranet menu is a mess"
+      - "anyway how was your weekend lol"
+      - "the menu, half the links go to old pages"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: One light line on the small talk, then back to the menu.
+    card: {project: Intranet site itself, kind: problem}
+    chips: [no_impact, none, card]
+    never_ask: [which tool]
+    never_repeat: [what's wrong with the menu]
+
+  # Answering a different question than asked
+
+  - name: answers-impact-when-asked-tool
+    messages:
+      - "something keeps crashing"
+      - "it's really annoying, happens like 5 times a day"
+      - "the epm thing"
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "—"]
+    good: Keep the impact from turn 2, ask for the tool once more if needed, map "the epm thing" to ADAIR EPM Portal.
+    card: {project: ADAIR EPM Portal, kind: problem, impact: Slowing me down}
+    chips: [tools, tools, card]
+    never_ask: [how much it affects their work]
+    never_repeat: [how often]
+
+  - name: answers-steps-when-asked-tool
+    messages:
+      - "can't upload my certificate"
+      - "I click upload, pick the pdf, then nothing happens"
+      - "cpd"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Keep the steps, ask for the tool once if unclear, then card for CPD Tracker; never ask for steps again.
+    card: {project: CPD Tracker, kind: problem}
+    chips: [tools, tools, card]
+    never_ask: [what happens when you upload]
+    never_repeat: [which tool]
+
+  - name: answers-question-with-question
+    messages:
+      - "the blog agent writes weird stuff"
+      - "what do you mean what do I mean"
+      - "it put american spelling in the sprinkler post"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Reword the question more concretely once (an example?), then card.
+    card: {project: Fire Safety Blog Agent, kind: problem}
+    chips: [no_impact, no_impact, card]
+    never_ask: [which tool]
+    never_repeat: [the same wording of the first question]
+
+  # Typos
+
+  - name: typo-rake-rgent
+    messages: ["rake rgent keeps saying it doesnt know about the new ppe policy"]
+    expect: card
+    require: []
+    forbid: ["which tool", "—"]
+    good: Read "rake rgent" as RAKE Agent and go straight to the card or one detail question.
+    card: {project: RAKE Agent, kind: problem}
+    chips: [card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: typo-heavy-training-portal
+    messages:
+      - "trainign protal wont load my certifcate pg"
+      - "its blank"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Read it as Training Portal certificate page; ask at most one thing.
+    card: {project: Training Portal, kind: problem}
+    chips: [no_impact, card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: typo-go-forms-extention
+    messages:
+      - "go forms extention breaks the signature box"
+      - "on the inspection form"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Map to GoFormz Extension Portal without asking which tool.
+    card: {project: GoFormz Extension Portal, kind: problem}
+    chips: [no_impact, card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: typo-afs-portl-down
+    messages: ["afs portl is down"]
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "which tool", "—"]
+    good: AFSS Portal, down means blocking; card straight away or one detail question.
+    card: {project: AFSS Portal, kind: problem, impact: Blocking my work}
+    chips: [card]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  # One-word replies
+
+  - name: one-word-slow-afss-yes
+    messages: ["slow", "afss", "yes"]
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "—"]
+    good: Ask the tool with tool chips, then what is slow or straight to the card; impact is Slowing me down.
+    card: {project: AFSS Portal, kind: problem, impact: Slowing me down}
+    chips: [tools, no_impact, card]
+    never_ask: [how much it affects their work]
+    never_repeat: [which tool]
+
+  - name: one-word-bug-staff-admin
+    messages: ["bug", "staff admin", "leave balance wrong", "yep"]
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: One short question per turn; card once tool and problem are known.
+    card: {project: Staff Admin Portal, kind: problem}
+    chips: [tools, no_impact, no_impact, card]
+    never_ask: []
+    never_repeat: [which tool, what's wrong]
+
+  - name: one-word-hi-nah-nothing
+    messages: ["hi", "nah", "nothing"]
+    expect: no_card
+    require: []
+    forbid: ["here's what i'll send", "—"]
+    good: Greet, accept "nah", close politely; no card and no pressing.
+    chips: [none, none, none]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: [anything you'd like to tell the team]
+
+  - name: one-word-hey
+    messages: ["hey"]
+    expect: no_card
+    require: []
+    forbid: ["here's what i'll send", "—"]
+    good: Greet in one line and ask what is on their mind.
+    chips: [none]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  # Two problems in one message
+
+  - name: two-problems-two-tools
+    messages:
+      - "the training portal won't play videos and also the CPD tracker lost my points"
+      - "both"
+      - "yes"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Take one at a time (one card per tool, never one card for both), then offer the second.
+    card: {project: Training Portal, kind: problem}
+    chips: [no_impact, no_impact, card]
+    never_ask: [which tool]
+    never_repeat: [which one first]
+
+  - name: two-problems-same-tool
+    messages: ["staff admin portal: payslips won't download and the leave calendar shows the wrong dates"]
+    expect: card
+    require: []
+    forbid: ["which tool", "—"]
+    good: Card for the first problem and say the second comes next, or ask which first; never drop one silently.
+    card: {project: Staff Admin Portal, kind: problem}
+    chips: [no_impact]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: praise-and-problem-together
+    messages: ["love the new atlas search, but the print button cuts off half the map"]
+    expect: card
+    require: []
+    forbid: ["which tool", "—"]
+    good: Card for the print bug; mention the praise can go through too.
+    card: {project: REDADAIR Workflow Atlas, kind: problem}
+    chips: [card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  # Sarcasm
+
+  - name: sarcasm-love-that-for-me
+    messages: ["oh great, the financial platform is down AGAIN, love that for me"]
+    expect: card
+    require: []
+    forbid: ["glad", "nuisance", "nice-to-have", "which tool", "—"]
+    good: Read the sarcasm as frustration; down means blocking; card or one detail question.
+    card: {project: Financial Platform, kind: problem, impact: Blocking my work}
+    chips: [card]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  - name: sarcasm-wonderful-update
+    messages:
+      - "wonderful update to the intranet, now I can't find anything 🙃"
+      - "the tiles moved"
+    expect: card
+    require: []
+    forbid: ["glad you like", "—"]
+    good: Treat it as a problem, not praise.
+    card: {project: Intranet site itself, kind: problem}
+    chips: [no_impact, card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: sarcasm-at-sig
+    messages:
+      - "wow another bot, just what we needed"
+      - "fine. it asset still shows my old laptop"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: No defensiveness; one light line, then take the IT Asset report.
+    card: {project: IT Asset, kind: problem}
+    chips: [none, card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  # Venting and swearing
+
+  - name: swearing-lost-work
+    messages:
+      - "this fucking epm portal crashed and I lost an hour of work"
+      - "the evacuation plan editor"
+    expect: card
+    require: []
+    forbid: ["language", "nuisance", "nice-to-have", "—"]
+    good: Acknowledge briefly without commenting on the swearing; lost work is blocking; card.
+    card: {project: ADAIR EPM Portal, kind: problem, impact: Blocking my work}
+    chips: [no_impact, card]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  - name: vent-with-no-target
+    messages:
+      - "honestly everything here is so slow and nobody listens"
+      - "just everything"
+      - "idk forget it"
+    expect: no_card
+    require: []
+    forbid: ["here's what i'll send", "—"]
+    good: Acknowledge, ask once which tool bothers them most, accept "forget it" and leave the door open. No card from a general vent.
+    chips: [tools, none, none]
+    never_ask: [how much it affects their work]
+    never_repeat: [which tool]
+
+  - name: vent-then-useful
+    messages:
+      - "I'm so over this"
+      - "the helpers agent forgets everything I told it 2 minutes ago"
+      - "the quote helper"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Short acknowledgment, ask what's up, then card for the helpers platform.
+    card: {project: Agents Platform (REDADAIR Helpers), kind: problem}
+    chips: [none, no_impact, card]
+    never_ask: []
+    never_repeat: [which helper]
+
+  # lol
+
+  - name: lol-only
+    messages: ["lol"]
+    expect: no_card
+    require: []
+    forbid: ["here's what i'll send", "—"]
+    good: One light line, ask if there's anything to tell the team.
+    chips: [none]
+    never_ask: [which tool, how much it affects their work]
+    never_repeat: []
+
+  - name: lol-in-a-serious-report
+    messages:
+      - "lol the flipbook just showed me someone else's brochure draft"
+      - "the one for the hospital job"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Don't match the "lol"; someone else's draft showing is a real problem worth a card.
+    card: {project: Flipbook, kind: problem}
+    chips: [no_impact, card]
+    never_ask: [which tool]
+    never_repeat: []
+
+  - name: lol-yes-confirms
+    messages: ["fpows portal won't save my notes", "lol yes"]
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Read "lol yes" as yes.
+    card: {project: FPOWS Portal, kind: problem}
+    chips: [no_impact, card]
+    never_ask: [which tool]
+    never_repeat: [the question "lol yes" answered]
+
+  # Coming back after the card to change something
+
+  - name: after-card-raise-impact
+    after_card: true
+    messages:
+      - "the training portal search is slow"
+      - "actually it's worse than that, I can't finish my induction because of it"
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "—"]
+    good: First card says Slowing me down; update it to Blocking my work in one line.
+    card: {project: Training Portal, kind: problem, impact: Blocking my work}
+    chips: [card, after]
+    never_ask: [how much it affects their work, which tool]
+    never_repeat: []
+
+  - name: after-card-wrong-tool
+    after_card: true
+    messages:
+      - "the cpd thing won't show my certificate"
+      - "sorry I meant the training portal not cpd"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Swap the tool on the card, keep the rest.
+    card: {project: Training Portal, kind: problem}
+    chips: [card, after]
+    never_ask: []
+    never_repeat: [which tool, what's wrong]
+
+  - name: after-card-never-mind
+    after_card: true
+    messages:
+      - "IT asset has the wrong serial for my phone"
+      - "actually never mind, I'll just email darlene"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Card shows first; on "never mind" drop it with nothing saved and no persuading.
+    card: {project: IT Asset, kind: problem}
+    chips: [card, none]
+    never_ask: [why]
+    never_repeat: []
+
+  - name: after-card-add-detail
+    after_card: true
+    messages:
+      - "goformz extension portal crashes when I attach photos"
+      - "oh and it's only on android"
+    expect: card
+    require: []
+    forbid: ["—"]
+    good: Add the Android detail to the card; no new questions.
+    card: {project: GoFormz Extension Portal, kind: problem}
+    chips: [card, after]
+    never_ask: [which tool, which device]
+    never_repeat: []
+
+  # Impact already stated
+
+  - name: impact-stated-painfully-slow
+    messages: ["the workflow atlas is painfully slow today"]
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "stopping you", "which tool", "—"]
+    good: Card with Slowing me down, or one question about what is slow; never impact chips.
+    card: {project: REDADAIR Workflow Atlas, kind: problem, impact: Slowing me down}
+    chips: [no_impact]
+    never_ask: [how much it affects their work, which tool]
+    never_repeat: []
+
+  - name: impact-stated-cant-work
+    messages: ["can't work, staff admin portal is just a white screen"]
+    expect: card
+    require: []
+    forbid: ["nuisance", "nice-to-have", "stopping you", "which tool", "—"]
+    good: Blocking my work from the message; card straight away.
+    card: {project: Staff Admin Portal, kind: problem, impact: Blocking my work}
+    chips: [card]
+    never_ask: [how much it affects their work, which tool]
+    never_repeat: []
+
+  - name: impact-stated-not-urgent
+    messages: ["not urgent but the CPD tracker shows dates american style"]
+    expect: card
+    require: []
+    forbid: ["stopping you", "which tool", "—"]
+    good: Nice-to-have from "not urgent"; card.
+    card: {project: CPD Tracker, kind: problem, impact: Nice-to-have}
+    chips: [card]
+    never_ask: [how much it affects their work, which tool]
+    never_repeat: []
+
+  # Access, ideas and praise in staff words
+
+  - name: access-new-starter
+    messages: ["I need access to the financial platform, started in accounts last week"]
+    expect: card
+    require: []
+    forbid: ["what's wrong", "stopping you", "—"]
+    good: Access request card straight away; no problem or impact questions.
+    card: {project: Financial Platform, kind: access}
+    chips: [card]
+    never_ask: [what's wrong, which tool]
+    never_repeat: []
+
+  - name: idea-rake-in-tagalog
+    messages: ["would be cool if rake could answer in tagalog for the offshore crew"]
+    expect: card
+    require: []
+    forbid: ["what's wrong", "—"]
+    good: Idea card for RAKE Agent.
+    card: {project: RAKE Agent, kind: idea}
+    chips: [card]
+    never_ask: [what's wrong, which tool]
+    never_repeat: []
+
+  - name: praise-afss-export
+    messages: ["just wanted to say the new AFSS export is awesome, saved me hours"]
+    expect: card
+    require: []
+    forbid: ["what's wrong", "stopping you", "—"]
+    good: Thank them and show a praise card; no problem or impact questions.
+    card: {project: AFSS Portal, kind: praise}
+    chips: [card]
+    never_ask: [what's wrong, how much it affects their work, which tool]
+    never_repeat: []

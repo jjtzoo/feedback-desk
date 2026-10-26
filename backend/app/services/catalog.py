@@ -4,6 +4,7 @@ The project list lives in the database, never in the prompt: a new intranet tool
 entry away from being recognised by the agent.
 """
 
+import re
 import uuid
 from typing import Any
 
@@ -14,6 +15,8 @@ from sqlalchemy.orm import selectinload
 from app.errors import Conflict, NotFound, ServiceError
 from app.models import DigitalStaff, Feedback, Project, RoutingRule
 from app.models.enums import CATEGORIES, OPEN_STATUSES, PROJECT_GROUPS, STAFF_ROLES
+
+LIKELY_TOOLS = 3
 
 # --- projects -------------------------------------------------------------------------
 
@@ -31,6 +34,32 @@ async def project_by_slug(db: AsyncSession, slug: str, active_only: bool = True)
         query = query.where(Project.active.is_(True))
     project: Project | None = await db.scalar(query)
     return project
+
+
+def mentions(text: str, project: Any) -> bool:
+    """Whether the text names the project: its name, an alias or a keyword, as whole words."""
+    low = text.lower()
+    words = [project.name, project.slug.replace("-", " "), *project.aliases, *project.keywords]
+    return any(re.search(rf"\b{re.escape(w.lower())}\b", low) for w in words if w)
+
+
+async def likely_projects(db: AsyncSession, email: str, source: str, projects: list[Project]) -> list[Project]:
+    """The tools someone probably means, strongest first: the page they came from, then the tools
+    they have reported on before (review item 10a). A suggestion only: the person still picks."""
+    came_from = [p for p in projects if source and mentions(re.sub(r"[^a-z0-9]+", " ", source.lower()), p)]
+    rows = await db.execute(
+        select(Feedback.project_id)
+        .where(Feedback.submitter_email == email, Feedback.project_id.is_not(None))
+        .group_by(Feedback.project_id)
+        .order_by(func.count().desc(), func.max(Feedback.created_at).desc())
+        .limit(LIKELY_TOOLS)
+    )
+    by_id = {p.id: p for p in projects}
+    likely: list[Project] = []
+    for p in came_from + [by_id[pid] for (pid,) in rows if pid in by_id]:
+        if p not in likely:
+            likely.append(p)
+    return likely[:LIKELY_TOOLS]
 
 
 def _clean_list(values: Any) -> list[str]:

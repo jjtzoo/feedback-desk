@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T00:50:26.303Z",
-  "commit": "568901f",
-  "uncommitted": true,
+  "ran": "2026-10-26T07:33:34.805Z",
+  "commit": "0e15f0c",
+  "uncommitted": false,
   "spec": "24-own-items-only.spec.ts",
-  "fingerprint": "bb9bb60fedf4ce4a",
+  "fingerprint": "0bff6b981a89f169",
   "caught": {
     "S24.01": true,
     "S24.02": true,

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { chatSay, getJson, person, postJson, raise, raiseBug } from "./helpers";
+import { chatSay, getJson, holderOf, person, postJson, raise, raiseBug } from "./helpers";
 
 // Manual checklist section 24: staff see only their own items, in My feedback, on the tracker,
 // the duplicate box and What's new.
@@ -101,7 +101,6 @@ test("S24.03 the duplicate box and What's new show no other submitter's name", a
   await page.goto("/chat");
   await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(page, second);
-  await page.getByRole("button", { name: "Slowing me down", exact: true }).click();
   const box = page.getByText("Someone may have raised this already", { exact: true }).locator("xpath=ancestor::li[1]");
   await expect(box).toContainText(ref);
   await expect(box).toContainText(first);
@@ -119,7 +118,7 @@ test("S24.03 the duplicate box and What's new show no other submitter's name", a
   const chris = await team.as("Chris");
   const fixed = await raiseBug(aishaPage, "rake-agent", released);
   await postJson(chris, `/console/items/${fixed}/approve`);
-  await postJson(chris, `/console/items/${fixed}/resolve`, { body: "Done in this week's update" });
+  await postJson(await team.as(await holderOf(chris, fixed)), `/console/items/${fixed}/resolve`, { body: "Done in this week's update" });
   await postJson(chris, "/console/releases/draft-now");
   const drafts = await getJson<ReleaseRow[]>(chris, "/console/releases");
   const draft = drafts.find((r) => r.project.slug === "rake-agent" && r.status === "draft");

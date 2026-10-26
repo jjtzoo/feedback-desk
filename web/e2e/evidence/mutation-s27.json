@@ -1,0 +1,11 @@
+{
+  "ran": "2026-10-26T04:19:33.959Z",
+  "commit": "a85dbb1",
+  "uncommitted": false,
+  "spec": "27-mobile.spec.ts",
+  "fingerprint": "ca24f9f5ca87c753",
+  "caught": {
+    "S27.06": true,
+    "S27.07": true
+  }
+}

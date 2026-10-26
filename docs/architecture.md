@@ -9,7 +9,7 @@ How the system fits together, per the company handover manual §17. Decisions (D
 | --- | --- | --- |
 | Web app | `web/` (Next.js App Router, React, TypeScript, Tailwind, shadcn/ui) | Staff area: a help-centre style landing page at `/` (one Give feedback action, four starting points, tool picker, recent feedback), the chat at `/chat` (`?project=` preselects a tool, `?start=` pre-fills a starter), My feedback, tracker, Fixes and updates and the console at `/console` (work as board, list or cards with inbox counts from `GET /console/counts`, approvals, channels, releases, dashboard, admin; the item opens in a side panel with its properties, one activity feed and previous/next). It forwards `/api/*` to the API; it never touches the database or the model. |
 | API | `backend/app/` (FastAPI) | Sign-in, every business rule (`app/services/`), the router that assigns owners, approvals, notifications, files, channels, releases, reports. Roles checked on every call. |
-| Agent | `backend/agent/` (Google ADK) | One LlmAgent: talks to staff, classifies, writes the developer brief, calls `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`. Runs in the API process locally; on Vertex AI Agent Engine in production (D7). |
+| Agent | `backend/agent/` (Google ADK, Gemini 3.8 Flash; 3.1 Flash-Lite as fallback by config, D36) | One LlmAgent: chats with staff first and starts a report only when there is something to report (D64), classifies, writes the developer brief, calls `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`. Runs in the API process locally; on Vertex AI Agent Engine in production (D7). |
 | Worker | `backend/app/worker.py` | Sends the email for each notification (3 tries), runs the daily digest and the Friday release drafter. A loop locally; a Cloud Run job started every minute by Cloud Scheduler in the cloud (D33). |
 | Database | PostgreSQL + pgvector | Schema `app` (everything below) and schema `adk` (agent sessions, owned by ADK). |
 | Files | Local folder (local), private Cloud Storage bucket (cloud) | Attachments, served through 15-minute signed links. |
@@ -39,13 +39,13 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 | Table | Purpose |
 | --- | --- |
 | `projects`, `digital_staff`, `routing_rules` | The catalogue, people who can be assigned, admin overrides |
-| `feedback` | One row per item: classification, status (nine values), ending (how a closed or declined item ended, D44), assignee, developer brief, context, dates |
+| `feedback` | One row per item: classification, status (nine values), ending (how a closed or declined item ended, D44), assignee, `routed` (routing's reason while nobody has accepted or changed its choice, D56), developer brief, context, dates |
 | `feedback_messages` | Chat transcript, replies, internal notes, progress updates, follow-ups |
-| `feedback_events` | Append-only audit and routing training signal; `is_public` drives the tracker |
+| `feedback_events` | Append-only audit and routing training signal; `is_public` drives the tracker. A change of hands is `assigned`, `taken_over` or `handed_over`, kept apart from routing `correction`s (D53) |
 | `feedback_followers` | Staff who added "+1 and comment" (one row per person, never the submitter). The console's reporter tally is 1 + these rows; at `PRIORITY_REVIEW_REPORTERS` (3) it suggests a priority review, never applies one (D38, proposed) |
 | `attachments` | Files and their extracted text |
 | `feedback_embeddings` | pgvector embeddings for duplicate search |
-| `notifications`, `notification_mutes` | The bell and its emails (title and body masked, then cut to 300 characters); per-item mutes |
+| `notifications`, `notification_mutes` | The bell and its emails (title and body masked, then cut to 300 characters); per-item mutes. An ask (needs approval, assigned, ready to start, asked about) settles for everyone once anyone acts, with `outcome` saying what happened (D54); each Admin has one standing approvals row, updated in place and never emailed (D55); `updated_at` lets the bell's stream see rows change in place |
 | `project_messages`, `releases`, `release_items` | Project channels and Friday releases |
 | `user_sessions`, `user_preferences`, `job_runs` | Sign-in sessions, remembered console view, scheduled-job slots |
 
@@ -114,6 +114,6 @@ Every chat turn and embedding call writes an `app.model_usage` row (tokens, esti
 
 The whole journey on one page: [smoke-signal-workflow.svg](design/smoke-signal-workflow.svg) (lanes for staff, Sig, system, Admin and Digital Staff, the five tracker stages, and the Friday release).
 
-1. **Submitting:** chat message (PII masked) → agent classifies and fills the draft → confirm card → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications.
-2. **Approving and working:** Admin approves or declines → owner starts work, posts updates and an Expected by date, resolves with a public note → every public change is an event the tracker shows, and a notification in the app and by email.
+1. **Submitting:** chat message (PII masked) → the agent replies to what was said; a question about Sig or small talk stays chat (D64) → when something is reported, it classifies and fills the draft, asking what happened before impact (D61), and signals each turn's step through `update_draft`'s `next_step`; the API shows the chips for that step only (the tool chips under the tool question, the person's usual tools first; impact chips under the impact question, by fault or idea; Yes and No under "Want me to send that to the team?" for a question or praise; the model's checked replies; D60, D62, D65) → confirm card, only on the `show_card` step (D65), with what happened and anything still unknown (D63) → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns (logged by System with its reason) → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications, and each Admin's approvals count updates.
+2. **Approving and working:** Admin approves or declines → the holder (only the holder, D53) starts work, posts updates and an Expected by date, resolves with a public note; anyone else uses Assign to me, Take over or Hand over, each named and told → every public change is an event the tracker shows, and a notification in the app and by email.
 3. **Friday release:** drafter collects the week's resolved items, public progress and channel notes → owner ticks and edits → publishes → Fixes and updates, contributors notified.

@@ -14,7 +14,7 @@ const card = (page: Page) => page.getByRole("region", { name: "Your feedback" })
 const field = (page: Page, label: string) => card(page).locator(`dt:text-is("${label}") + dd`);
 
 /** Describe it, choose how much it affects the person, say what was expected: the confirm card shows. */
-async function reachCard(page: Page, description: string, impact = "Slowing me down") {
+async function reachCard(page: Page, description: string, impact = "Slower, but I get there") {
   await page.goto("/chat");
   await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(page, description);
@@ -74,10 +74,10 @@ test.describe("25. Nothing saved without Confirm", () => {
 
   test("S25.03 after Change, the saved item matches the new card, not the old one", async ({ page, signIn }) => {
     await signIn("Tom");
-    // Old card: RAKE Agent, Nice-to-have. The new card: Training Portal, Major.
-    await reachCard(page, "The RAKE Agent shows an error when I open a report", "Nice-to-have");
+    // Old card: RAKE Agent, Minor. The new card: Training Portal, Major.
+    await reachCard(page, "The RAKE Agent shows an error when I open a report", "Minor, I can live with it");
     await expect(field(page, "Tool")).toHaveText("RAKE Agent");
-    await expect(field(page, "Priority")).toHaveText("Nice-to-have");
+    await expect(field(page, "Priority")).toHaveText("Minor");
 
     await page.getByRole("button", { name: "Change" }).click();
     await expect(page.getByText("No worries. What should I change?")).toBeVisible();
@@ -102,6 +102,6 @@ test.describe("25. Nothing saved without Confirm", () => {
     await expect(band).not.toContainText("RAKE Agent");
     const sent = page.getByRole("region", { name: "What you sent" });
     await expect(sent).toContainText("Major");
-    await expect(sent).not.toContainText("Nice-to-have");
+    await expect(sent).not.toContainText("Minor");
   });
 });

@@ -21,12 +21,11 @@ const PAIRS = {
 
 const SOMEONE = "Someone may have raised this already";
 
-/** Mike describes the same problem in a new chat and answers the impact question; returns the duplicate box. */
+/** Mike describes the same problem in a new chat ("slow" already says the impact, D66); returns the duplicate box. */
 async function describeAgain(mike: Page, text: string) {
   await mike.goto("/chat");
   await expect(mike.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
   await chatSay(mike, text);
-  await mike.getByRole("button", { name: "Slowing me down" }).click();
   const box = mike.getByText(SOMEONE, { exact: true }).locator("xpath=ancestor::li[1]");
   await expect(box).toBeVisible();
   return box;

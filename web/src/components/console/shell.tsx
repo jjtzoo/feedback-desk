@@ -117,7 +117,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           <div className="flex h-14 items-center gap-3 px-3 sm:px-5">
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon-lg" className="size-11 text-band-foreground hover:bg-white/10 hover:text-band-foreground lg:hidden" aria-label="Open menu">
+                <Button variant="ghost" size="icon-lg" className="size-11 text-band-foreground hover:bg-white/10 hover:text-band-foreground lg:hidden" aria-label="Open menu" data-tour="menu">
                   <Menu className="size-5" />
                 </Button>
               </SheetTrigger>

@@ -1,10 +1,10 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, postJson, raise, raiseBug } from "./helpers";
+import { getJson, holderOf, postJson, raise, raiseBug } from "./helpers";
 
 // Manual checklist section 21 (Admin: Dashboard). The numbers come from six items raised through the
-// API as six staff and moved on by Chris; the checks are on /console/dashboard and in the console.
+// API as six staff and moved on by Chris and each item's holder; the checks are on /console/dashboard and in the console.
 
 test.beforeAll(resetDatabase);
 
@@ -35,7 +35,7 @@ async function build(team: Team): Promise<Refs> {
 
   const started = await raiseBug(liam, "rake-agent", "The RAKE Agent export page shows an error when I open it");
   await approve(started);
-  await postJson(chris, `/console/items/${started}/start`);
+  await postJson(await team.as(await holderOf(chris, started)), `/console/items/${started}/start`);
 
   const approved = await raiseBug(aisha, "training-portal", "The Training Portal course list shows an error when I open it");
   await approve(approved);
@@ -45,7 +45,7 @@ async function build(team: Team): Promise<Refs> {
 
   const resolved = await raiseBug(rafael, "rake-agent", "The RAKE Agent report page shows an error when I open it");
   await approve(resolved);
-  await postJson(chris, `/console/items/${resolved}/resolve`, { body: "Fixed in this week's update" });
+  await postJson(await team.as(await holderOf(chris, resolved)), `/console/items/${resolved}/resolve`, { body: "Fixed in this week's update" });
 
   const closed = await raiseBug(mei, "training-portal", "The Training Portal profile page shows an error when I open it");
   await approve(closed);
