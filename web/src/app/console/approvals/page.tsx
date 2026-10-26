@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { PriorityBadge, StatusBadge } from "@/components/badges";
 import { useCounts } from "@/components/console/counts";
+import { RoutingLine } from "@/components/console/routing-line";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
 import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
@@ -104,8 +105,9 @@ export default function ApprovalsPage() {
           </div>
           <h2 className="mt-2 text-lg font-bold">{i.title}</h2>
           <p className="text-sm text-muted-foreground">
-            {i.work_type && `${WORK_TYPE_LABEL[i.work_type]} · `}{i.project?.name ?? "Tool to confirm"} · {i.area ?? "area not given"} · from {i.submitter_name} · owner {i.assignee?.name ?? "not set"}
+            {i.work_type && `${WORK_TYPE_LABEL[i.work_type]} · `}{i.project?.name ?? "Tool to confirm"} · {i.area ?? "area not given"} · from {i.submitter_name}
           </p>
+          <RoutingLine item={i} className="mt-1" />
           {i.dev_brief.problem && <p className="mt-3">{i.dev_brief.problem}</p>}
           {i.ai_recommendation?.decision && (
             <p className="mt-3 rounded-2xl bg-muted p-3 text-sm">

@@ -7,9 +7,9 @@
   "S18.06": ["\"Reply from Chris\"", "\"Reply from Chrisx\""],
   "S18.07": ["Added. The owner has been told.", "Added. The owner has been toldx."],
   "S18.08": ["column(page, \"Approved\"), boardRef", "column(page, \"Approvedx\"), boardRef"],
-  "S18.09": ["\"Planned (Chris accepted it)\"", "\"Planned (Chris accepted itx)\""],
+  "S18.09": ["[approved, \"Approved\"]", "[approved, \"Approvedx\"]"],
   "S18.10": ["toHaveCount(0)", "toHaveCount(1)"],
   "S18.11": ["toBe(409)", "toBe(200)"],
-  "S18.12": ["\"owner not set\"", "\"owner not setx\""],
+  "S18.12": ["\"Nobody has it yet · flagged for the Admins\"", "\"Nobody has it yet · flagged for the Adminsx\""],
   "S18.13": ["\"2 over 2 business days\"", "\"3 over 2 business days\""]
 }

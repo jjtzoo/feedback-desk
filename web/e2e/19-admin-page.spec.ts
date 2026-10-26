@@ -345,10 +345,11 @@ test.describe("routing around people and rules", () => {
     await expect(row).toContainText("sam.reid@redadair.example");
     await expect(row.getByRole("combobox")).toHaveText("Admin");
 
-    // The assignee list on an item in the console offers the new person.
+    // The assignee list on an item in the console (Hand over, D53) offers the new person.
     const ref = await raiseBug(await team.as("Grace"), "rake-agent", "RAKE Agent assignee list check shows an error when I open it");
     await page.goto(`/console?item=${ref}`);
-    await page.getByRole("combobox", { name: /Assignee/ }).click();
+    await page.getByRole("button", { name: "Hand over to…" }).click();
+    await page.getByRole("dialog").getByRole("combobox", { name: "Hand over to" }).click();
     await expect(page.getByRole("option", { name: "Sam Reid", exact: true })).toBeVisible();
   });
 

@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import path from "node:path";
 
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
 import { BUG, chatSay, dropOnChat, getJson, pdf, postJson, raiseBug, reachBackupForm } from "./helpers";
@@ -212,6 +212,27 @@ test("S03.17 thirteen messages without confirming switch to the backup form with
   await expect(page.locator("strong", { hasText: "Sorry, this is taking longer than it should." })).toBeVisible();
   await expect(page.getByText("What you typed is kept below.")).toBeVisible();
   await expect(page.getByLabel(/What happened, or what would you like/)).toHaveValue(/typed note number 1/);
+});
+
+test("S03.18 The Gemini and privacy line sits under the chat box and under the backup form's Send feedback; no other staff page has a footer", async ({ page }) => {
+  // Thirteen round trips to the stub to reach the backup form.
+  test.setTimeout(150_000);
+  const line = (where: Page) => where.getByText(/chats are processed by Google's Gemini model\. Passwords, card numbers and tax file numbers are removed before anything is saved\./);
+  const below = async (upper: Locator, lower: Locator) => {
+    const [a, b] = [(await upper.boundingBox())!, (await lower.boundingBox())!];
+    expect(b.y).toBeGreaterThanOrEqual(a.y + a.height);
+  };
+
+  await below(page.getByLabel("Your message"), line(page));
+  await reachBackupForm(page);
+  await below(page.getByRole("button", { name: "Send feedback" }), line(page));
+
+  for (const [path, heading] of [["/", "What can we help you with?"], ["/my", "My feedback"], ["/whats-new", "Fixes and updates"]]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(page.getByRole("contentinfo")).toHaveCount(0);
+    await expect(line(page)).toHaveCount(0);
+  }
 });
 
 test("S03.19 With no tool named, the tool chips show the tools you've reported on before first, under 'Your usual tools'", async ({ page, signIn }) => {

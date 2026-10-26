@@ -3,6 +3,7 @@
 import { CircleHelp, Flag, Paperclip, TrendingUp, Users } from "lucide-react";
 
 import { PriorityBadge, StatusBadge, WorkTypeBadge } from "@/components/badges";
+import { AutoMarker } from "@/components/console/routing-line";
 import type { Card } from "@/lib/api";
 import { age, day, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -69,7 +70,12 @@ export function WorkCard({ card, onOpen, showStatus = false, dragging = false }:
             <span className="sr-only"> people reported this</span>
           </span>
         )}
-        {card.assignee && <span className="ml-auto truncate">{card.assignee.name}</span>}
+        {card.assignee && (
+          <span className="ml-auto flex min-w-0 items-center gap-1.5">
+            <AutoMarker card={card} />
+            <span className="truncate">{card.assignee.name}</span>
+          </span>
+        )}
       </span>
     </button>
   );

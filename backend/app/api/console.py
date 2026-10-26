@@ -8,8 +8,9 @@ from fastapi.responses import Response
 
 from app.api.deps import AdminUser, Db, DigitalUser
 from app.models import Feedback
-from app.models.enums import OPEN_STATUSES, STAGE_OF
+from app.models.enums import DUE_STATUSES, STAGE_OF
 from app.schemas import (
+    ActivityOut,
     AskInfoIn,
     AttachmentOut,
     BoardOut,
@@ -22,6 +23,7 @@ from app.schemas import (
     DetailOut,
     EventOut,
     FieldsIn,
+    HandOverIn,
     ListOut,
     MergeIn,
     MessageOut,
@@ -31,6 +33,7 @@ from app.schemas import (
     ProjectOut,
     ReplyIn,
     SimilarOut,
+    TakeOverIn,
     UpdateIn,
     UsageSummaryOut,
     ViewIn,
@@ -59,7 +62,7 @@ def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) 
         assignee=PersonOut(id=fb.assignee.id, name=fb.assignee.name) if fb.assignee else None,
         created_at=fb.created_at,
         expected_by=fb.expected_by,
-        overdue=bool(fb.expected_by and fb.expected_by < today and fb.status in OPEN_STATUSES),
+        overdue=bool(fb.expected_by and fb.expected_by < today and fb.status in DUE_STATUSES),
         has_files=fb.id in files,
         unread_reply=bool(
             fb.submitter_replied_at and (fb.assignee_read_at is None or fb.submitter_replied_at > fb.assignee_read_at)
@@ -69,6 +72,7 @@ def _card(fb: Feedback, files: set[uuid.UUID], reporters: dict[uuid.UUID, int]) 
         reporters=count,
         priority_review=console.needs_priority_review(fb, count),
         needs_detail=console.needs_detail(fb),
+        routed=fb.routed,
     )
 
 
@@ -196,6 +200,10 @@ async def _detail(db: Db, user: DigitalUser, ref: str) -> DetailOut:
             for s in d.duplicates
         ],
         linked=[f.ref_no for f in d.linked],
+        assignee_away=bool(fb.assignee and fb.assignee.is_away),
+        holder_activity=ActivityOut(text=d.holder_activity.text, at=d.holder_activity.at)
+        if d.holder_activity
+        else None,
     )
 
 
@@ -207,6 +215,24 @@ async def detail(ref: str, db: Db, user: DigitalUser) -> DetailOut:
 @router.post("/items/{ref}/start", response_model=DetailOut)
 async def start(ref: str, db: Db, user: DigitalUser) -> DetailOut:
     await console.start_work(db, user, ref)
+    return await _detail(db, user, ref)
+
+
+@router.post("/items/{ref}/assign-to-me", response_model=DetailOut)
+async def assign_to_me(ref: str, db: Db, user: DigitalUser) -> DetailOut:
+    await console.assign_to_me(db, user, ref)
+    return await _detail(db, user, ref)
+
+
+@router.post("/items/{ref}/take-over", response_model=DetailOut)
+async def take_over(ref: str, body: TakeOverIn, db: Db, user: DigitalUser) -> DetailOut:
+    await console.take_over(db, user, ref, body.holder_id, body.reason)
+    return await _detail(db, user, ref)
+
+
+@router.post("/items/{ref}/hand-over", response_model=DetailOut)
+async def hand_over(ref: str, body: HandOverIn, db: Db, user: DigitalUser) -> DetailOut:
+    await console.hand_over(db, user, ref, body.to, body.reason)
     return await _detail(db, user, ref)
 
 

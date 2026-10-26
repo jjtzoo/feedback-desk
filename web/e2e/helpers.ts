@@ -51,6 +51,12 @@ export async function postJson<T = unknown>(page: Page, path: string, data: unkn
   return (await r.json().catch(() => ({}))) as T;
 }
 
+/** The first name of whoever has an item: only they start work on it, post updates and resolve it (D53). */
+export async function holderOf(page: Page, ref: string) {
+  const item = await getJson<{ assignee: { name: string } | null }>(page, `/console/items/${ref}`);
+  return item.assignee!.name.split(" ")[0];
+}
+
 /** Parse the server-sent events the chat endpoints return. */
 function events(body: string): { name: string; data: Record<string, unknown> }[] {
   return body

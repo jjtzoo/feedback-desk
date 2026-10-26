@@ -25,8 +25,10 @@ from app.models import (
     UserPreference,
 )
 from app.models.enums import (
+    APPROVAL_STATUSES,
     CATEGORIES,
     CLOSED_STATUSES,
+    DUE_STATUSES,
     ENDINGS,
     OPEN_STATUSES,
     PRIORITIES,
@@ -37,22 +39,21 @@ from app.models.enums import (
 from app.services import embeddings, events, notifications
 from app.services.actors import User
 from app.services.drafts import CATEGORY_LABEL, WORK_TYPE_LABEL
-from app.services.feedback import day_text, load
+from app.services.feedback import ENDING_TEXT, day_text, load
 
 log = logging.getLogger(__name__)
 
 PAGE_SIZE = 50
-APPROVAL_STATUSES = ("awaiting_approval", "needs_review")
 BOARD_COLUMNS = (
     ("needs_review", "Needs review", ("needs_review", "new")),
     ("awaiting_approval", "Awaiting approval", ("awaiting_approval",)),
     ("approved", "Approved", ("approved",)),
     ("in_progress", "In progress", ("in_progress",)),
     ("resolved", "Resolved", ("resolved",)),
-    ("fixed", "Fixed", ("closed",)),
 )
-# The board's last column shows only Fixed items, for this many days; every other ending goes to the Archive (D47).
-FIXED_SHOWN_DAYS = 7
+# The board ends at Resolved; every ended item, Fixed included, goes to the Archive (D47, D52), whose
+# board has one column per ending, like its list.
+ARCHIVE_COLUMNS = (*((e, ENDING_TEXT[e]) for e in ENDINGS), ("acknowledged", "Praise"))
 
 
 def _now() -> datetime:
@@ -100,17 +101,13 @@ class Filters:
     ending: str | None = None  # in the Archive: an ending, or "acknowledged" for praise
 
 
-def _recently_fixed() -> Any:
-    return and_(Feedback.ending == "fixed", Feedback.updated_at >= _now() - timedelta(days=FIXED_SHOWN_DAYS))
-
-
 def _filtered(user: User, f: Filters) -> Select[Feedback]:
     query = select(Feedback).options(selectinload(Feedback.project), selectinload(Feedback.assignee))
     conds: list[Any] = []
     today = _now().date()
     if f.inbox == "mine":
         conds.append(Feedback.assignee_id == user.staff_id)
-        conds.append(or_(Feedback.status.in_(OPEN_STATUSES), _recently_fixed()))
+        conds.append(Feedback.status.in_(OPEN_STATUSES))
     elif f.inbox == "needs_review":
         conds.append(
             or_(
@@ -123,7 +120,7 @@ def _filtered(user: User, f: Filters) -> Select[Feedback]:
     elif f.inbox == "archive":
         conds.append(Feedback.status.in_(CLOSED_STATUSES))
     elif f.inbox == "overdue":
-        conds.append(and_(Feedback.expected_by < today, Feedback.status.in_(OPEN_STATUSES)))
+        conds.append(and_(Feedback.expected_by < today, Feedback.status.in_(DUE_STATUSES)))
     if f.ending == "acknowledged":
         conds.append(Feedback.status == "acknowledged")
     elif f.ending in ENDINGS:
@@ -200,13 +197,17 @@ class Column:
 async def board(db: AsyncSession, user: User, f: Filters) -> list[Column]:
     require_digital(user)
     cols = []
+    if f.inbox == "archive":
+        for key, title in ARCHIVE_COLUMNS:
+            ended = Feedback.status == "acknowledged" if key == "acknowledged" else Feedback.ending == key
+            items = list(await db.scalars(_ordered(_filtered(user, f).where(ended), f.sort).limit(100)))
+            cols.append(Column(key, title, items, len(items), 0))
+        return cols
     today = _now().date()
     for key, title, statuses in visible_columns(user):
         query = _ordered(_filtered(user, f).where(Feedback.status.in_(statuses)), f.sort)
-        if key == "fixed":
-            query = query.where(_recently_fixed())
         items = list(await db.scalars(query.limit(100)))
-        overdue = sum(1 for i in items if i.expected_by and i.expected_by < today and i.status in OPEN_STATUSES)
+        overdue = sum(1 for i in items if i.expected_by and i.expected_by < today and i.status in DUE_STATUSES)
         cols.append(Column(key, title, items, len(items), overdue))
     return cols
 
@@ -219,10 +220,7 @@ async def counts(db: AsyncSession, user: User) -> dict[str, int]:
     require_digital(user)
     out: dict[str, int] = {}
     for inbox in INBOXES:
-        query = _filtered(user, Filters(inbox=inbox))
-        if inbox == "mine":
-            query = query.where(Feedback.status.in_(OPEN_STATUSES))  # recently fixed items show, but aren't to do
-        ids = query.with_only_columns(Feedback.id).subquery()
+        ids = _filtered(user, Filters(inbox=inbox)).with_only_columns(Feedback.id).subquery()
         out[inbox] = int(await db.scalar(select(func.count()).select_from(ids)) or 0)
     waiting = select(func.count()).where(Feedback.status.in_(APPROVAL_STATUSES))
     out["approvals"] = int(await db.scalar(waiting) or 0) if user.is_admin else 0
@@ -288,6 +286,42 @@ class Detail:
     linked: list[Feedback]
     merged_into: str | None
     staff: list[DigitalStaff] = field(default_factory=list)
+    holder_activity: "Activity | None" = None
+
+
+@dataclass
+class Activity:
+    """The assignee's latest step on an item ("posted an update"), shown before anyone takes it over."""
+
+    text: str
+    at: datetime
+
+
+MESSAGE_DOING = {"progress": "posted an update", "reply": "replied to the submitter", "note": "added a note"}
+STATUS_DOING = {"in_progress": "started work", "resolved": "resolved it"}
+
+
+def holder_activity(fb: Feedback, messages: list[FeedbackMessage], evs: list[FeedbackEvent]) -> Activity | None:
+    if fb.assignee is None:
+        return None
+    email = fb.assignee.google_email
+    found = [
+        Activity(MESSAGE_DOING[m.message_type], m.created_at)
+        for m in messages
+        if m.author_email == email and m.message_type in MESSAGE_DOING
+    ]
+    opened = None
+    for e in evs:
+        if e.actor_email != email:
+            continue
+        if e.event_type == "status":
+            found.append(Activity(STATUS_DOING.get(str(e.after.get("status")), "moved it on"), e.created_at))
+        elif e.event_type in CHANGE_EVENTS:
+            found.append(Activity("took it on", e.created_at))
+        elif e.event_type == "opened":
+            opened = Activity("opened it", e.created_at)
+    # Opening it only counts when they have done nothing else: the panel records it after their first step too.
+    return max(found, key=lambda a: a.at, default=opened)
 
 
 async def detail(db: AsyncSession, user: User, ref_no: str) -> Detail:
@@ -328,7 +362,7 @@ async def detail(db: AsyncSession, user: User, ref_no: str) -> Detail:
     staff = list(
         await db.scalars(select(DigitalStaff).where(DigitalStaff.active.is_(True)).order_by(DigitalStaff.name))
     )
-    return Detail(fb, messages, evs, files, followers, dups, linked, merged, staff)
+    return Detail(fb, messages, evs, files, followers, dups, linked, merged, staff, holder_activity(fb, messages, evs))
 
 
 # --- actions --------------------------------------------------------------------------
@@ -337,6 +371,120 @@ async def detail(db: AsyncSession, user: User, ref_no: str) -> Detail:
 def _first_response(fb: Feedback) -> None:
     if fb.first_response_at is None:
         fb.first_response_at = _now()
+
+
+def require_holder(fb: Feedback, user: User) -> None:
+    """Only the person who has an item starts work on it, posts updates and resolves it (D1, D53).
+    Anyone else takes it over first, so every change of hands is named and told."""
+    if fb.assignee_id is None or fb.assignee_id != user.staff_id:
+        if fb.assignee is None:
+            raise Forbidden(f"Nobody has {fb.ref_no} yet. Assign it to yourself first.")
+        raise Forbidden(f"{fb.assignee.name} has {fb.ref_no}. Take it over first.")
+
+
+def _require_open(fb: Feedback) -> None:
+    if fb.status in CLOSED_STATUSES:
+        raise Conflict("closed", "That item has ended; it can't change hands.")
+
+
+async def _load_locked(db: AsyncSession, ref_no: str) -> Feedback:
+    """Load an item holding its row, so two people changing hands at once are told apart."""
+    await db.execute(select(Feedback.id).where(Feedback.ref_no == ref_no.upper()).with_for_update())
+    return await load(db, ref_no=ref_no)
+
+
+# A change of hands, by how it happened (D53). Kept apart from routing corrections in the data.
+CHANGE_EVENTS = ("assigned", "taken_over", "handed_over")
+
+
+async def _change_hands(
+    db: AsyncSession, fb: Feedback, user: User, target: DigitalStaff, event: str, reason: str = ""
+) -> None:
+    previous = fb.assignee
+    before = {"assignee": previous.google_email, "name": previous.name} if previous else {"assignee": None}
+    after = {"assignee": target.google_email, "name": target.name} | ({"reason": reason[:500]} if reason else {})
+    # Staff see who has it now; they are not notified (D53).
+    events.log(db, fb.id, user.actor, event, before=before, after=after, public_text=f"Now with {target.name}")
+    fb.assignee_id, fb.assignee_opened_at, fb.routed = target.id, None, None
+    fb.updated_at = _now()
+    await notifications.settle(db, fb.id, notifications.START, f"{fb.ref_no} is now with {target.name}")
+    if target.google_email != user.email:
+        await notifications.notify(
+            db,
+            [target.google_email],
+            type="assigned",
+            title=f"{fb.ref_no} assigned to you: {fb.title}",
+            body=reason,
+            link=notifications.console_link(fb),
+            feedback_id=fb.id,
+            actor_email=user.email,
+        )
+    if previous is not None and previous.google_email != user.email:
+        title = (
+            f"{user.name} took over {fb.ref_no}"
+            if event == "taken_over"
+            else f"{user.name} handed {fb.ref_no} to {target.name}"
+        )
+        await notifications.notify(
+            db,
+            [previous.google_email],
+            type=event,
+            title=title,
+            body=reason,
+            link=notifications.console_link(fb),
+            feedback_id=fb.id,
+            actor_email=user.email,
+        )
+
+
+async def assign_to_me(db: AsyncSession, user: User, ref_no: str) -> Feedback:
+    """Take on an item nobody has."""
+    require_digital(user)
+    fb = await _load_locked(db, ref_no)
+    _require_open(fb)
+    if fb.assignee is not None:
+        if fb.assignee_id == user.staff_id:
+            raise Conflict("yours", "It's already yours.")
+        raise Conflict("changed_hands", f"{fb.assignee.name} has just taken this on.")
+    me = await db.get(DigitalStaff, user.staff_id)
+    assert me is not None  # a Digital user always has a staff row
+    await _change_hands(db, fb, user, me, "assigned")
+    return await load(db, feedback_id=fb.id)
+
+
+async def take_over(db: AsyncSession, user: User, ref_no: str, holder_id: uuid.UUID, reason: str) -> Feedback:
+    """Take an item from whoever has it. holder_id is who had it when the dialog opened: if that
+    changed, nothing happens and the person is told who has it now."""
+    require_digital(user)
+    fb = await _load_locked(db, ref_no)
+    _require_open(fb)
+    if fb.assignee is None:
+        raise Conflict("changed_hands", "Nobody has this now. Use Assign to me.")
+    if fb.assignee_id == user.staff_id:
+        raise Conflict("yours", "It's already yours.")
+    if fb.assignee_id != holder_id:
+        raise Conflict("changed_hands", f"{fb.assignee.name} has just taken this over.")
+    me = await db.get(DigitalStaff, user.staff_id)
+    assert me is not None
+    await _change_hands(db, fb, user, me, "taken_over", reason.strip())
+    return await load(db, feedback_id=fb.id)
+
+
+async def hand_over(db: AsyncSession, user: User, ref_no: str, to_id: uuid.UUID | None, reason: str = "") -> Feedback:
+    """Give an item to someone: its holder, an Admin or the triage lead (who also assign items nobody has)."""
+    require_digital(user)
+    fb = await _load_locked(db, ref_no)
+    _require_open(fb)
+    holder = fb.assignee_id is not None and fb.assignee_id == user.staff_id
+    if not (holder or user.is_admin or user.is_triage_lead):
+        raise Forbidden("Only the person who has it, an Admin or the triage lead can hand it over. Take it over.")
+    target = await db.get(DigitalStaff, to_id) if to_id else None
+    if target is None or not target.active:
+        raise ServiceError("bad_value", "Choose someone who can take items.")
+    if target.id == fb.assignee_id:
+        raise Conflict("same", f"{target.name} already has it.")
+    await _change_hands(db, fb, user, target, "handed_over" if fb.assignee else "assigned", reason.strip())
+    return await load(db, feedback_id=fb.id)
 
 
 def _set_status(db: AsyncSession, fb: Feedback, user: User, new: str, public_text: str | None = None) -> None:
@@ -354,12 +502,12 @@ async def start_work(db: AsyncSession, user: User, ref_no: str) -> Feedback:
     fb = await load(db, ref_no=ref_no)
     if fb.status not in ("approved", "resolved"):
         raise Conflict("not_approved", "Only approved items can be started. Ask an Admin to approve it first.")
-    if fb.assignee_id is None:
-        fb.assignee_id = user.staff_id
-        events.log(
-            db, fb.id, user.actor, "assigned", after={"assignee": user.email}, public_text=f"Assigned to {user.name}"
-        )
+    if fb.assignee_id is None:  # starting an item nobody has takes it on first
+        await assign_to_me(db, user, ref_no)
+        fb = await load(db, ref_no=ref_no)
+    require_holder(fb, user)
     _set_status(db, fb, user, "in_progress", f"{user.name} started work")
+    await notifications.settle(db, fb.id, notifications.START, f"{fb.ref_no}: {user.name} started work")
     fb.resolved_at = None
     _first_response(fb)
     await notifications.notify_submitters(
@@ -371,6 +519,7 @@ async def start_work(db: AsyncSession, user: User, ref_no: str) -> Feedback:
 async def post_update(db: AsyncSession, user: User, ref_no: str, body: str, expected_by: date | None) -> Feedback:
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
+    require_holder(fb, user)
     if not body.strip() and expected_by is None:
         raise ServiceError("empty", "Write an update or set an Expected by date.")
     if expected_by is not None and expected_by != fb.expected_by:
@@ -398,6 +547,7 @@ async def post_update(db: AsyncSession, user: User, ref_no: str, body: str, expe
         )
     fb.updated_at = _now()
     _first_response(fb)
+    await _answered(db, fb, user)
     title = f"Update on {fb.ref_no}" + (f", expected by {day_text(expected_by)}" if expected_by else "")
     await notifications.notify_submitters(
         db, fb, type="progress", title=title, body=body.strip(), actor_email=user.email
@@ -410,6 +560,7 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
     if not note.strip():
         raise ServiceError("note_required", "Say briefly what was done; staff see it on their tracker.")
     fb = await load(db, ref_no=ref_no)
+    require_holder(fb, user)
     if fb.status not in ("approved", "in_progress"):
         raise Conflict("bad_stage", "Only approved or in-progress items can be resolved.")
     db.add(
@@ -466,6 +617,7 @@ async def close(db: AsyncSession, user: User, ref_no: str, reason: str, ending: 
     # Won't fix stays a declined item (D21); fixed and no longer needed are closed.
     text = CLOSE_TEXT[ending] + (f": {reason[:140]}" if reason else "")
     _set_status(db, fb, user, "declined" if ending == "wont_fix" else "closed", text)
+    await _ended(db, fb, f"{fb.ref_no} closed: {CLOSE_TEXT[ending]}")
     await notifications.notify_submitters(
         db,
         fb,
@@ -494,6 +646,7 @@ async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedbac
     )
     fb.updated_at = _now()
     _first_response(fb)
+    await _answered(db, fb, user)
     await notifications.notify_submitters(
         db,
         fb,
@@ -521,6 +674,7 @@ async def add_note(db: AsyncSession, user: User, ref_no: str, body: str) -> Feed
             is_internal=True,
         )
     )
+    await _answered(db, fb, user)
     return fb
 
 
@@ -544,36 +698,12 @@ async def update_fields(db: AsyncSession, user: User, ref_no: str, changes: dict
         if project.id != fb.project_id:
             before = fb.project.slug if fb.project else "general"
             events.log(db, fb.id, user.actor, "correction", before={"project": before}, after={"project": project.slug})
-            fb.project_id = project.id
+            fb.project_id, fb.routed = project.id, None
             await embeddings.store(db, fb.id, f"{fb.title}. {fb.summary}")
-    if "assignee_id" in changes and changes["assignee_id"] != fb.assignee_id:
-        new_id = changes["assignee_id"]
-        target = await db.get(DigitalStaff, new_id) if new_id else None
-        if new_id and (target is None or not target.active):
-            raise ServiceError("bad_value", "That person can't take items.")
-        previous = fb.assignee.google_email if fb.assignee else None
-        events.log(
-            db,
-            fb.id,
-            user.actor,
-            "assigned",
-            before={"assignee": previous},
-            after={"assignee": target.google_email if target else None, "correction": True},
-            public_text=f"Reassigned to {target.name}" if target else None,
-        )
-        fb.assignee_id = new_id
-        fb.assignee_opened_at = None
-        if target is not None:
-            await notifications.notify(
-                db,
-                [target.google_email],
-                type="assigned",
-                title=f"{fb.ref_no} assigned to you: {fb.title}",
-                link=notifications.console_link(fb),
-                feedback_id=fb.id,
-                actor_email=user.email,
-            )
     fb.updated_at = _now()
+    if "assignee_id" in changes and changes["assignee_id"] != fb.assignee_id:
+        await db.flush()
+        return await hand_over(db, user, ref_no, changes["assignee_id"])
     await db.flush()
     return await load(db, feedback_id=fb.id)
 
@@ -605,6 +735,7 @@ async def merge(db: AsyncSession, user: User, ref_no: str, into_ref: str) -> Fee
     fb.duplicate_of = target.id
     fb.ending, fb.close_reason = "duplicate", None
     _set_status(db, fb, user, "declined", f"Duplicate of {target.ref_no}")
+    await _ended(db, fb, f"{fb.ref_no} merged into {target.ref_no}")
     events.log(
         db,
         target.id,
@@ -636,10 +767,6 @@ async def move(db: AsyncSession, user: User, ref_no: str, column: str, note: str
         return await start_work(db, user, ref_no)
     if column == "resolved":
         return await resolve(db, user, ref_no, note)
-    if column == "fixed":
-        if fb.status != "resolved":
-            raise Conflict("bad_move", "Only resolved items can move to Fixed. Use Close to say why it ends.")
-        return await close(db, user, ref_no, "", "fixed")
     raise Conflict("bad_move", "Cards can't be moved there.")
 
 
@@ -650,7 +777,7 @@ async def bulk(
     done = 0
     for ref in refs[:100]:
         if action == "reassign":
-            await update_fields(db, user, ref, {"assignee_id": assignee_id})
+            await hand_over(db, user, ref, assignee_id)
         elif action == "close":
             await close(db, user, ref, reason)
         else:
@@ -683,9 +810,12 @@ async def approve(db: AsyncSession, user: User, ref_no: str) -> Feedback:
     if fb.status not in ("awaiting_approval", "needs_review"):
         raise Conflict("decided", "That item has already been decided.")
     fb.approved_by, fb.approved_at = user.email, _now()
+    fb.routed = None  # an Admin accepted routing's choice
     # Staff see stage 2 as Planned (D43); the console keeps Approved.
     _set_status(db, fb, user, "approved", f"Planned ({user.name} accepted it)")
     _first_response(fb)
+    await notifications.settle(db, fb.id, notifications.DECIDE, f"{fb.ref_no} approved by {user.name}")
+    await notifications.refresh_approvals(db)
     await notifications.notify_submitters(
         db,
         fb,
@@ -710,6 +840,7 @@ async def decline(db: AsyncSession, user: User, ref_no: str, reason: str) -> Fee
     fb.ending, fb.close_reason = "declined", reason.strip()[:1000]
     _set_status(db, fb, user, "declined", f"Declined: {reason.strip()[:140]}")
     _first_response(fb)
+    await _ended(db, fb, f"{fb.ref_no} declined by {user.name}")
     await notifications.notify_submitters(
         db, fb, type="stage", title=f"{fb.ref_no} was declined", body=reason.strip(), actor_email=user.email
     )
@@ -764,6 +895,18 @@ async def ask_info(db: AsyncSession, user: User, ref_no: str, question: str, ask
     events.log(db, fb.id, user.actor, "asked_for_info", after={"ask": ask})
     fb.updated_at = _now()
     return await load(db, feedback_id=fb.id)
+
+
+async def _answered(db: AsyncSession, fb: Feedback, user: User) -> None:
+    """A question to the owner is answered once they write anything on the item."""
+    await notifications.settle(db, fb.id, notifications.ANSWER, f"{fb.ref_no} answered", recipient=user.email)
+
+
+async def _ended(db: AsyncSession, fb: Feedback, outcome: str) -> None:
+    """Nothing is left to do on an ended item: every ask on it settles, and it leaves the approvals count."""
+    fb.routed = None
+    await notifications.settle(db, fb.id, notifications.ASKS, outcome)
+    await notifications.refresh_approvals(db)
 
 
 def work_type_label(value: str | None) -> str:

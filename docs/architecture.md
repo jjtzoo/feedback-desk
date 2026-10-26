@@ -39,13 +39,13 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 | Table | Purpose |
 | --- | --- |
 | `projects`, `digital_staff`, `routing_rules` | The catalogue, people who can be assigned, admin overrides |
-| `feedback` | One row per item: classification, status (nine values), ending (how a closed or declined item ended, D44), assignee, developer brief, context, dates |
+| `feedback` | One row per item: classification, status (nine values), ending (how a closed or declined item ended, D44), assignee, `routed` (routing's reason while nobody has accepted or changed its choice, D56), developer brief, context, dates |
 | `feedback_messages` | Chat transcript, replies, internal notes, progress updates, follow-ups |
-| `feedback_events` | Append-only audit and routing training signal; `is_public` drives the tracker |
+| `feedback_events` | Append-only audit and routing training signal; `is_public` drives the tracker. A change of hands is `assigned`, `taken_over` or `handed_over`, kept apart from routing `correction`s (D53) |
 | `feedback_followers` | Staff who added "+1 and comment" (one row per person, never the submitter). The console's reporter tally is 1 + these rows; at `PRIORITY_REVIEW_REPORTERS` (3) it suggests a priority review, never applies one (D38, proposed) |
 | `attachments` | Files and their extracted text |
 | `feedback_embeddings` | pgvector embeddings for duplicate search |
-| `notifications`, `notification_mutes` | The bell and its emails (title and body masked, then cut to 300 characters); per-item mutes |
+| `notifications`, `notification_mutes` | The bell and its emails (title and body masked, then cut to 300 characters); per-item mutes. An ask (needs approval, assigned, ready to start, asked about) settles for everyone once anyone acts, with `outcome` saying what happened (D54); each Admin has one standing approvals row, updated in place and never emailed (D55); `updated_at` lets the bell's stream see rows change in place |
 | `project_messages`, `releases`, `release_items` | Project channels and Friday releases |
 | `user_sessions`, `user_preferences`, `job_runs` | Sign-in sessions, remembered console view, scheduled-job slots |
 
@@ -112,6 +112,8 @@ Every chat turn and embedding call writes an `app.model_usage` row (tokens, esti
 
 ## Key data flows
 
-1. **Submitting:** chat message (PII masked) → agent classifies and fills the draft, asking what happened before impact (D61) with chips that fit (the person's usual tools first, impact by fault or idea, the model's checked replies; D60, D62) → confirm card, with what happened and anything still unknown (D63) → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications.
-2. **Approving and working:** Admin approves or declines → owner starts work, posts updates and an Expected by date, resolves with a public note → every public change is an event the tracker shows, and a notification in the app and by email.
+The whole journey on one page: [smoke-signal-workflow.svg](design/smoke-signal-workflow.svg) (lanes for staff, Sig, system, Admin and Digital Staff, the five tracker stages, and the Friday release).
+
+1. **Submitting:** chat message (PII masked) → agent classifies and fills the draft, asking what happened before impact (D61) with chips that fit (the person's usual tools first, impact by fault or idea, the model's checked replies; D60, D62) → confirm card, with what happened and anything still unknown (D63) → Confirm (draft hash) → `submit_feedback` saves the item, attachments, transcript and events → router assigns (logged by System with its reason) → Awaiting approval (or Needs review, or Acknowledged for praise) → notifications, and each Admin's approvals count updates.
+2. **Approving and working:** Admin approves or declines → the holder (only the holder, D53) starts work, posts updates and an Expected by date, resolves with a public note; anyone else uses Assign to me, Take over or Hand over, each named and told → every public change is an event the tracker shows, and a notification in the app and by email.
 3. **Friday release:** drafter collects the week's resolved items, public progress and channel notes → owner ticks and edits → publishes → Fixes and updates, contributors notified.

@@ -1,0 +1,190 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1760 1040" width="1760" height="1040" font-family="'Plus Jakarta Sans','Segoe UI',Arial,sans-serif" role="img" aria-labelledby="t d"><title id="t">Smoke Signal workflow</title><desc id="d">How feedback moves from a staff member through Sig, routing, Admin approval and Digital Staff work to a closed item, with the tracker stages staff see and the Friday release.</desc>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#14161a"/></marker></defs>
+<rect width="1760" height="1040" fill="#fff"/>
+<text x="24" y="30" font-size="20" font-weight="800" fill="#14161a">Smoke Signal workflow</text>
+<text x="24" y="50" font-size="12" fill="#5b616b">From a staff member's message to a closed item. Red lines are the status an item holds at that step.</text>
+<text x="114" y="72" font-size="12" font-weight="800" fill="#d0101b">1  Tell Sig</text>
+<text x="481" y="72" font-size="12" font-weight="800" fill="#d0101b">2  Shape and confirm</text>
+<line x1="467" y1="58" x2="467" y2="830" stroke="#cfd3da" stroke-dasharray="2 5"/>
+<text x="851" y="72" font-size="12" font-weight="800" fill="#d0101b">3  Submit and route</text>
+<line x1="837" y1="58" x2="837" y2="830" stroke="#cfd3da" stroke-dasharray="2 5"/>
+<text x="1221" y="72" font-size="12" font-weight="800" fill="#d0101b">4  Decide, work, close</text>
+<line x1="1207" y1="58" x2="1207" y2="830" stroke="#cfd3da" stroke-dasharray="2 5"/>
+<rect x="0" y="80" width="1760" height="150" fill="#f6f7f9"/>
+<line x1="0" y1="80" x2="1760" y2="80" stroke="#cfd3da"/>
+<text x="88" y="159" text-anchor="end" font-size="12" font-weight="800" fill="#14161a">Staff</text>
+<rect x="0" y="230" width="1760" height="150" fill="#fff"/>
+<line x1="0" y1="230" x2="1760" y2="230" stroke="#cfd3da"/>
+<text x="88" y="309" text-anchor="end" font-size="12" font-weight="800" fill="#14161a">Sig</text>
+<rect x="0" y="380" width="1760" height="150" fill="#f6f7f9"/>
+<line x1="0" y1="380" x2="1760" y2="380" stroke="#cfd3da"/>
+<text x="88" y="459" text-anchor="end" font-size="12" font-weight="800" fill="#14161a">System</text>
+<rect x="0" y="530" width="1760" height="150" fill="#fff"/>
+<line x1="0" y1="530" x2="1760" y2="530" stroke="#cfd3da"/>
+<text x="88" y="609" text-anchor="end" font-size="12" font-weight="800" fill="#14161a">Admin</text>
+<rect x="0" y="680" width="1760" height="150" fill="#f6f7f9"/>
+<line x1="0" y1="680" x2="1760" y2="680" stroke="#cfd3da"/>
+<text x="88" y="759" text-anchor="end" font-size="12" font-weight="800" fill="#14161a">Digital Staff</text>
+<line x1="0" y1="830" x2="1760" y2="830" stroke="#cfd3da"/>
+<line x1="100" y1="80" x2="100" y2="830" stroke="#cfd3da"/>
+<rect x="117.5" y="123.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="190" y="145.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Opens Smoke Signal</text>
+<text x="190" y="159.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">and signs in (Google,</text>
+<text x="190" y="172.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">redadair.com.au)</text>
+<rect x="302.5" y="123.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="375" y="145.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Describes it in chat</text>
+<text x="375" y="159.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Free text, screenshots,</text>
+<text x="375" y="172.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Word or Excel files</text>
+<rect x="672.5" y="123.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="745" y="138.75" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Confirms the card</text>
+<text x="745" y="152.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">or edits any field.</text>
+<text x="745" y="165.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Nothing saves without</text>
+<text x="745" y="179.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">this step</text>
+<rect x="1285.0" y="119.0" width="400" height="72" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1485" y="138.75" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Follows it on the tracker (5 stages)</text>
+<text x="1485" y="152.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Bell and email at each change.</text>
+<text x="1485" y="165.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Can reply or add details; a reply</text>
+<text x="1485" y="179.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">on a Resolved item reopens it</text>
+<rect x="302.5" y="235.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="375" y="257.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Sig greets and asks</text>
+<text x="375" y="271.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">only what is missing:</text>
+<text x="375" y="284.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">at most 3 questions</text>
+<rect x="487.5" y="235.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="560" y="257.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Classifies and writes</text>
+<text x="560" y="271.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">the developer brief</text>
+<text x="560" y="284.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Project, type, priority</text>
+<rect x="487.5" y="313.0" width="145" height="56" rx="8" fill="#fff1f1" stroke="#d0101b" stroke-width="1.2"/>
+<text x="560" y="331.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Likely duplicate?</text>
+<text x="560" y="345.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Offers +1 and comment</text>
+<text x="560" y="358.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">on the existing item</text>
+<rect x="672.5" y="235.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="745" y="257.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Shows the confirm card</text>
+<text x="745" y="271.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Project, type, summary,</text>
+<text x="745" y="284.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">priority</text>
+<rect x="672.5" y="313.0" width="145" height="56" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2" stroke-dasharray="5 4"/>
+<text x="745" y="331.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Model fails or stalls:</text>
+<text x="745" y="345.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Backup form keeps</text>
+<text x="745" y="358.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">what was typed</text>
+<rect x="1180.0" y="263.0" width="380" height="84" rx="8" fill="#fff1f1" stroke="#d0101b" stroke-width="1.2"/>
+<text x="1370" y="288.75" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Ground rules</text>
+<text x="1370" y="302.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">The model proposes; code decides who gets it,</text>
+<text x="1370" y="315.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">never the model. Roles are checked on the</text>
+<text x="1370" y="329.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">server. Staff see only their own items.</text>
+<rect x="857.5" y="423.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="930" y="438.75" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Submit</text>
+<text x="930" y="452.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Masks passwords, cards,</text>
+<text x="930" y="465.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">saves with a reference</text>
+<text x="930" y="479.25" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">New</text>
+<rect x="1042.5" y="403.0" width="145" height="104" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1115" y="425.25" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Router (plain code)</text>
+<text x="1115" y="438.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Gate, rules, owner,</text>
+<text x="1115" y="452.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">away check. Assigns</text>
+<text x="1115" y="465.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">it. If unsure, away or</text>
+<text x="1115" y="479.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">flagged:</text>
+<text x="1115" y="492.75" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Needs review</text>
+<rect x="1227.5" y="385.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1300" y="400.75" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Praise</text>
+<text x="1300" y="414.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Passed to the owner</text>
+<text x="1300" y="427.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">as thanks. No approval.</text>
+<text x="1300" y="441.25" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Acknowledged</text>
+<rect x="1250.0" y="467.0" width="470" height="52" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1485" y="490.25" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Every change writes the tracker history and notifies the submitter</text>
+<text x="1485" y="503.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">and followers: bell at once, email from the worker</text>
+<rect x="1042.5" y="535.0" width="145" height="74" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1115" y="549.0" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Admin decides</text>
+<text x="1115" y="562.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Reads the brief and AI</text>
+<text x="1115" y="576.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">advice. P1 alerts now.</text>
+<text x="1115" y="589.5" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Awaiting approval or</text>
+<text x="1115" y="603.0" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Needs review</text>
+<rect x="1042.5" y="629.0" width="145" height="50" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1115" y="644.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Decline with a reason</text>
+<text x="1115" y="658.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Staff see why</text>
+<text x="1115" y="671.5" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Declined</text>
+<rect x="1227.5" y="544.0" width="145" height="56" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1300" y="562.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Approve</text>
+<text x="1300" y="576.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Staff see it as Planned</text>
+<text x="1300" y="589.5" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Approved</text>
+<rect x="1227.5" y="687.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1300" y="702.75" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Start work</text>
+<text x="1300" y="716.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Takes it on if nobody</text>
+<text x="1300" y="729.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">has it</text>
+<text x="1300" y="743.25" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">In progress</text>
+<rect x="1412.5" y="687.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1485" y="709.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Resolve with a note</text>
+<text x="1485" y="723.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Staff see the note</text>
+<text x="1485" y="736.5" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Resolved</text>
+<rect x="1597.5" y="687.0" width="145" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1670" y="709.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Close as Fixed</text>
+<text x="1670" y="723.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Resolved items only</text>
+<text x="1670" y="736.5" text-anchor="middle" font-size="11" font-weight="700" fill="#b00d17">Closed (Fixed)</text>
+<rect x="1227.0" y="773.0" width="330" height="52" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1392" y="789.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Any time while open: post updates, set Expected by,</text>
+<text x="1392" y="803.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">reassign, merge a duplicate (Declined), or close as</text>
+<text x="1392" y="816.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Won't fix (Declined) or No longer needed (Closed)</text>
+<path d="M262.5 155 H302.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M375 187.0 V235.0" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M447.5 267 H487.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M560 299.0 V313" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="568" y="311" text-anchor="start" font-size="10" font-weight="700" fill="#b00d17" stroke="#fff" stroke-width="3" paint-order="stroke">match</text>
+<path d="M632.5 267 H672.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M745 235.0 V187.0" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M817.5 155 H915 V423.0" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M817.5 341 H945 V423.0" fill="none" stroke="#14161a" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<path d="M1002.5 455 H1042.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M1187.5 435.0 H1227.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="1207.5" y="429.0" text-anchor="middle" font-size="10" font-weight="700" fill="#b00d17" stroke="#fff" stroke-width="3" paint-order="stroke">praise</text>
+<path d="M1115 505 V535" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="1123" y="521" text-anchor="start" font-size="10" font-weight="700" fill="#b00d17" stroke="#fff" stroke-width="3" paint-order="stroke">all else</text>
+<path d="M1187.5 572 H1227.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="1207.5" y="565" text-anchor="middle" font-size="10" font-weight="700" fill="#b00d17" stroke="#fff" stroke-width="3" paint-order="stroke">approve</text>
+<path d="M1115 609 V629" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="1123" y="629" text-anchor="start" font-size="10" font-weight="700" fill="#b00d17" stroke="#fff" stroke-width="3" paint-order="stroke">decline</text>
+<path d="M1300 600 V687.0" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M1372.5 711 H1412.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M1557.5 719 H1597.5" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M1470 687.0 V673.0 H1330 V687.0" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<text x="1400.5" y="669.0" text-anchor="middle" font-size="10" font-weight="700" fill="#b00d17" stroke="#fff" stroke-width="3" paint-order="stroke">a staff reply reopens it</text>
+<path d="M1600 467 V191" fill="none" stroke="#5b616b" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="24" y="864" font-size="13" font-weight="800" fill="#14161a">What staff see on the tracker</text>
+<text x="24" y="880" font-size="11" fill="#5b616b">Nine internal statuses sit behind five stages.</text>
+<path d="M330 850 H566 L580 882 L566 914 H330 L344 882 Z" fill="#fff1f1" stroke="#d0101b"/>
+<text x="455.0" y="876" text-anchor="middle" font-size="12" font-weight="800" fill="#b00d17">1  Received</text>
+<text x="455.0" y="891" text-anchor="middle" font-size="10.5" fill="#5b616b">New, Needs review,</text>
+<text x="455.0" y="904" text-anchor="middle" font-size="10.5" fill="#5b616b">Awaiting approval</text>
+<path d="M586 850 H822 L836 882 L822 914 H586 L600 882 Z" fill="#fff1f1" stroke="#d0101b"/>
+<text x="711.0" y="880" text-anchor="middle" font-size="12" font-weight="800" fill="#b00d17">2  Planned</text>
+<text x="711.0" y="895" text-anchor="middle" font-size="10.5" fill="#5b616b">Approved</text>
+<path d="M842 850 H1078 L1092 882 L1078 914 H842 L856 882 Z" fill="#fff1f1" stroke="#d0101b"/>
+<text x="967.0" y="880" text-anchor="middle" font-size="12" font-weight="800" fill="#b00d17">3  In progress</text>
+<text x="967.0" y="895" text-anchor="middle" font-size="10.5" fill="#5b616b">In progress</text>
+<path d="M1098 850 H1334 L1348 882 L1334 914 H1098 L1112 882 Z" fill="#fff1f1" stroke="#d0101b"/>
+<text x="1223.0" y="880" text-anchor="middle" font-size="12" font-weight="800" fill="#b00d17">4  Resolved</text>
+<text x="1223.0" y="895" text-anchor="middle" font-size="10.5" fill="#5b616b">Resolved</text>
+<path d="M1354 850 H1730 L1744 882 L1730 914 H1354 L1368 882 Z" fill="#d0101b" stroke="#d0101b"/>
+<text x="1549.0" y="876" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">5  Closed</text>
+<text x="1549.0" y="891" text-anchor="middle" font-size="10.5" fill="#fff">Closed (Fixed, No longer needed), Declined (Won't fix,</text>
+<text x="1549.0" y="904" text-anchor="middle" font-size="10.5" fill="#fff">Duplicate, Declined), Acknowledged (praise)</text>
+<line x1="24" y1="931" x2="1736" y2="931" stroke="#cfd3da"/>
+<text x="24" y="955" font-size="13" font-weight="800" fill="#14161a">Every Friday</text>
+<text x="24" y="971" font-size="11" fill="#5b616b">Nothing publishes by itself.</text>
+<rect x="330.0" y="951.0" width="240" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="450" y="966.75" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Drafter writes a release</text>
+<text x="450" y="980.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">One per project with activity</text>
+<text x="450" y="993.75" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">that week: Fixed, Improved,</text>
+<text x="450" y="1007.25" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">New, In progress</text>
+<rect x="670.0" y="951.0" width="240" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="790" y="973.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Project owner reviews</text>
+<text x="790" y="987.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Ticks what to share, edits</text>
+<text x="790" y="1000.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">the wording, publishes</text>
+<rect x="1010.0" y="951.0" width="240" height="64" rx="8" fill="#fff" stroke="#cfd3da" stroke-width="1.2"/>
+<text x="1130" y="973.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Staff read What's new</text>
+<text x="1130" y="987.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Published releases only;</text>
+<text x="1130" y="1000.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">no names, no internal notes</text>
+<path d="M570 983 H670" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<path d="M910 983 H1010" fill="none" stroke="#14161a" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="1320.0" y="951.0" width="400" height="64" rx="8" fill="#fff1f1" stroke="#d0101b" stroke-width="1.2"/>
+<text x="1520" y="973.5" text-anchor="middle" font-size="11" font-weight="700" fill="#14161a">Weekday mornings: daily digest</text>
+<text x="1520" y="987.0" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">Needs review items over a day old go to the triage lead;</text>
+<text x="1520" y="1000.5" text-anchor="middle" font-size="11" font-weight="390" fill="#5b616b">a summary of approvals waiting goes to the Admins</text>
+<text x="1520" y="1023" text-anchor="middle" font-size="10" font-weight="700" fill="#b00d17" stroke="#fff" stroke-width="3" paint-order="stroke"></text>
+</svg>

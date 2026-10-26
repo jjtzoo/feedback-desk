@@ -75,7 +75,8 @@ async def test_bug_conversation_routes_to_the_owner_and_waits_for_approval(staff
         turns = list(await db.scalars(select(FeedbackMessage).where(FeedbackMessage.feedback_id == fb.id)))
         assert turns[0].author_type == "agent" and any("blank answer" in t.body for t in turns)
         kinds = {n.type for n in await db.scalars(select(Notification))}
-        assert kinds == {"assigned", "approval_p1"}  # owner told; P1 goes to the Admins at once
+        # Owner told; P1 goes to the Admins at once, and their standing approvals count appears (D55).
+        assert kinds == {"assigned", "approval_p1", "approvals_waiting"}
 
     assert (await staff.post(f"/api/chat/sessions/{sid}/messages", json={"text": "one more"})).status_code == 409
 

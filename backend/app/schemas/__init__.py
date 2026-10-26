@@ -278,6 +278,8 @@ class CardOut(Out):
     reporters: int
     priority_review: bool
     needs_detail: bool
+    # Routing's reason while its choice still stands: the "Auto" marker and the "Auto-assigned" line (D56).
+    routed: str | None
 
 
 class ColumnOut(Out):
@@ -339,6 +341,11 @@ class SimilarOut(Out):
     similarity: float
 
 
+class ActivityOut(Out):
+    text: str
+    at: datetime
+
+
 class DetailOut(CardOut):
     submitter_email: str
     target_type: str | None
@@ -360,6 +367,20 @@ class DetailOut(CardOut):
     followers: list[str]
     duplicates: list[SimilarOut]
     linked: list[str]
+    # For the Take over dialog: whether the holder is away, and their latest step on the item (D53).
+    assignee_away: bool
+    holder_activity: ActivityOut | None
+
+
+class TakeOverIn(BaseModel):
+    # Who had it when the dialog opened: if that changed, nothing happens (D53).
+    holder_id: uuid.UUID
+    reason: str = Field(default="", max_length=500)
+
+
+class HandOverIn(BaseModel):
+    to: uuid.UUID
+    reason: str = Field(default="", max_length=500)
 
 
 class UpdateIn(BaseModel):
@@ -390,7 +411,7 @@ class MergeIn(BaseModel):
 
 
 class MoveIn(BaseModel):
-    column: Literal["approved", "in_progress", "resolved", "fixed"]
+    column: Literal["approved", "in_progress", "resolved"]
     note: str = Field(default="", max_length=1000)
 
 
@@ -425,6 +446,11 @@ class NotificationOut(Out):
     link: str
     read_at: datetime | None
     created_at: datetime
+    # What happened once anyone acted on it, and the item's stage as it is now (D54).
+    outcome: str | None
+    item_status: Status | None = None
+    item_stage: str | None = None  # the staff stage, for a staff member's bell
+    item_ending: Ending | None = None
 
 
 class NotificationsOut(Out):

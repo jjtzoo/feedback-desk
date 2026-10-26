@@ -9,7 +9,7 @@ import { ConfirmCard } from "@/components/chat/confirm-card";
 import { DoneView } from "@/components/chat/done-view";
 import { SigAvatar, type SigState } from "@/components/chat/sig-avatar";
 import { UsageMeter } from "@/components/chat/usage-meter";
-import { DISCLOSURE } from "@/components/staff-header";
+import { DISCLOSURE } from "@/components/chat/disclosure";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";

@@ -37,7 +37,7 @@ The 3D art is a vector stand-in. Once D37 is approved, commission a proper rende
 
 1. **Flat in the product, 3D for large moments.** Use the flat `SigAvatar` in the chat header, messages and notifications. Use the 3D Sig on the landing page, empty states, onboarding and internal comms, and never below 96 px tall.
 2. **Colours come from tokens.** Components never contain hex values (globals.css says so). The snippets below use `currentColor` and Tailwind theme classes (`fill-primary`, `fill-band`, `fill-muted-foreground`, `fill-primary-foreground`).
-3. **Always say it's AI.** Wherever Sig speaks, its name has an `AI` tag beside it, and the staff footer (in the chat, the line under the message box) says chats are processed by Google's Gemini model.
+3. **Always say it's AI.** Wherever Sig speaks, its name has an `AI` tag beside it, and the line under the chat box and the backup form (D58) says chats are processed by Google's Gemini model.
 4. **Puff is the logo; Sig is never the logo.** The favicon, `BrandMark` and the tile all use Puff.
 5. **Motion.** Sig is a functional mark, not a performer (D49): it moves only while it is working. While Sig writes a reply, a small mark with the writing face pulses beside "Sig is writing…"; otherwise it holds still. The face shows the state that matters: ready, writing, sent, offline, and error after a reply fails. No idle swell, no decorative reactions (the pilot set in `docs/research/sig-motion-interactions.md` was built and removed on 2026-10-26), no Sig motion in the console, toasts or notifications. With reduced motion on, the mark doesn't pulse; the face still changes.
 6. **Status is never shown by the face alone.** Every state also has words, such as "Sig is writing…" or "Sig isn't available right now".
@@ -233,7 +233,7 @@ For the 3D art, use `next/image` with `unoptimized` so the SVG is served as is, 
 | `web/src/components/chat/backup-form.tsx` | "The assistant isn't available right now." | "Sig isn't available right now." |
 | `web/src/components/chat/backup-form.tsx` | "You've used today's assistant allowance. It resets tomorrow." | "You've used today's allowance with Sig. It resets tomorrow." |
 | `web/src/components/chat/backup-form.tsx` | "The assistant is paused for today to keep costs in check." | "Sig is paused for today to keep costs in check." |
-| `web/src/components/staff-header.tsx` | Footer: "…Chats are processed by Google's Gemini model…" | "…Sig is an AI assistant, and chats are processed by Google's Gemini model…" |
+| `web/src/components/chat/disclosure.ts` (was the staff footer) | "…Chats are processed by Google's Gemini model…" | "…Sig is an AI assistant, and chats are processed by Google's Gemini model…" |
 | `backend/app/agent_runtime.py` | `GREETING = "G'day! What's on your mind? …"` | `"G'day, I'm Sig. Spotted something? Tell me what's not working, or what would make one of our tools better."` |
 | `backend/agent/instruction.md` | "You are Feedback, REDADAIR's feedback assistant." | "You are Sig, the assistant in Smoke Signal, REDADAIR's feedback app." Add to Rules: "You catch problems early. Never talk about putting out or shutting down people's feedback." |
 | `backend/app/services/email.py` | `FOOTER`: "Feedback, REDADAIR Digital team." | "Smoke Signal, REDADAIR Digital team." |

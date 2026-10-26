@@ -4,21 +4,37 @@ Every notification is a row; the bell reads the rows, and the worker sends each 
 The person who caused an event is never notified about it, and a muted item stays quiet.
 Title and body are masked here, before they are stored or emailed (brief §5.5), and cut only
 after masking so a card number split at the cut cannot slip through.
+
+A notification that asks for an action settles once anyone takes it: it turns read for everyone
+who got it and says what happened instead (D54). Each Admin has one standing "N items waiting
+for your approval" row, updated in place and gone at zero (D55).
 """
 
 import uuid
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
 from app.models import DigitalStaff, Feedback, FeedbackFollower, Notification, NotificationMute
+from app.models.enums import APPROVAL_STATUSES
 from app.services.privacy import mask
 
 KEEP_DAYS = 90
 MAX_CHARS = 300
+
+# Notifications that ask for an action, by the action that settles them (D54).
+DECIDE = ("approval_p1", "flagged")  # an Admin approves or declines
+START = ("assigned", "approved")  # the assignee starts work, or the item changes hands
+ANSWER = ("ask_info",)  # the person asked replies
+ASKS = DECIDE + START + ANSWER
+# The standing approvals count (bell only) and the daily approvals email (email only, D55).
+APPROVALS_WAITING = "approvals_waiting"
+EMAIL_ONLY = ("approvals_summary",)
 
 
 def tracker_link(fb: Feedback) -> str:
@@ -127,15 +143,85 @@ async def triage_lead_emails(db: AsyncSession) -> list[str]:
     return leads or await admin_emails(db)
 
 
+async def settle(
+    db: AsyncSession, feedback_id: uuid.UUID, types: Iterable[str], outcome: str, recipient: str | None = None
+) -> None:
+    """Close the open asks of these types on an item, for everyone who got them or for one recipient."""
+    now = datetime.now(UTC)
+    query = update(Notification).where(
+        Notification.feedback_id == feedback_id,
+        Notification.type.in_(tuple(types)),
+        Notification.settled_at.is_(None),
+    )
+    if recipient is not None:
+        query = query.where(Notification.recipient_email == recipient.lower())
+    await db.execute(
+        query.values(
+            settled_at=now,
+            outcome=mask(outcome)[:MAX_CHARS],
+            read_at=func.coalesce(Notification.read_at, now),
+            updated_at=now,
+        )
+    )
+
+
+def _waiting_title(n: int) -> str:
+    return f"{n} item{'s' if n != 1 else ''} waiting for your approval"
+
+
+async def refresh_approvals(db: AsyncSession) -> None:
+    """Bring each Admin's standing approvals row up to date. A rising count makes it unread and new
+    again; a falling one only changes the words; at zero it goes. Never emailed: the daily summary is."""
+    await db.flush()
+    waiting = int(
+        await db.scalar(select(func.count()).select_from(Feedback).where(Feedback.status.in_(APPROVAL_STATUSES))) or 0
+    )
+    rows = {
+        n.recipient_email: n
+        for n in await db.scalars(select(Notification).where(Notification.type == APPROVALS_WAITING))
+    }
+    now = datetime.now(UTC)
+    title = _waiting_title(waiting)
+    for email in await admin_emails(db) if waiting else []:
+        row = rows.pop(email, None)
+        if row is None:
+            db.add(
+                Notification(
+                    recipient_email=email,
+                    type=APPROVALS_WAITING,
+                    title=title,
+                    link="/console/approvals",
+                    email_status="skipped",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        elif row.title != title:
+            if waiting > int(row.title.split()[0]):
+                row.read_at, row.created_at = None, now
+            row.title, row.updated_at = title, now
+    for row in rows.values():
+        await db.delete(row)
+
+
 # --- the bell -----------------------------------------------------------------------
 
 
-async def list_for(db: AsyncSession, email: str, limit: int = 30) -> tuple[list[Notification], int]:
+def _bell(email: str) -> list[Any]:
     since = datetime.now(UTC) - timedelta(days=KEEP_DAYS)
+    return [
+        Notification.recipient_email == email,
+        Notification.created_at >= since,
+        Notification.type.not_in(EMAIL_ONLY),
+    ]
+
+
+async def list_for(db: AsyncSession, email: str, limit: int = 30) -> tuple[list[Notification], int]:
     rows = list(
         await db.scalars(
             select(Notification)
-            .where(Notification.recipient_email == email, Notification.created_at >= since)
+            .options(selectinload(Notification.feedback))
+            .where(*_bell(email))
             .order_by(Notification.created_at.desc())
             .limit(limit)
         )
@@ -144,36 +230,30 @@ async def list_for(db: AsyncSession, email: str, limit: int = 30) -> tuple[list[
 
 
 async def unread_count(db: AsyncSession, email: str) -> int:
-    since = datetime.now(UTC) - timedelta(days=KEEP_DAYS)
     return int(
         await db.scalar(
-            select(func.count())
-            .select_from(Notification)
-            .where(
-                Notification.recipient_email == email,
-                Notification.read_at.is_(None),
-                Notification.created_at >= since,
-            )
+            select(func.count()).select_from(Notification).where(*_bell(email), Notification.read_at.is_(None))
         )
         or 0
     )
 
 
-async def latest_id(db: AsyncSession, email: str) -> str | None:
-    newest = await db.scalar(
-        select(Notification.id)
-        .where(Notification.recipient_email == email)
-        .order_by(Notification.created_at.desc())
-        .limit(1)
-    )
-    return str(newest) if newest else None
+async def bell_state(db: AsyncSession, email: str) -> str:
+    """Changes whenever the bell would look different: a row added, changed in place or removed."""
+    newest, rows = (
+        await db.execute(
+            select(func.max(Notification.updated_at), func.count()).where(Notification.recipient_email == email)
+        )
+    ).one()
+    return f"{newest}|{rows}"
 
 
 async def mark_read(db: AsyncSession, email: str, ids: list[uuid.UUID] | None) -> None:
     query = update(Notification).where(Notification.recipient_email == email, Notification.read_at.is_(None))
     if ids:
         query = query.where(Notification.id.in_(ids))
-    await db.execute(query.values(read_at=datetime.now(UTC)))
+    now = datetime.now(UTC)
+    await db.execute(query.values(read_at=now, updated_at=now))
 
 
 async def set_mute(db: AsyncSession, email: str, feedback_id: uuid.UUID, muted: bool) -> None:

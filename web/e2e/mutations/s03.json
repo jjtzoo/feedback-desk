@@ -16,5 +16,6 @@
   "S03.15": ["intranet\\.example", "intranet\\.examplex"],
   "S03.16": ["toHaveCount(0)", "toHaveCount(1)"],
   "S03.17": ["number 1/", "number 1x/"],
+  "S03.18": ["contentinfo\")).toHaveCount(0)", "contentinfo\")).toHaveCount(1)"],
   "S03.19": ["toHaveText([\"RAKE Agent\"])", "toHaveText([\"Flipbook\"])"]
 }
