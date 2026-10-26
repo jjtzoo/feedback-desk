@@ -11,7 +11,8 @@ staff really chat, to break Sig: D68). Every reply of every case is judged by co
   4. no dashes as punctuation
   5. no card unless something was reported (the case's expect)
   6. no impact question when the person already said it ("slow", "can't work")
-plus each case's own keys (chips per message, never_ask, card; never_repeat is rule 1, for every case).
+plus each case's own keys (chips per message, never_ask, card, asks_details, keeps; never_repeat is
+rule 1, for every case).
 
 Runs each case through the real chat API on whichever model the settings choose, in a throwaway local
 database (pgserver, database "feedback_conversations", recreated each run), and reports the model
@@ -119,6 +120,18 @@ def judge_turns(case: dict[str, Any], turns: list[Turn]) -> list[str]:
     return problems
 
 
+def asked_about_the_problem(turns: list[Turn]) -> bool:
+    """A question before the card that isn't about the tool, the impact, sending or the work type (D63)."""
+    other = {"tool", "impact", "send", "work_type"}
+    for turn in turns:
+        if turn.card is not None:
+            return False
+        last = turn.replies[-1] if turn.replies else ""
+        if last.rstrip().endswith("?") and not question_kinds(last) & other:
+            return True
+    return False
+
+
 def _expected_chips(at: str, expected: str, turn: Turn) -> list[str]:
     kinds = [k for k, _ in turn.chips]
     labels = {lb.lower() for _, options in turn.chips for lb in options}
@@ -201,6 +214,8 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
     problems += [f"offered the chip {c!r}" for c in case.get("forbid_chip_labels") or [] if c.lower() in labels]
     if case.get("asks_last") and not (replies and replies[-1].rstrip().endswith("?")):
         problems.append("the last reply is not a question")
+    if case.get("asks_details") and not asked_about_the_problem(turns):
+        problems.append("no question about the problem itself before the card")
     if card is not None:
         # Written in the person's terms (review item 11), never about "the user".
         for f in ("title", "summary"):
@@ -214,6 +229,9 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
             problems.append(f"project {card.get('project')!r}, not {want['project']}")
         if case.get("gaps") and not card.get("gaps"):
             problems.append("the card shows no open gaps")
+        shown = " ".join(str(card.get(f, "")) for f in ("title", "summary", "what_happened")).lower()
+        if case.get("keeps") and not any(k.lower() in shown for k in case["keeps"]):
+            problems.append(f"the card dropped what they said first (none of {case['keeps']})")
     if problems:
         problems.append("replies: " + " | ".join(r.replace("\n", " ")[:160] for r in replies))
     return Result(case["name"], not problems, problems)

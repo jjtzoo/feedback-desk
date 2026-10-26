@@ -22,6 +22,9 @@
 # never_repeat: questions that may be asked once but must never be asked again
 # after_card:   true when the later messages come after the card; the harness must keep sending
 #               them instead of stopping at the first card
+# asks_details: true when Sig must ask about the problem itself (not the tool, the impact or "send it?")
+#               at least once before the card (D63, review item 23)
+# keeps:        the card's title, summary or what happened says one of these: nothing they said was dropped
 #
 # Checked on every reply of every case:
 #   1. no question asked twice (same meaning, any wording)
@@ -90,6 +93,31 @@ cases:
     chips: [none, no_impact, none]
     never_ask: [how much it affects their work, which tool]
     never_repeat: [what's happening with RAKE Agent]
+
+  # The product owner's own chat of 27 Oct (review items 21 to 23)
+
+  - name: real-23-goformz-slow-then-submit-fails
+    source: |
+      ### 21 to 23. Seen 27 Oct (Mei Lin): "I'm having trouble with my app it's so slow" -> "Which app or site?" -> "GoFormz Extension Portal" -> straight to the impact question with impact chips -> the submission description -> "Here's what I'll send" and the card at once.
+      - "So slow" already says the impact: no impact question (21, 15).
+      - Ask about the problem itself before the card (23): which form, any error, every time, since when.
+      - The opening "so slow" isn't on the card: if the later description is a different problem, ask whether it's the same issue or a second one; never drop it (23).
+    messages:
+      - "I'm having trouble with my app it's so slow"
+      - "GoFormz Extension Portal"
+      - "There's this part in form submission when i pressed submit it failed to do the task and then resets all my filled forms"
+      - "same thing, it hangs for ages when I press submit and then it fails"
+      - "every time since Monday, no error message"
+    expect: card
+    require: []
+    forbid: ["nice-to-have", "stopping you", "nuisance", "—"]
+    good: Tool chips first, then what is slow; on the submission failure, check whether that is the slowness or a second problem; card with the slowness and the failed submission together, Slowing me down or Blocking.
+    card: {project: GoFormz Extension Portal, kind: problem}
+    chips: [tools, no_impact, no_impact]
+    never_ask: [how much it affects their work]
+    never_repeat: [which tool]
+    asks_details: true
+    keeps: ["slow", "hang", "ages"]
 
   # Questions about Sig
 

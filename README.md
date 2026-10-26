@@ -69,6 +69,8 @@ export GOOGLE_API_KEY="$(gcloud secrets versions access latest --secret=feedback
 
 For Vertex AI instead, set `GOOGLE_GENAI_USE_ENTERPRISE=true`, `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` in `.env` and run `gcloud auth application-default login`. `/api/health` shows which model is in use.
 
+The chat's duplicate check looks at open items and at items fixed in the last `DUPLICATE_FIXED_DAYS` (183 by default, 0 for open items only); a match that was fixed before is linked to the new report as a possible regression (D73).
+
 ## Test
 
 ```bash

@@ -444,6 +444,24 @@ async def test_the_tool_chips_put_the_persons_usual_tools_first(staff: httpx.Asy
     assert not any(o.get("usual") for o in chips["options"][1:])
 
 
+async def test_the_27_oct_goformz_opening_offers_the_persons_goformz_first_and_no_impact_question(
+    staff: httpx.AsyncClient,
+) -> None:
+    """Review items 21 and 24 (D60): "my app, so slow" names no tool; their usual tool leads the chips."""
+    await submit_via_chat(
+        staff,
+        "GoFormz inspection form won't sync, it's annoying",
+        ["I expected it to sync"],
+        project="goformz-extension-portal",
+    )
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "I'm having trouble with my app it's so slow")
+    chips = first(events, "chips")
+    assert chips is not None and chips["kind"] == "project"
+    assert chips["options"][0] == {"label": "GoFormz Extension Portal", "value": "GoFormz Extension Portal", "usual": True}
+    assert ASK_IMPACT not in texts(events)
+
+
 async def test_impact_chips_only_follow_an_impact_question(staff: httpx.AsyncClient) -> None:
     sid = await start_chat(staff)
     events = await say(staff, sid, "RAKE gives a blank answer when I ask about leave.")

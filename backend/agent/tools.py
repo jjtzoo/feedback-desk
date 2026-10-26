@@ -102,13 +102,14 @@ async def update_draft(
         priority_confidence: 0 to 1.
         impact: one_person, team or company.
         effort: S, M or L.
-        recommendation: implement, decline or needs_info.
-        recommendation_reason: one sentence for the approver.
+        recommendation: implement, decline or needs_info. Set it again with show_card, from
+            everything known by then.
+        recommendation_reason: one sentence for the approver, rewritten with the recommendation.
         summary: one plain-English sentence.
         title: under 80 characters.
         sentiment: positive, neutral or negative.
         problem: developer brief, one plain sentence.
-        steps: developer brief, numbered steps to reproduce (fixes).
+        steps: developer brief, steps to reproduce, one per item, without numbers (fixes).
         expected: developer brief, what should happen (fixes).
         actual: developer brief, what happened instead (fixes).
         who_needs_it: developer brief, the job, how often, how many people (improvements, new features).
