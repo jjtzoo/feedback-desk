@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 
+import { WEB } from "./env";
 import { expect, resetDatabase, test } from "./fixtures";
 import { raiseBug } from "./helpers";
 
@@ -192,7 +193,7 @@ test("S02.04 While the small card says 'Click Give feedback', clicking anywhere 
 
   await expect(page.getByRole("menu")).toHaveCount(0);
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page).toHaveURL(/:3100\/$/);
+  await expect(page).toHaveURL(`${WEB}/`);
   await expect(card).toBeVisible();
 
   // The highlighted control still works, and it is the only navigation there was.

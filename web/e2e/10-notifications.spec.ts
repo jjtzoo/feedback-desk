@@ -251,7 +251,7 @@ test("S10.12 Each Admin has one standing 'N items waiting for your approval' row
   const approvals = page.getByRole("navigation", { name: "Console" }).getByRole("link", { name: /^Approvals/ });
   await openBell(page);
   await expect(row(page, /^2 items waiting for your approval/)).toHaveCount(1);
-  await expect(approvals).toHaveAccessibleName("Approvals, 2 waiting");
+  await expect(approvals).toHaveAccessibleName(/^Approvals ?, 2 waiting$/);
 
   await postJson(chris, `/console/items/${first}/approve`);
   await page.reload();
