@@ -299,6 +299,13 @@ async def test_submit_tool_refuses_without_confirm_even_if_the_guard_is_skipped(
     assert (await tools.submit_feedback(ctx))["error"] == "not_confirmed"  # type: ignore[arg-type]
 
 
+def test_instruction_names_the_signed_in_person_and_role_but_not_their_email() -> None:
+    user = {"email": "liam.carter@redadair.example", "name": "Liam Carter", "role": "admin"}
+    text = agent.instruction(FakeContext(state={"user": user}))  # type: ignore[arg-type]
+    assert "talking to Liam, signed in with the admin role" in text
+    assert "Carter" not in text and "liam.carter" not in text
+
+
 # --- model credentials ---------------------------------------------------------------------
 
 
