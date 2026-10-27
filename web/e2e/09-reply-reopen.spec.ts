@@ -1,5 +1,5 @@
 import { expect, resetDatabase, test } from "./fixtures";
-import { postJson, raiseBug } from "./helpers";
+import { pasteImage, pdf, postJson, raiseBug } from "./helpers";
 import type { Page } from "@playwright/test";
 
 // Manual checklist section 9: Staff: reply and reopen.
@@ -22,7 +22,7 @@ async function expandHistory(page: Page) {
 
 async function reply(page: Page, text: string) {
   await page.getByLabel("Reply or add details").fill(text);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 }
 
 test("S09.01 A reply on an open item toasts 'Added. The owner has been told.' and history shows 'You added details'", async ({ page, signIn, team }) => {
@@ -110,4 +110,27 @@ test("S09.05 Darlene replying on Liam's tracker is refused with 'Reply from the 
   await page.goto(`/track/${ref}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Planned, not started yet");
   await expect(await expandHistory(page)).not.toContainText("Trying to reply from here");
+});
+
+test("S09.06 A screenshot pasted into Reply or add details shows as a thumbnail with the passwords line, then under What you sent", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await approvedBug(page, await team.as("Marc"), "RAKE Agent export page shows an error");
+  await page.goto(`/track/${ref}`);
+
+  await pasteImage(page.getByLabel("Reply or add details"));
+  await page.getByTestId("reply-files").setInputFiles(pdf("steps.pdf"));
+  const shot = page.getByRole("img", { name: /^Screenshot \d\d\.\d\d\.\d\d\.png$/ });
+  await expect(shot).toBeVisible();
+  await expect(page.getByText(/steps\.pdf · \d+ KB/)).toBeVisible();
+  await expect(page.getByText("Check it doesn't show passwords or card numbers.")).toBeVisible();
+  await reply(page, "Here's the error I get");
+
+  await expect(page.getByText("Added. The owner has been told.")).toBeVisible();
+  await expect(page.getByText("Check it doesn't show passwords or card numbers.")).toHaveCount(0);
+  const sent = page.getByRole("region", { name: "What you sent" });
+  const thumbnail = sent.getByRole("img", { name: /^Screenshot / });
+  await expect(thumbnail).toBeVisible();
+  // The thumbnail is the real file, served through its signed link.
+  await expect.poll(() => thumbnail.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await expect(sent.getByRole("link", { name: /steps\.pdf/ })).toBeVisible();
 });

@@ -363,7 +363,7 @@ class ActivityOut(Out):
     at: datetime
 
 
-class DetailOut(CardOut):
+class DetailOut(CardOut, UploadLimits):
     submitter_email: str
     target_type: str | None
     area: str | None

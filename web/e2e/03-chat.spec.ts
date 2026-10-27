@@ -4,14 +4,13 @@ import path from "node:path";
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { BUG, chatSay, dropOnChat, getJson, pdf, postJson, raiseBug, reachBackupForm } from "./helpers";
+import { BUG, PNG, chatSay, dropOnChat, getJson, pasteImage, pdf, postJson, raiseBug, reachBackupForm } from "./helpers";
 
 // Manual checklist section 3: the staff chat, with the scripted stub model (its fixed phrases are in backend/agent/stub.py).
 
 test.beforeAll(resetDatabase);
 
 const MACRO = { name: "macro-test.docm", mimeType: "application/vnd.ms-word.document.macroEnabled.12", buffer: Buffer.from("PK\u0003\u0004") };
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
 
 /** A real Word and Excel file, made by the backend's own libraries so the upload's content checks pass. */
 function officeFiles() {
@@ -110,7 +109,7 @@ test("S03.08 Enter sends and Shift+Enter adds a new line", async ({ page }) => {
   await expect(page.getByText("Sig is writing…")).toHaveCount(0, { timeout: 20_000 });
 });
 
-test("S03.09 a PNG, PDF, Word and Excel file each show as a chip with size, can be removed, and name the message", async ({ page }) => {
+test("S03.09 a PNG shows as a thumbnail and a PDF, Word and Excel file as a chip with size; each can be removed and shows on the message", async ({ page }) => {
   const { docx, xlsx } = officeFiles();
   const sheet = { name: "sheet.xlsx", mimeType: XLSX, buffer: xlsx };
   await page.locator("#chat-files").setInputFiles([
@@ -119,7 +118,8 @@ test("S03.09 a PNG, PDF, Word and Excel file each show as a chip with size, can 
     { name: "notes.docx", mimeType: DOCX, buffer: docx },
     sheet,
   ]);
-  for (const name of ["screenshot.png", "report.pdf", "notes.docx", "sheet.xlsx"]) await expect(chip(page, name)).toBeVisible();
+  await expect(page.getByRole("img", { name: "screenshot.png" })).toBeVisible();
+  for (const name of ["report.pdf", "notes.docx", "sheet.xlsx"]) await expect(chip(page, name)).toBeVisible();
 
   // The cross removes one; it can be attached again.
   await page.getByRole("button", { name: "Don't send sheet.xlsx" }).click();
@@ -127,10 +127,12 @@ test("S03.09 a PNG, PDF, Word and Excel file each show as a chip with size, can 
   await page.locator("#chat-files").setInputFiles(sheet);
   await expect(chip(page, "sheet.xlsx")).toBeVisible();
 
-  // After sending, the file names show on the message and the chips are gone.
+  // After sending, the files show on the message and the chips are gone.
   await chatSay(page, "hi");
   await expect(page.getByRole("button", { name: /Don't send/ })).toHaveCount(0);
-  for (const name of ["screenshot.png", "report.pdf", "notes.docx", "sheet.xlsx"]) await expect(page.getByText(name)).toBeVisible();
+  const message = page.getByRole("listitem").filter({ hasText: "You: hi" });
+  await expect(message.getByRole("img", { name: "screenshot.png" })).toBeVisible();
+  for (const name of ["report.pdf", "notes.docx", "sheet.xlsx"]) await expect(message.getByText(name)).toBeVisible();
 });
 
 test("S03.10 dragging a macro file shows the drop zone, and dropping it is refused", async ({ page }) => {
@@ -271,4 +273,93 @@ test("S03.21 A question about Sig gets a short answer, with no chips and no card
   await expect(answer).toHaveCount(2);
   await expect(page.getByRole("listitem", { name: "Quick answers" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Your feedback" })).toHaveCount(0);
+});
+
+// D99: a new chat opens with the app cards. D95: screenshots by paste and, on phones, the camera.
+
+const cards = (page: Page) => page.getByRole("region", { name: /Which tool is it about/ });
+const you = (page: Page, text: string) => page.getByRole("listitem").filter({ hasText: `You: ${text}` });
+
+test("S03.23 A new chat shows the app cards under Sig's greeting: your usual tools, then Platforms, Agents and Other, then Something else", async ({ page, signIn }) => {
+  await signIn("Mei");
+  await raiseBug(page, "flipbook", "Flipbook shows a blank page when I open the safety brochure");
+  await page.goto("/chat");
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
+  const groups = cards(page).getByRole("group");
+  await expect(groups.first()).toBeVisible();
+  expect(await groups.evaluateAll((all) => all.map((g) => g.getAttribute("aria-label")))).toEqual(["Your usual tools", "Platforms", "Agents", "Other"]);
+  await expect(cards(page).getByRole("group", { name: "Your usual tools" }).getByRole("button")).toHaveText(["Flipbook"]);
+  await expect(cards(page).getByRole("group", { name: "Platforms" }).getByRole("button", { name: "Flipbook" })).toHaveCount(0);
+  const projects = await getJson<unknown[]>(page, "/projects");
+  await expect(cards(page).getByRole("button")).toHaveCount(projects.length + 1);
+  await expect(cards(page).getByRole("button").last()).toHaveText("Something else");
+  await expect(page.getByLabel("Your message")).toBeEditable();
+});
+
+test("S03.24 Picking a card sends the tool's name, and Sig asks what's happening, never which tool", async ({ page }) => {
+  await cards(page).getByRole("button", { name: "IT Asset" }).click();
+  await expect(you(page, "IT Asset")).toBeVisible();
+  await expect(page.getByText("What's happening with IT Asset?")).toBeVisible();
+  await expect(cards(page)).toHaveCount(0);
+  await expect(page.getByText("About IT Asset")).toBeVisible();
+  await chatSay(page, "Asset search shows an error every time and it's blocking my work");
+  await expect(page.getByText("What did you expect to happen")).toBeVisible();
+  await expect(page.getByText("Which tool is this about?")).toHaveCount(0);
+});
+
+test("S03.25 Typing first works as before: the cards stay through a chat and go once the tool is named", async ({ page }) => {
+  await chatSay(page, "hi");
+  await expect(page.getByText("I'm here for feedback on our intranet tools")).toBeVisible();
+  await expect(cards(page)).toBeVisible();
+  await chatSay(page, BUG);
+  await expect(page.getByText("How much is this affecting your work")).toBeVisible();
+  await expect(cards(page)).toHaveCount(0);
+  await expect(page.getByText("About Training Portal")).toBeVisible();
+});
+
+test("S03.26 A chat opened for a tool with ?project= shows no cards", async ({ page }) => {
+  await page.goto("/chat?project=it-asset");
+  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
+  await expect(page.getByText("About IT Asset")).toBeVisible();
+  await expect(cards(page)).toHaveCount(0);
+});
+
+test("S03.27 Something else puts the cursor in the box and sends nothing", async ({ page }) => {
+  await cards(page).getByRole("button", { name: "Something else" }).click();
+  await expect(cards(page)).toHaveCount(0);
+  await expect(page.getByLabel("Your message")).toBeFocused();
+  await expect(page.getByRole("listitem").filter({ hasText: "You:" })).toHaveCount(0);
+});
+
+test("S03.28 A pasted screenshot shows as a thumbnail with the passwords line, then on the message and the summary card; no camera button on a desktop", async ({ page }) => {
+  const box = page.getByLabel("Your message");
+  await expect(page.getByRole("button", { name: "Take a photo" })).toBeHidden();
+  // Copied text that also carries a picture (cells from Excel) pastes as text, not a file.
+  await pasteImage(box, "Asset tag 1234");
+  await pasteImage(box);
+  const shot = page.getByRole("img", { name: /^Screenshot \d\d\.\d\d\.\d\d\.png$/ });
+  await expect(shot).toHaveCount(1);
+  await expect(page.getByText("Check it doesn't show passwords or card numbers.")).toBeVisible();
+  await chatSay(page, BUG);
+  await expect(page.getByText("Check it doesn't show passwords or card numbers.")).toHaveCount(0);
+  await expect(you(page, BUG).getByRole("img", { name: /^Screenshot / })).toBeVisible();
+  await page.getByRole("button", { name: "Slower, but I get there" }).click();
+  await chatSay(page, "I expected my certificate to open but got a blank screen");
+  await expect(page.getByRole("region", { name: "Your feedback" }).getByRole("img", { name: /^Screenshot / })).toBeVisible();
+});
+
+test.describe("on a phone", () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true });
+
+  test("S03.29 Take a photo opens the camera and the photo attaches as a thumbnail", async ({ page }) => {
+    const button = page.getByRole("button", { name: "Take a photo" });
+    await expect(button).toBeVisible();
+    const camera = page.getByTestId("photo-input");
+    await expect(camera).toHaveAttribute("capture", "environment");
+    const chooser = page.waitForEvent("filechooser");
+    await button.click();
+    await (await chooser).setFiles({ name: "photo.png", mimeType: "image/png", buffer: PNG });
+    await expect(page.getByRole("img", { name: "photo.png" })).toBeVisible();
+    await expect(page.getByText("Check it doesn't show passwords or card numbers.")).toBeVisible();
+  });
 });

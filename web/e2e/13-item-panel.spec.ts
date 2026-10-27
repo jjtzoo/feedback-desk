@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, openActivity, pdf, postJson, raise, raiseBug } from "./helpers";
+import { PNG, getJson, openActivity, pdf, postJson, raise, raiseBug } from "./helpers";
 
 // Manual checklist section 13: Digital Staff, the item panel. Submitters raise through the API and
 // Darlene (who owns RAKE Agent) looks at the panel on screen; Chris approves where an item must be
@@ -12,7 +12,6 @@ import { getJson, openActivity, pdf, postJson, raise, raiseBug } from "./helpers
 
 test.beforeAll(resetDatabase);
 
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
 
 /** A real Word and Excel file, made by the backend's own libraries so the upload's content checks pass. */
 function officeFiles() {
@@ -546,4 +545,27 @@ test("S13.17 An item saved with open gaps says 'Needs detail' on its card and pa
   await postJson(liam, `/feedback/${ref}/replies`, { body: "It happens after I sign out and back in" });
   await page.reload();
   await expect(card).not.toContainText("Needs detail");
+});
+
+test("S13.21 A reply to the submitter can carry an image, which shows on their tracker under From the team; a note can't", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const aisha = await team.as("Aisha");
+  const ref = await raiseBug(aisha, "rake-agent", "RAKE Agent search box overlaps the answers");
+  await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
+
+  const panel = await openItem(page, ref);
+  await openActivity(panel, "Messages");
+  await panel.getByRole("radio", { name: "Internal note" }).click();
+  await expect(panel.getByRole("button", { name: "Add an image" })).toHaveCount(0);
+  await panel.getByRole("radio", { name: "Reply to submitter", exact: true }).click();
+  await panel.getByTestId("reply-images").setInputFiles({ name: "fixed.png", mimeType: "image/png", buffer: PNG });
+  await expect(panel.getByRole("img", { name: "fixed.png" })).toBeVisible();
+  await panel.getByRole("textbox", { name: "Reply to the submitter" }).fill("Fixed, here's how it looks now");
+  await panel.getByRole("button", { name: "Send reply" }).click();
+  await expect(page.getByText("Reply sent to the submitter")).toBeVisible();
+  await expect(panel.getByRole("img", { name: "fixed.png" })).toHaveCount(0);
+
+  await aisha.goto(`/track/${ref}`);
+  await expect(aisha.getByRole("region", { name: "From the team" }).getByRole("img", { name: "fixed.png" })).toBeVisible();
+  await expect(aisha.getByRole("region", { name: "What you sent" }).getByRole("img", { name: "fixed.png" })).toHaveCount(0);
 });

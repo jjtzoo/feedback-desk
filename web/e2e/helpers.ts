@@ -128,6 +128,22 @@ export function pdf(name: string, bytes = 400) {
   return { name, mimeType: "application/pdf", buffer: Buffer.concat([head, Buffer.alloc(Math.max(0, bytes - head.length), 32)]) };
 }
 
+/** A real one-pixel PNG, so the upload's content check passes. */
+export const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
+
+/** Paste into a box the way Ctrl+V of a screenshot does: a clipboard holding a picture called image.png and no text. */
+export async function pasteImage(box: Locator, text = "") {
+  await box.evaluate(
+    (el, { bytes, text }) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(bytes)], "image.png", { type: "image/png" }));
+      if (text) dt.setData("text/plain", text);
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    },
+    { bytes: Array.from(PNG), text },
+  );
+}
+
 type Dropped = { name: string; mimeType: string; buffer: Buffer };
 
 /** Drag files over the chat the way a person drags them from File Explorer; `hold` stops before the drop. */

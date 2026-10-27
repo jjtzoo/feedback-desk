@@ -15,5 +15,6 @@
   "S13.14": ["\"Mario has just taken this over.\"", "\"Mario has just taken this overx.\""],
   "S13.15": ["Mario · Mario took this on", "Mario · Mario took this onx"],
   "S13.16": ["owner of RAKE Agent/", "owner of Flipbook/"],
-  "S13.17": ["\"Needs detail: ask for info first\"", "\"Needs detail: ask for info firstx\""]
+  "S13.17": ["\"Needs detail: ask for info first\"", "\"Needs detail: ask for info firstx\""],
+  "S13.21": ["{ name: \"From the team\" }).getByRole(\"img\", { name: \"fixed.png\" })", "{ name: \"What you sent\" }).getByRole(\"img\", { name: \"fixed.png\" })"]
 }

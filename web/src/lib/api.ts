@@ -120,6 +120,8 @@ export interface ChatStart {
   greeting: string | null;
   project: Project | null;
   projects: Project[];
+  /** Slugs of the person's usual tools: the app cards show them first (D60, D99). */
+  usual: string[];
   max_file_mb: number;
   max_files: number;
 }
@@ -175,9 +177,16 @@ export interface Tracker {
   history: TimelineEntry[];
   close_reason: string | null;
   merged_into: string | null;
-  attachments: Attachment[];
+  attachments: TrackerFile[];
   can_reply: boolean;
   muted: boolean;
+  max_file_mb: number;
+  max_files: number;
+}
+
+/** A file on the tracker; `from_team` when Digital Staff added it with a reply (D95). */
+export interface TrackerFile extends Attachment {
+  from_team: boolean;
 }
 
 export interface Card {
@@ -284,6 +293,8 @@ export interface Detail extends Card {
   messages: Message[];
   events: FeedbackEvent[];
   attachments: Attachment[];
+  max_file_mb: number;
+  max_files: number;
   followers: string[];
   duplicates: { reference: string; title: string; status: string; similarity: number }[];
   linked: string[];
@@ -438,6 +449,7 @@ export function errorText(e: unknown, fallback = "Something went wrong. Please t
 
 export type ChatEvent =
   | { type: "message"; text: string }
+  | { type: "tool"; slug: string }
   | { type: "chips"; kind: "project" | "impact"; options: Chip[] }
   | { type: "duplicates"; candidates: Duplicate[] }
   | { type: "draft"; card: ChatCard; hash: string }

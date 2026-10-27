@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CircleHelp, FileText, Lock, TrendingUp, Users } from "lucide-react";
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { ChevronDown, ChevronUp, CircleHelp, FileText, ImagePlus, Lock, TrendingUp, Users } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { FileThumbs, IMAGES, ScreenshotNote, pastedImages, preview, withinLimits } from "@/components/attach";
 import { PriorityBadge, StatusBadge } from "@/components/badges";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
 import { RoutingLine } from "@/components/console/routing-line";
@@ -64,6 +65,9 @@ export function ItemPanel({
   const [feedFilter, setFeedFilter] = useState<"all" | "messages" | "history">("all");
   const [justSent, setJustSent] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  // Images to send with a reply, for example to show the fix (D95); notes take none.
+  const [images, setImages] = useState<{ file: File; src: string | null }[]>([]);
+  const imageInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -111,10 +115,27 @@ export function ItemPanel({
     return ok;
   }
 
+  function addImages(files: File[]) {
+    if (!item) return;
+    const { ok, error } = withinLimits(files, item.attachments.length + images.length, item.max_files, item.max_file_mb);
+    if (error) toast.error(error);
+    setImages((all) => [...all, ...ok.map((file) => ({ file, src: preview(file) }))]);
+  }
+
   async function sendMessage(e: FormEvent) {
     e.preventDefault();
-    if (!message.trim()) return;
+    if (!message.trim() || !reference) return;
+    const withImages = composer === "reply" ? images : [];
+    try {
+      // The images go on the item first, so the reply they belong to never arrives without them.
+      for (const image of withImages) await api.upload(`/feedback/${reference}/attachments`, image.file);
+    } catch (err) {
+      toast.error(errorText(err));
+      return;
+    }
     if (await act(composer, { body: message })) {
+      withImages.forEach((image) => image.src && URL.revokeObjectURL(image.src));
+      if (withImages.length) setImages([]);
       setMessage("");
       toast.success(composer === "reply" ? "Reply sent to the submitter" : "Note added");
       setFeedFilter((f) => (f === "history" ? "all" : f));
@@ -441,15 +462,51 @@ export function ItemPanel({
                               rows={3}
                               value={message}
                               onChange={(e) => setMessage(e.target.value)}
+                              onPaste={(e) => {
+                                const pasted = composer === "reply" ? pastedImages(e) : [];
+                                if (pasted.length === 0) return;
+                                e.preventDefault();
+                                addImages(pasted);
+                              }}
                               aria-label={composer === "reply" ? "Reply to the submitter" : "Internal note (staff never see it)"}
                               placeholder={composer === "reply" ? "They see this on their tracker and by email" : "Only the Digital team sees this"}
                               className="rounded-xl bg-background"
                             />
+                            {composer === "reply" && images.length > 0 && (
+                              <div className="grid gap-2">
+                                <FileThumbs
+                                  files={images.map((image, i) => ({ key: String(i), name: image.file.name, size: image.file.size, src: image.src }))}
+                                  onRemove={(key) => setImages((all) => all.filter((_, i) => String(i) !== key))}
+                                />
+                                <ScreenshotNote files={images.map((image, i) => ({ key: String(i), name: image.file.name, src: image.src }))} />
+                              </div>
+                            )}
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 {composer === "note" && <Lock className="size-3" aria-hidden="true" />}
                                 {composer === "reply" ? "The submitter sees this." : "Only the Digital team sees this."}
                               </p>
+                              {composer === "reply" && (
+                                <>
+                                  <input
+                                    ref={imageInput}
+                                    type="file"
+                                    accept={IMAGES}
+                                    multiple
+                                    className="sr-only"
+                                    tabIndex={-1}
+                                    aria-hidden="true"
+                                    data-testid="reply-images"
+                                    onChange={(e) => {
+                                      addImages(Array.from(e.target.files ?? []));
+                                      e.target.value = "";
+                                    }}
+                                  />
+                                  <Button type="button" variant="ghost" className="ml-auto rounded-xl" disabled={busy} onClick={() => imageInput.current?.click()}>
+                                    <ImagePlus /> Add an image
+                                  </Button>
+                                </>
+                              )}
                               <Button type="submit" variant={composer === "reply" ? "default" : "outline"} className="rounded-xl" disabled={busy || !message.trim()}>
                                 {composer === "reply" ? "Send reply" : "Add note"}
                               </Button>
