@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T07:27:05.664Z",
-  "commit": "f85381c",
-  "uncommitted": false,
+  "ran": "2026-10-27T22:22:44.336Z",
+  "commit": "a20c51e",
+  "uncommitted": true,
   "spec": "03-chat.spec.ts",
-  "fingerprint": "271d169216564d7e",
+  "fingerprint": "515a1e0c5b2a6e09",
   "caught": {
     "S03.01": true,
     "S03.02": true,
@@ -13,7 +13,7 @@
     "S03.06": true,
     "S03.07": true,
     "S03.08": true,
-    "S03.09": true,
+    "S03.09": false,
     "S03.10": true,
     "S03.11": true,
     "S03.12": true,
@@ -25,6 +25,13 @@
     "S03.18": true,
     "S03.19": true,
     "S03.20": true,
-    "S03.21": true
+    "S03.21": true,
+    "S03.23": true,
+    "S03.24": true,
+    "S03.25": true,
+    "S03.26": true,
+    "S03.27": true,
+    "S03.28": true,
+    "S03.29": true
   }
 }

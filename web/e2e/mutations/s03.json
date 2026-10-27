@@ -7,7 +7,7 @@
   "S03.06": ["toHaveCount(2)", "toHaveCount(3)"],
   "S03.07": ["length + 1", "length + 2"],
   "S03.08": ["line one\\nline two", "line one line two"],
-  "S03.09": ["getByRole(\"img\", { name: \"screenshot.png\" })).toBeVisible()", "getByRole(\"img\", { name: \"screenshot.png\" })).toHaveCount(0)"],
+  "S03.09": ["message.getByRole(\"img\", { name: \"screenshot.png\" })", "message.getByRole(\"img\", { name: \"screenshotx.png\" })"],
   "S03.10": ["uploaded.", "uploadedx."],
   "S03.11": ["toHaveCount(0)", "toHaveCount(1)"],
   "S03.12": ["don't match", "don't matchx"],
