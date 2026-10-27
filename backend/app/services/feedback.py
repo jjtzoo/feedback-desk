@@ -11,6 +11,7 @@ from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.config import get_settings
 from app.errors import Conflict, Forbidden, NotFound
 from app.models import Attachment, DigitalStaff, Feedback, FeedbackEvent, FeedbackFollower, FeedbackMessage, Project
 from app.models.entities import stamp
@@ -358,6 +359,7 @@ class TrackerView:
     can_reply: bool
     muted: bool
     check: dict[str, Any] | None = None
+    is_it_fixed: dict[str, Any] | None = None
 
 
 def _public_text(e: FeedbackEvent) -> str:
@@ -370,13 +372,10 @@ def _public_text(e: FeedbackEvent) -> str:
     return e.public_text or ""
 
 
-CHECK_STAGES = ("in_progress", "resolved")
-
-
 def open_check(fb: Feedback, messages: list[FeedbackMessage], evs: list[FeedbackEvent]) -> FeedbackMessage | None:
-    """The latest update or Resolve note that asked the person to try it, while they haven't said
-    whether it's fixed (D80). Messages and events oldest first."""
-    if fb.status not in CHECK_STAGES:
+    """The latest update that asked the person to try it, while the work is in progress and they haven't
+    said whether it's fixed (D80). A resolved item asks Is it fixed? instead (D92). Oldest first."""
+    if fb.status != "in_progress":
         return None
     ask = next((m for m in reversed(messages) if m.asks_check), None)
     if ask is None or any(e.event_type == "checked" and e.created_at > ask.created_at for e in evs):
@@ -469,6 +468,11 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
             history.append(TimelineEntry(e.created_at, _public_text(e)))
     history.sort(key=lambda h: h.at, reverse=True)
     ask = open_check(fb, messages, public_events)
+    question = None
+    if fb.submitter_email == user.email:
+        until = reopen_until(fb, status_events)
+        if fb.status == "resolved" or until is not None:
+            question = {"state": fb.status, "reopen_until": until.isoformat() if until else None}
 
     latest = next((m for m in reversed(messages) if m.message_type in ("progress", "reply")), None)
     assignee = None
@@ -502,11 +506,25 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         can_reply=fb.status not in CLOSED_STATUSES,
         muted=await notifications.is_muted(db, user.email, fb.id),
         check={"by": ask.author_name, "body": ask.body, "at": ask.created_at.isoformat()} if ask else None,
+        is_it_fixed=question,
     )
 
 
+def reopen_until(fb: Feedback, status_events: list[FeedbackEvent]) -> datetime | None:
+    """Until when the person who raised a fixed item can still say I still have an issue (D92):
+    REOPEN_DAYS after it closed. None once that has passed, or if it didn't end as Fixed."""
+    if fb.status != "closed" or fb.ending != "fixed":
+        return None
+    closed = max((e.created_at for e in status_events if e.after.get("status") == "closed"), default=None)
+    if closed is None:
+        return None
+    until = closed + timedelta(days=get_settings().reopen_days)
+    return until if _now() < until else None
+
+
 async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedback:
-    """Reply or add details from the tracker. A reply on a Resolved item reopens it (brief §4.2.7)."""
+    """Reply or add details from the tracker. A reply on a Resolved item leaves it Resolved: only
+    I still have an issue reopens it (D92, which changes brief §4.2.7)."""
     fb = await _load_for_reporter(db, user, ref_no)
     message_id = uuid.uuid4()
     db.add(
@@ -522,18 +540,6 @@ async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) 
     )
     fb.submitter_replied_at = _now()
     fb.updated_at = _now()
-    if fb.status == "resolved":
-        events.log(
-            db,
-            fb.id,
-            user.actor,
-            "status",
-            before={"status": "resolved"},
-            after={"status": "in_progress"},
-            public_text="Reopened after you added details",
-        )
-        fb.status = "in_progress"
-        fb.resolved_at = None
     await notifications.settle(db, fb.id, notifications.ANSWER, f"{fb.ref_no}: you replied", recipient=user.email)
     await notifications.notify_assignee(
         db,
@@ -561,9 +567,8 @@ async def _load_for_reporter(db: AsyncSession, user: User, ref_no: str) -> Feedb
 
 
 async def answer_check(db: AsyncSession, user: User, ref_no: str, fixed: bool, comment: str = "") -> Feedback:
-    """The person asked to try it says whether it's fixed (D80). Still happening reopens a Resolved
-    item to In progress. It's fixed is recorded and told to the owner, who closes it; whether it
-    closes by itself is an open decision."""
+    """The person asked to try an in-progress fix says whether it works (D80): recorded and told to the
+    owner, who resolves it. A resolved item is answered with Is it fixed? instead (D92, lifecycle)."""
     fb = await _load_for_reporter(db, user, ref_no)
     messages = list(
         await db.scalars(
@@ -597,18 +602,6 @@ async def answer_check(db: AsyncSession, user: User, ref_no: str, fixed: bool, c
         )
     said = "it's fixed" if fixed else "it's still happening"
     events.log(db, fb.id, user.actor, "checked", after={"fixed": fixed}, public_text=f"{user.name} said {said}")
-    if not fixed and fb.status == "resolved":
-        events.log(
-            db,
-            fb.id,
-            user.actor,
-            "status",
-            before={"status": "resolved"},
-            after={"status": "in_progress"},
-            public_text="Reopened: still happening",
-        )
-        fb.status = "in_progress"
-        fb.resolved_at = None
     fb.submitter_replied_at = _now()
     fb.updated_at = _now()
     await notifications.settle(db, fb.id, notifications.ANSWER, f"{fb.ref_no}: you replied", recipient=user.email)

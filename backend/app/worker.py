@@ -8,6 +8,8 @@
   (written in the same step, such as assigned and needs approval) go as one email (D78).
 - Runs the daily digest and the Friday release drafter when their local slot comes round.
   Cloud Scheduler may call the same jobs; job_runs makes each slot run once.
+- Ends resolved items nobody answered (D92): one Is it fixed? reminder after RESOLVED_REMINDER_DAYS,
+  then closes them as Fixed by System after RESOLVED_AUTO_CLOSE_DAYS.
 - Embeds open items whose embedding is missing or from another model, a batch at a time,
   so duplicate search finds them.
 """
@@ -26,7 +28,7 @@ from app.config import get_settings
 from app.db import dispose_engine, session_scope
 from app.models import Notification
 from app.services import email as email_service
-from app.services import embeddings, jobs
+from app.services import embeddings, jobs, lifecycle
 
 log = logging.getLogger("app.worker")
 
@@ -97,6 +99,13 @@ async def run_due_jobs() -> None:
                 log.info("job %s ran: %s", name, count)
 
 
+async def close_resolved() -> None:
+    async with session_scope() as db:
+        closed, reminded = await lifecycle.run_clock(db)
+    if closed or reminded:
+        log.info("resolved items: %s closed as fixed, %s reminded", closed, reminded)
+
+
 async def backfill_embeddings() -> None:
     async with session_scope() as db:
         count = await embeddings.backfill(db)
@@ -119,6 +128,7 @@ async def main() -> None:
             if time.monotonic() - last_jobs_check > 60:
                 last_jobs_check = time.monotonic()
                 await run_due_jobs()
+                await close_resolved()
                 await backfill_embeddings()
         except Exception:
             log.exception("worker loop error")
@@ -134,6 +144,7 @@ async def once() -> None:
     if get_settings().email_backend != "off":
         await send_batch(limit=100)
     await run_due_jobs()
+    await close_resolved()
     await backfill_embeddings()
     await dispose_engine()
 

@@ -39,7 +39,7 @@ from app.models.enums import (
     WORK_TYPES,
 )
 from app.services import embeddings, events, notifications
-from app.services.actors import User
+from app.services.actors import Actor, User
 from app.services.drafts import CATEGORY_LABEL, WORK_TYPE_LABEL
 from app.services.feedback import ENDING_TEXT, day_text, load
 
@@ -526,12 +526,20 @@ async def hand_over(db: AsyncSession, user: User, ref_no: str, to_id: uuid.UUID 
     return await load(db, feedback_id=fb.id)
 
 
-def _set_status(db: AsyncSession, fb: Feedback, user: User, new: str, public_text: str | None = None) -> None:
+def _set_status(
+    db: AsyncSession,
+    fb: Feedback,
+    who: User | Actor,
+    new: str,
+    public_text: str | None = None,
+    detail: dict[str, Any] | None = None,
+) -> None:
+    """Move the item and log it. detail adds to the event's after, such as who closed it and why (D92)."""
     if new not in STATUSES:
         raise ServiceError("bad_value", "Unknown status.")
-    events.log(
-        db, fb.id, user.actor, "status", before={"status": fb.status}, after={"status": new}, public_text=public_text
-    )
+    actor = who.actor if isinstance(who, User) else who
+    after = {"status": new} | (detail or {})
+    events.log(db, fb.id, actor, "status", before={"status": fb.status}, after=after, public_text=public_text)
     fb.status = new
     fb.updated_at = _now()
 
@@ -627,8 +635,6 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
             author_name=user.name,
             message_type="progress",
             body=note.strip()[:4000],
-            # Resolved is the step that asks them to try it (D80).
-            asks_check=True,
             # Stamped just before the status event below, so the tracker lists "Resolved: ..." as the newest entry.
             created_at=datetime.now(UTC) - timedelta(milliseconds=1),
         )
@@ -636,15 +642,8 @@ async def resolve(db: AsyncSession, user: User, ref_no: str, note: str) -> Feedb
     _set_status(db, fb, user, "resolved", f"Resolved: {note.strip()[:140]}")
     fb.resolved_at = _now()
     _first_response(fb)
-    await notifications.notify_submitters(
-        db,
-        fb,
-        type="stage",
-        title=f"{fb.ref_no} is resolved: {user.name} asked you to check it",
-        body=note.strip(),
-        actor_email=user.email,
-        step="Resolved",
-        latest=True,
+    await notifications.ask_is_it_fixed(
+        db, fb, title=f"{fb.ref_no} is resolved. Is it fixed?", body=note.strip(), actor_email=user.email
     )
     await notifications.notify_fixed(
         db, fb, step="Resolved", title=f"Resolved: {fb.ref_no} · {fb.title}", actor_email=user.email
@@ -661,8 +660,9 @@ CLOSE_TITLE = {
 
 
 async def close(db: AsyncSession, user: User, ref_no: str, reason: str, ending: str | None = None) -> Feedback:
-    """Close with a named ending (D44, D45): a resolved item closes as fixed with no reason; an open one
-    as won't fix or no longer needed, with the reason staff see on their tracker."""
+    """Close with a named ending (D44, D45, D92). A resolved item closes as fixed, by the person who raised
+    it, by the clock, or by an Admin with a reason; Digital Staff can't. An open one closes as won't fix or
+    no longer needed, with the reason staff see on their tracker."""
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
     if fb.status in CLOSED_STATUSES:
@@ -671,7 +671,15 @@ async def close(db: AsyncSession, user: User, ref_no: str, reason: str, ending: 
     if fb.status == "resolved":
         if ending not in (None, "fixed"):
             raise Conflict("resolved", "A resolved item closes as fixed. If it isn't fixed, start work on it again.")
-        ending, reason = "fixed", ""
+        if not user.is_admin:
+            raise Conflict(
+                "resolved_admin_only",
+                "The person who raised it closes a resolved item, or it closes by itself. An Admin can close it.",
+            )
+        if not reason:
+            raise ServiceError("reason_required", "Say why you're closing it for them, such as confirmed by phone.")
+        await close_fixed(db, fb, user.actor, "admin", reason)
+        return await load(db, feedback_id=fb.id)
     else:
         ending = ending or "no_longer_needed"
         if ending == "fixed":
@@ -695,11 +703,48 @@ async def close(db: AsyncSession, user: User, ref_no: str, reason: str, ending: 
         actor_email=user.email,
         step=CLOSE_TEXT[ending],
     )
-    if ending == "fixed":
-        await notifications.notify_fixed(
-            db, fb, step="Fixed", title=f"Fixed: {fb.ref_no} · {fb.title}", actor_email=user.email
-        )
     return await load(db, feedback_id=fb.id)
+
+
+# Who closed a resolved item as fixed (D92), as the tracker and the owner hear it.
+FIXED_BY_TEXT = {
+    "submitter": "{name} confirmed it's fixed",
+    "system": "Closed as fixed: no reply in {days} days",
+    "admin": "Closed as fixed by {name}",
+}
+FIXED_OWNER_TITLE = {
+    "submitter": "{ref}: {name} confirmed it's fixed",
+    "system": "{ref} closed as fixed: no reply in {days} days",
+    "admin": "{ref}: {name} closed it as fixed",
+}
+
+
+async def close_fixed(db: AsyncSession, fb: Feedback, actor: Actor, by: str, reason: str = "") -> None:
+    """End a resolved item as Fixed (D92): by the person who raised it (Yes, close it), the worker after
+    RESOLVED_AUTO_CLOSE_DAYS, or an Admin with a reason. The reason stays in the console; staff see who
+    closed it and that they can still say I still have an issue for REOPEN_DAYS."""
+    settings = get_settings()
+    words = {"name": actor.name or "", "days": settings.resolved_auto_close_days, "ref": fb.ref_no}
+    fb.ending, fb.close_reason = "fixed", reason[:1000] or None
+    detail: dict[str, Any] = {"ending": "fixed", "by": by} | ({"reason": reason[:500]} if reason else {})
+    _set_status(db, fb, actor, "closed", FIXED_BY_TEXT[by].format(**words), detail)
+    await _ended(db, fb, f"{fb.ref_no} closed: Fixed")
+    until = day_text((_now() + timedelta(days=settings.reopen_days)).date())
+    await notifications.notify_submitters(
+        db,
+        fb,
+        type="stage",
+        title=CLOSE_TITLE["fixed"].format(ref=fb.ref_no),
+        body=f"Still not right? Open it and choose I still have an issue by {until}.",
+        actor_email=actor.email,
+        step="Fixed",
+    )
+    await notifications.notify_assignee(
+        db, fb, type="closed", title=FIXED_OWNER_TITLE[by].format(**words), actor_email=actor.email, step="Fixed"
+    )
+    await notifications.notify_fixed(
+        db, fb, step="Fixed", title=f"Fixed: {fb.ref_no} · {fb.title}", actor_email=actor.email or ""
+    )
 
 
 async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedback:

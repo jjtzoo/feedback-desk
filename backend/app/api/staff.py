@@ -22,10 +22,11 @@ from app.schemas import (
     ReleaseItemOut,
     ReleaseOut,
     ReplyIn,
+    StillAnIssueIn,
     TimelineOut,
     TrackerOut,
 )
-from app.services import catalog, files, notifications, releases, usage
+from app.services import catalog, files, lifecycle, notifications, releases, usage
 from app.services import feedback as feedback_service
 
 router = APIRouter(tags=["staff"])
@@ -90,6 +91,7 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         can_reply=v.can_reply,
         muted=v.muted,
         check=v.check,
+        is_it_fixed=v.is_it_fixed,
     )
 
 
@@ -108,6 +110,20 @@ async def add_details(ref: str, body: ReplyIn, db: Db, user: CurrentUser) -> Tra
 async def answer_check(ref: str, body: CheckIn, db: Db, user: CurrentUser) -> TrackerOut:
     """It's fixed or Still happening, when an update or the Resolve note asked them to check (D80)."""
     await feedback_service.answer_check(db, user, ref, body.fixed, body.comment)
+    return await _tracker(db, user, ref)
+
+
+@router.post("/feedback/{ref}/fixed", response_model=TrackerOut)
+async def confirm_fixed(ref: str, db: Db, user: CurrentUser) -> TrackerOut:
+    """Yes, close it: the person who raised a resolved item closes it as Fixed (D92)."""
+    await lifecycle.confirm_fixed(db, user, ref)
+    return await _tracker(db, user, ref)
+
+
+@router.post("/feedback/{ref}/still-an-issue", response_model=TrackerOut)
+async def still_an_issue(ref: str, body: StillAnIssueIn, db: Db, user: CurrentUser) -> TrackerOut:
+    """I still have an issue: reopens a resolved item, or a fixed one within REOPEN_DAYS (D92)."""
+    await lifecycle.still_an_issue(db, user, ref, body.body)
     return await _tracker(db, user, ref)
 
 

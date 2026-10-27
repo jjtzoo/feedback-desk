@@ -133,21 +133,6 @@ async def test_an_update_can_ask_them_to_check_and_they_answer(
     assert (await staff.post(f"/api/feedback/{ref}/check", json={"fixed": True})).status_code == 409
 
 
-async def test_still_happening_reopens_a_resolved_item(
-    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
-) -> None:
-    ref = await started(staff, marc, darlene)
-    await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fixed the blank answer, please try it"})
-    t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
-    assert t["check"]["by"] == "Darlene"  # Resolve always asks them to try it
-    assert (await rows(STAFF, "stage"))[-1].title == f"{ref} is resolved: Darlene asked you to check it"
-    t = (await staff.post(f"/api/feedback/{ref}/check", json={"fixed": False})).json()
-    assert t["status"] == "in_progress" and t["check"] is None
-    assert [h["text"] for h in t["history"][:2]] == ["Reopened: still happening", "Sam Lee said it's still happening"]
-    told = (await rows(DARLENE, "check"))[-1]
-    assert told.step == "Still happening" and told.link.endswith("&tab=activity")
-
-
 async def test_a_reply_notification_opens_the_message(
     staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
 ) -> None:
@@ -201,7 +186,7 @@ async def test_a_p1_fix_is_told_to_everyone_who_can_see_triage(
     await colleague.aclose()
 
     await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fixed"})
-    await darlene.post(f"/api/console/items/{ref}/close", json={"reason": ""})
+    assert (await staff.post(f"/api/feedback/{ref}/fixed")).status_code == 200  # Yes, close it (D92)
     for admin in (MARC, CHRIS, MIKE):
         assert [(n.step, n.title) for n in await rows(admin, "fixed")] == [
             ("Resolved", f"Resolved: {ref} · {(await staff.get(f'/api/feedback/{ref}/tracker')).json()['title']}"),
@@ -209,8 +194,10 @@ async def test_a_p1_fix_is_told_to_everyone_who_can_see_triage(
         ]
     assert await rows(DARLENE, "fixed") == []  # she fixed it
     for reporter in (STAFF, STAFF2):
-        assert [n.step for n in await rows(reporter, "stage")][-2:] == ["Resolved", "Fixed"]
         assert await rows(reporter, "fixed") == []
+    # The person who raised it was asked Is it fixed? and closed it; the merged-in colleague heard both.
+    assert [n.step for n in await rows(STAFF, "is_it_fixed")] == ["Resolved"]
+    assert [n.step for n in await rows(STAFF2, "stage")][-2:] == ["Resolved", "Fixed"]
 
 
 async def test_other_fixes_wait_for_the_open_decision(
@@ -218,7 +205,7 @@ async def test_other_fixes_wait_for_the_open_decision(
 ) -> None:
     ref = await started(staff, marc, darlene)
     await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fixed"})
-    await darlene.post(f"/api/console/items/{ref}/close", json={"reason": ""})
+    await staff.post(f"/api/feedback/{ref}/fixed")
     async with session_scope() as db:
         assert list(await db.scalars(select(Notification).where(Notification.type == "fixed"))) == []
         checked = list(await db.scalars(select(FeedbackEvent).where(FeedbackEvent.event_type == "checked")))
