@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T07:27:05.664Z",
-  "commit": "f85381c",
+  "ran": "2026-10-27T01:53:04.806Z",
+  "commit": "1d3b920",
   "uncommitted": false,
   "spec": "03-chat.spec.ts",
-  "fingerprint": "271d169216564d7e",
+  "fingerprint": "e8b67bed350f7517",
   "caught": {
     "S03.01": true,
     "S03.02": true,
@@ -25,6 +25,7 @@
     "S03.18": true,
     "S03.19": true,
     "S03.20": true,
-    "S03.21": true
+    "S03.21": true,
+    "S03.22": true
   }
 }
