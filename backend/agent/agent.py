@@ -20,7 +20,9 @@ def instruction(ctx: ReadonlyContext) -> str:
     hint = ctx.state.get("project_hint")
     context = ctx.state.get("context") or {}
     lines = ["", "## This conversation"]
-    if hint:
+    if ctx.state.get("picked"):
+        lines.append(f"They picked {ctx.state['picked']!r} from the app cards; it is already in the draft.")
+    elif hint:
         lines.append(f"The page was opened for project {hint!r}; it is already in the draft.")
     if context.get("source"):
         lines.append(f"They came from: {context['source']}.")

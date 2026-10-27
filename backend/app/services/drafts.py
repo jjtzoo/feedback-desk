@@ -110,6 +110,15 @@ def apply_update(draft: Draft, updates: dict[str, Any], valid_slugs: set[str]) -
     return new, errors
 
 
+def with_tool(draft: Draft, slug: str) -> Draft:
+    """The draft with a tool the person chose on the page (`?project=` or an app card, D99): certain,
+    so Sig never asks which tool."""
+    new: Draft = json.loads(json.dumps(draft or {}))
+    new["project_slug"] = slug
+    new.setdefault("confidence", {})["project"] = 1.0
+    return new
+
+
 def missing(draft: Draft) -> list[str]:
     return [f for f in REQUIRED if not draft.get(f)]
 

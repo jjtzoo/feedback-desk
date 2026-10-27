@@ -22,6 +22,7 @@ from app.schemas import (
     ReleaseOut,
     ReplyIn,
     TimelineOut,
+    TrackerFileOut,
     TrackerOut,
 )
 from app.services import catalog, files, notifications, releases, usage
@@ -66,6 +67,7 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
     v = await feedback_service.tracker(db, user, ref)
     fb = v.feedback
     labels = feedback_service.label(fb)
+    team = {s.google_email for s in await catalog.list_staff(db)} - {fb.submitter_email}
     return TrackerOut(
         reference=fb.ref_no,
         title=fb.title,
@@ -85,7 +87,10 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         history=[TimelineOut(at=h.at, text=h.text, detail=h.detail) for h in v.history],
         close_reason=feedback_service.shown_reason(fb),
         merged_into=v.merged_into,
-        attachments=[AttachmentOut.model_validate(a) for a in v.attachments],
+        attachments=[
+            TrackerFileOut.model_validate(a).model_copy(update={"from_team": a.uploaded_by in team})
+            for a in v.attachments
+        ],
         can_reply=v.can_reply,
         muted=v.muted,
     )

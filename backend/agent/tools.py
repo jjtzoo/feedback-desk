@@ -142,7 +142,10 @@ async def update_draft(
     slug = draft.get("project_slug")
     chosen = next((p for p in projects if p.slug == slug), None)
     said = str(tool_context.state.get("user_text") or "")
-    if chosen and slug != tool_context.state.get("project_hint") and not catalog.mentions(said, chosen):
+    if chosen and slug == tool_context.state.get("project_hint"):
+        # Chosen on the page (?project= or an app card, D99): certain, whatever the model guessed.
+        draft.setdefault("confidence", {})["project"] = 1.0
+    elif chosen and not catalog.mentions(said, chosen):
         if UNSURE_RE.search(said.lower()):
             # They were asked and don't know: the Digital team checks it (needs review), no more questions.
             draft["project_slug"] = GENERAL
@@ -213,7 +216,8 @@ async def submit_feedback(tool_context: ToolContext) -> dict[str, Any]:
         if text and text != "Confirmed":
             role = "user" if event.author == "user" else "agent"
             turns.append((role, text, datetime.fromtimestamp(event.timestamp, UTC)))
-    first_user = next((t for r, t, _ in turns if r == "user"), "")
+    # An app card's tool name is not what they wrote (D99).
+    first_user = next((t for r, t, _ in turns if r == "user" and t != state.get("picked")), "")
 
     usage = dict(state.get("usage") or {})
     usage["cost_aud"] = cost_aud(usage)

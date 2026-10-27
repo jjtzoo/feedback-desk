@@ -522,3 +522,129 @@ async def test_the_card_stays_up_for_a_yes_and_goes_when_they_change_their_mind(
     events = await say(staff, sid, "never mind")
     assert texts(events) == [NOT_SENT] and first(events, "draft") is None
     assert await count() == 0
+
+
+# --- D99: the chat opens with the app cards; D95: screenshots ------------------------------
+
+
+async def pick(client: httpx.AsyncClient, sid: str, slug: str) -> list[tuple[str, dict[str, Any]]]:
+    r = await client.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": slug})
+    assert r.status_code == 200, r.text
+    return parse_sse(r.text)
+
+
+async def test_a_new_chat_lists_the_persons_usual_tools_for_the_cards(staff: httpx.AsyncClient) -> None:
+    await submit_via_chat(
+        staff, "RAKE gives a blank answer when I ask about leave.", ["It's blocking my work", "I expected an answer"]
+    )
+    r = await staff.post("/api/chat/sessions", json={"context": {"source": "https://tools.example/it-asset"}})
+    assert r.json()["usual"] == ["it-asset", "rake-agent"]
+    assert {p["slug"] for p in r.json()["projects"]} >= {"it-asset", "rake-agent", "intranet"}
+    # A page opened for a tool skips the cards.
+    r = await staff.post("/api/chat/sessions", json={"project_slug": "flipbook"})
+    assert r.json()["usual"] == []
+
+
+async def test_a_card_sets_the_tool_so_sig_asks_what_happened_never_which_tool(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    submitted: list[feedback_service.Submission] = []
+    real_submit = feedback_service.submit
+
+    async def spy(db: Any, sub: feedback_service.Submission) -> Any:
+        submitted.append(sub)
+        return await real_submit(db, sub)
+
+    monkeypatch.setattr(feedback_service, "submit", spy)
+    sid = await start_chat(staff)
+    events = await pick(staff, sid, "it-asset")
+    assert texts(events) == ["What's happening with IT Asset?"]
+    assert first(events, "tool") == {"slug": "it-asset"} and first(events, "chips") is None
+    events = await say(staff, sid, "Asset search takes about a minute and it's slowing me down")
+    said = texts(events)
+    for answer in ["I expected results in a second or two"]:
+        if first(events, "draft"):
+            break
+        events = await say(staff, sid, answer)
+        said += texts(events)
+    assert ASK_PROJECT not in said
+    card = first(events, "draft")
+    assert card is not None and card["card"]["project"] == "IT Asset"
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    done = first(parse_sse(r.text), "done")
+    # Code routed it to the tool's owner; the model named nobody (D2).
+    assert done is not None and done["assigned_to"] == "Darlene"
+    async with session_scope() as db:
+        fb = await feedback_service.load(db, ref_no=done["reference"])
+        assert fb.project is not None and fb.project.slug == "it-asset"
+        assert fb.ai_confidence["project"] == 1.0
+    # What they wrote, not the card's tool name, is their own words (the quote and the abuse check).
+    assert submitted[0].original_text.startswith("Asset search takes about a minute")
+
+
+async def test_a_card_answers_the_tool_question_after_typing_first(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "The export button throws an error every single time")
+    assert texts(events)[-1] == ASK_PROJECT and first(events, "tool") is None
+    events = await pick(staff, sid, "financial-platform")
+    assert first(events, "tool") == {"slug": "financial-platform"}
+    assert ASK_PROJECT not in texts(events)
+
+
+async def test_a_card_never_confirms_and_refuses_an_unknown_tool(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff, project="flipbook")
+    events = await say(staff, sid, "Flipbook crashes when I open the brochure, it's blocking my work")
+    while first(events, "draft") is None:
+        events = await say(staff, sid, "I expected the brochure to open")
+    hash_before = first(events, "draft")["hash"]  # type: ignore[index]
+    # A card picked with the summary up changes the draft: the old summary can't be confirmed (D12).
+    await pick(staff, sid, "training-portal")
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": hash_before})
+    assert r.status_code == 409 and await count() == 0
+    r = await staff.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": "not-a-tool"})
+    assert r.status_code == 404
+    other = await signed_in(STAFF2)
+    r = await other.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": "flipbook"})
+    assert r.status_code == 404
+    await other.aclose()
+
+
+async def test_the_page_hears_the_tool_once_it_is_named_not_guessed(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff)
+    assert first(await say(staff, sid, "the page is slow to load"), "tool") is None
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "Flipbook crashes when I open the brochure")
+    assert first(events, "tool") == {"slug": "flipbook"}
+
+
+async def test_the_tracker_shows_the_teams_images_apart_and_gives_the_upload_limits(
+    staff: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    sid = await start_chat(staff, project="staff-admin-portal")
+    up = await staff.post(f"/api/chat/sessions/{sid}/attachments", files={"file": ("Screenshot.png", PNG, "image/png")})
+    events = await say(
+        staff,
+        sid,
+        "Login loops on my phone, it's blocking, I expected the dashboard but got the sign-in page",
+        [up.json()["id"]],
+    )
+    card = first(events, "draft")
+    assert card is not None
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    ref = first(parse_sse(r.text), "done")["reference"]  # type: ignore[index]
+    # The person adds a pasted screenshot on the tracker; the owner replies with one showing the fix.
+    mine = await staff.post(f"/api/feedback/{ref}/attachments", files={"file": ("Screenshot 2.png", PNG, "image/png")})
+    fix = await darlene.post(f"/api/feedback/{ref}/attachments", files={"file": ("fixed.png", PNG, "image/png")})
+    assert mine.status_code == 201 and fix.status_code == 201
+    fake = await darlene.post(
+        f"/api/feedback/{ref}/attachments", files={"file": ("x.png", b"not an image", "image/png")}
+    )
+    assert fake.status_code == 415
+    tracker = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    assert [(a["file_name"], a["from_team"]) for a in tracker["attachments"]] == [
+        ("Screenshot.png", False),
+        ("Screenshot 2.png", False),
+        ("fixed.png", True),
+    ]
+    assert tracker["max_files"] == get_settings().max_files_per_item
+    assert tracker["max_file_mb"] == get_settings().max_file_mb

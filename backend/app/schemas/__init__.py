@@ -143,12 +143,19 @@ class ClientContext(BaseModel):
     time: str = Field(default="", max_length=60)
 
 
+class UploadLimits(Out):
+    """Upload limits, so a page can refuse a file before sending it (the API checks again)."""
+
+    max_file_mb: int = Field(default_factory=lambda: get_settings().max_file_mb)
+    max_files: int = Field(default_factory=lambda: get_settings().max_files_per_item)
+
+
 class ChatStartIn(BaseModel):
     project_slug: str | None = None
     context: ClientContext = ClientContext()
 
 
-class ChatStartOut(Out):
+class ChatStartOut(UploadLimits):
     mode: Literal["chat", "fallback"]
     # Set when a spend guard sent this chat to the backup form (D36).
     limit: Literal["user", "budget"] | None = None
@@ -156,14 +163,19 @@ class ChatStartOut(Out):
     greeting: str | None = None
     project: ProjectOut | None = None
     projects: list[ProjectOut] = []
-    # Upload limits, so the page can refuse a file before sending it (the API checks again).
-    max_file_mb: int = Field(default_factory=lambda: get_settings().max_file_mb)
-    max_files: int = Field(default_factory=lambda: get_settings().max_files_per_item)
+    # Slugs of the person's usual tools, strongest first: the app cards show them first (D60, D99).
+    usual: list[str] = []
 
 
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     attachment_ids: list[uuid.UUID] = Field(default=[], max_length=5)
+
+
+class ToolIn(BaseModel):
+    """An app card picked at the start of a chat (D99)."""
+
+    project_slug: str = Field(min_length=1, max_length=100)
 
 
 class ConfirmIn(BaseModel):
@@ -181,6 +193,11 @@ class AttachmentOut(Out):
     mime_type: str
     size_bytes: int
     created_at: datetime
+
+
+class TrackerFileOut(AttachmentOut):
+    # Added by the Digital team with a reply (D95), not part of what the person sent.
+    from_team: bool = False
 
 
 class FallbackIn(BaseModel):
@@ -219,7 +236,7 @@ class TimelineOut(Out):
     detail: str | None = None
 
 
-class TrackerOut(Out):
+class TrackerOut(UploadLimits):
     reference: str
     title: str
     summary: str
@@ -238,7 +255,7 @@ class TrackerOut(Out):
     history: list[TimelineOut]
     close_reason: str | None
     merged_into: str | None
-    attachments: list[AttachmentOut]
+    attachments: list[TrackerFileOut]
     can_reply: bool
     muted: bool
 

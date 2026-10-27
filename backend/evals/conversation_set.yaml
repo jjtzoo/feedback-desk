@@ -64,3 +64,14 @@ cases:
   - {name: vague-cant-work, expect: card, messages: ["can't log in to the Staff Admin Portal, can't work", "It says my session has expired straight after the Google sign-in, since this morning"], forbid: ["affecting your work", "how much is this"], forbid_chips: [impact], priority: P1}
   - {name: vague-no-detail, expect: card, messages: ["IT Asset doesn't work", "not sure, it just doesn't", "I don't know, it's blocking my work", "no idea"], gaps: true}
   - {name: vague-fault-chips, expect: card, messages: ["The Flipbook safety brochure is slow to open", "It takes about a minute to show the first page, since Monday", "It's slowing me down"], forbid_chip_labels: ["Nice-to-have"]}
+
+  # App cards (D99, Chris's review of 2026-10-28): a picked card sets the tool, so Sig goes straight to
+  # what happened and never asks which tool; typing first is handled as in D64; ?project= skips the cards.
+  #   {pick: <slug>}: the person picks that app card instead of typing; project: the chat opened with ?project=
+  - {name: card-pick-asks-what-happened, expect: no_card, messages: [{pick: rake-agent}], require: ["RAKE"], never_ask: [which tool], chips: [none], asks_last: true}
+  - {name: card-pick-then-describe, expect: card, messages: [{pick: it-asset}, "Asset search takes about a minute to load, every time since Monday", "Slowing me down"], never_ask: [which tool], card: {project: IT Asset}}
+  - {name: card-pick-idea, expect: card, messages: [{pick: cpd-tracker}, "It would be good to export my points to a spreadsheet", "Nice to have, it would save me copying them by hand"], never_ask: [which tool], card: {project: CPD Tracker}}
+  - {name: card-pick-then-chat, expect: no_card, messages: [{pick: flipbook}, "actually, what are you exactly?"], never_ask: [which tool]}
+  - {name: typed-first-then-card, expect: card, messages: ["hey, what do you do?", {pick: afss-portal}, "My inspection report won't upload, it just spins, since this morning", "Blocking my work"], never_ask: [which tool], card: {project: AFSS Portal}}
+  - {name: project-link, expect: card, project: training-portal, messages: ["My certificate shows an error when I open it", "I expected the PDF but got a blank page, every time", "Slowing me down"], never_ask: [which tool], card: {project: Training Portal}}
+  - {name: project-link-other-tool, expect: card, project: it-asset, messages: ["Actually this is about RAKE, it gives blank answers when I ask about leave, since yesterday", "Slowing me down"], card: {project: RAKE Agent}}

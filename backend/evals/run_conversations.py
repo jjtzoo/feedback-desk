@@ -12,6 +12,8 @@ staff really chat, to break Sig: D68). Every reply of every case is judged by co
   5. no card unless something was reported (the case's expect)
   6. no impact question when the person already said it ("slow", "can't work")
 plus each case's own keys (chips per message, never_ask, card; never_repeat is rule 1, for every case).
+A message written {pick: <slug>} picks that app card instead of typing (D99); a case's project opens
+the chat for that tool, as /chat?project= does.
 
 Runs each case through the real chat API on whichever model the settings choose, in a throwaway local
 database (pgserver, database "feedback_conversations", recreated each run), and reports the model
@@ -162,12 +164,16 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
     card = None
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://eval") as client:
         (await client.post("/api/auth/dev/sign-in", json={"email": email})).raise_for_status()
-        sid = (await client.post("/api/chat/sessions", json={"context": {"source": "conversation eval"}})).json()[
-            "session_id"
-        ]
-        for text in case["messages"][:MAX_TURNS]:
-            turn = Turn(said=text)
-            body = (await client.post(f"/api/chat/sessions/{sid}/messages", json={"text": text})).text
+        start = {"project_slug": case.get("project"), "context": {"source": "conversation eval"}}
+        sid = (await client.post("/api/chat/sessions", json=start)).json()["session_id"]
+        for message in case["messages"][:MAX_TURNS]:
+            if isinstance(message, dict):  # {pick: slug}: an app card at the start of the chat (D99)
+                turn = Turn(said=f"[card] {message['pick']}")
+                sent = await client.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": message["pick"]})
+            else:
+                turn = Turn(said=message)
+                sent = await client.post(f"/api/chat/sessions/{sid}/messages", json={"text": message})
+            body = sent.text
             for name, data in _events(body):
                 if name == "message":
                     turn.replies.append(str(data.get("text", "")))

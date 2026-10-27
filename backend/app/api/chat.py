@@ -4,6 +4,7 @@ card, "+1 and comment", and the backup form when the model is down (F10).
 Messages stream back as server-sent events:
   message    {"text"}                               something the agent says
   chips      {"kind", "options"}                    quick picks (project, impact, reply)
+  tool       {"slug"}                               the tool is known, so the app cards go (D99)
   duplicates {"candidates"}                         likely duplicates, for "+1 and comment"
   draft      {"card", "hash"}                       the confirm card, when Sig is at that step
   done       {"reference", "assigned_to", "status"} saved
@@ -39,6 +40,7 @@ from app.schemas import (
     PlusOneIn,
     ProjectOut,
     SavedOut,
+    ToolIn,
 )
 from app.services import catalog, files, usage
 from app.services import feedback as feedback_service
@@ -51,6 +53,7 @@ from app.services.drafts import (
     first_sentence,
     impact_chips,
     is_complete,
+    with_tool,
 )
 from app.services.privacy import mask
 from app.services.ratelimit import RateLimiter
@@ -84,8 +87,15 @@ async def start_session(body: ChatStartIn, user: CurrentUser, db: Db) -> ChatSta
     except Exception:
         log.exception("could not start an agent session")
         return ChatStartOut(mode="fallback", project=project_out, projects=project_list)
+    # The app cards put the person's usual tools first (D99); a page opened for a tool shows none.
+    usual = [] if project else await catalog.likely_projects(db, user.email, body.context.source, projects)
     return ChatStartOut(
-        mode="chat", session_id=sid, greeting=runtime.GREETING, project=project_out, projects=project_list
+        mode="chat",
+        session_id=sid,
+        greeting=runtime.GREETING,
+        project=project_out,
+        projects=project_list,
+        usual=[p.slug for p in usual],
     )
 
 
@@ -100,22 +110,30 @@ async def upload(session_id: str, user: CurrentUser, db: Db, file: UploadFile = 
 @router.post("/chat/sessions/{session_id}/messages")
 async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> EventSourceResponse:
     state = await _state(user, session_id)
-    settings = get_settings()
-    messages = int(state.get("messages") or 0)
-    if messages >= settings.max_messages_per_session:
-        raise ServiceError("rate_limited", "This chat has reached its message limit. Use the form instead.", 429)
     text = mask(body.text)
+    delta = _turn(state, text)
     parts = await _message_parts(user, session_id, text, body.attachment_ids)
-    delta = {
-        "messages": messages + 1,
-        "user_turns": int(state.get("user_turns") or 0) + 1,
-        # The person's own words (masked), so update_draft can tell whether they named the tool.
-        "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
-        # Suggested answers and the step belong to one turn: update_draft sets them again for the next.
-        "replies": [],
-        "step": None,
-    }
     return EventSourceResponse(_stream(user, session_id, parts, delta), headers=STREAM_HEADERS)
+
+
+@router.post("/chat/sessions/{session_id}/tool")
+async def pick_tool(session_id: str, body: ToolIn, user: StreamUser) -> EventSourceResponse:
+    """An app card (D99). Code sets the tool, the way `?project=` does, so the model never has to
+    guess or ask it; the tool's name is the person's turn, and Sig answers it like any message."""
+    state = await _state(user, session_id)
+    async with session_scope() as db:
+        project = await catalog.project_by_slug(db, body.project_slug)
+    if project is None:
+        raise NotFound("That tool isn't in the list any more. Please pick another or type it.")
+    delta = _turn(state, project.name) | {
+        "draft": with_tool(state.get("draft") or {}, project.slug),
+        "draft_confirmed": False,
+        "project_hint": project.slug,
+        "picked": project.name,
+    }
+    return EventSourceResponse(
+        _stream(user, session_id, [types.Part(text=project.name)], delta), headers=STREAM_HEADERS
+    )
 
 
 @router.post("/chat/sessions/{session_id}/confirm")
@@ -197,6 +215,32 @@ async def _state(user: User, session_id: str) -> dict[str, Any]:
     if state.get("saved"):
         raise Conflict("already_saved", "This chat's feedback is already sent.")
     return state
+
+
+def _turn(state: dict[str, Any], text: str) -> dict[str, Any]:
+    """The state a new turn starts with, once the chat's message limit allows it."""
+    messages = int(state.get("messages") or 0)
+    if messages >= get_settings().max_messages_per_session:
+        raise ServiceError("rate_limited", "This chat has reached its message limit. Use the form instead.", 429)
+    return {
+        "messages": messages + 1,
+        "user_turns": int(state.get("user_turns") or 0) + 1,
+        # The person's own words (masked), so update_draft can tell whether they named the tool.
+        "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
+        # Suggested answers and the step belong to one turn: update_draft sets them again for the next.
+        "replies": [],
+        "step": None,
+    }
+
+
+def _tool_known(state: dict[str, Any]) -> str | None:
+    """The draft's tool once it is settled: chosen on the page, or named with enough confidence."""
+    draft = state.get("draft") or {}
+    slug = draft.get("project_slug")
+    if not slug or slug == GENERAL:
+        return None
+    sure = float((draft.get("confidence") or {}).get("project", 0.0)) >= get_settings().project_confidence_gate
+    return str(slug) if sure or slug == state.get("project_hint") else None
 
 
 def _user_words(state: dict[str, Any]) -> str:
@@ -291,6 +335,9 @@ async def _stream(
     replies = state.get("replies") or []
     shown = draft_hash(draft) if is_complete(draft) else None
     keep = step == "show_card" or (step is None and shown is not None and state.get("card_hash") == shown)
+    tool = _tool_known(state)
+    if tool:
+        yield _sse("tool", {"slug": tool})
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
     if keep and shown:

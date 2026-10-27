@@ -18,6 +18,7 @@ from agent.model import ModelChoice, export_credentials, resolve
 from app.config import get_settings
 from app.services import usage
 from app.services.actors import User
+from app.services.drafts import with_tool
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ async def create_session(user: User, project_hint: str | None, context: dict[str
     state: dict[str, Any] = {
         "user": {"email": user.email, "name": user.name, "role": user.role},
         "context": context,
-        "draft": {"project_slug": project_hint, "project_confidence": 1.0} if project_hint else {},
+        "draft": with_tool({}, project_hint) if project_hint else {},
         "draft_confirmed": False,
         "user_turns": 0,
         "messages": 0,
