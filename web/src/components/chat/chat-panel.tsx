@@ -1,10 +1,10 @@
 "use client";
 
-import { Loader2, Paperclip, Send } from "lucide-react";
+import { Loader2, Paperclip, RotateCcw, Send } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-import { ACCEPT, FileThumbs, PhotoButton, ScreenshotNote, pastedImages, preview, withinLimits, type Shown } from "@/components/attach";
+import { ACCEPT, FileThumbs, PhotoButton, ScreenshotNote, isImage, pastedImages, preview, withinLimits, type Shown } from "@/components/attach";
 import { AppCards } from "@/components/chat/app-cards";
 import { BackupForm } from "@/components/chat/backup-form";
 import { ConfirmCard } from "@/components/chat/confirm-card";
@@ -23,6 +23,7 @@ import {
   type Allowance,
   type Attachment,
   type ChatCard,
+  type ChatResume,
   type ChatStart,
   type Chip,
   type Duplicate,
@@ -34,6 +35,29 @@ import { cn } from "@/lib/utils";
 
 type Turn = { role: "user" | "agent"; text: string; files?: Shown[] };
 type Mode = "starting" | "chat" | "fallback" | "done";
+
+/** The chat in progress in this tab, so a refresh picks it up again. The API only returns the
+ *  signed-in person's own chat, and none once it is sent. */
+const CHAT_KEY = "sig-chat";
+type Remembered = { sid: string; project: string | null };
+
+function remembered(): Remembered | null {
+  try {
+    const raw = window.sessionStorage.getItem(CHAT_KEY);
+    return raw ? (JSON.parse(raw) as Remembered) : null;
+  } catch {
+    return null;
+  }
+}
+
+function remember(value: Remembered | null) {
+  try {
+    if (value) window.sessionStorage.setItem(CHAT_KEY, JSON.stringify(value));
+    else window.sessionStorage.removeItem(CHAT_KEY);
+  } catch {
+    // Storage blocked: the chat still works, it just won't survive a refresh.
+  }
+}
 
 function captureContext(): Record<string, string> {
   const ua = navigator.userAgent;
@@ -99,24 +123,58 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     setFiles([]);
     setSent([]);
     setError(null);
-    api
-      .post<ChatStart>("/chat/sessions", { project_slug: project, context: ctx })
-      .then((s) => {
-        setStart(s);
-        setLimit(s.limit);
-        refreshAllowance();
-        if (s.mode === "fallback" || !s.session_id) {
+    const begin = () =>
+      api
+        .post<ChatStart>("/chat/sessions", { project_slug: project, context: ctx })
+        .then((s) => {
+          setStart(s);
+          setLimit(s.limit);
+          refreshAllowance();
+          if (s.mode === "fallback" || !s.session_id) {
+            setMode("fallback");
+            return;
+          }
+          remember({ sid: s.session_id, project });
+          setTurns([{ role: "agent", text: s.greeting ?? "What's on your mind?" }]);
+          setTool(s.project?.slug ?? null);
+          setCardsOpen(!s.project);
+          setMode("chat");
+        })
+        .catch((e: unknown) => {
+          if (e instanceof ApiError && e.status === 429) setError(e.message);
           setMode("fallback");
-          return;
-        }
-        setTurns([{ role: "agent", text: s.greeting ?? "What's on your mind?" }]);
-        setTool(s.project?.slug ?? null);
-        setCardsOpen(!s.project);
+        });
+    // A refresh picks the chat up again; a sent or ended one starts fresh.
+    const last = round === 0 ? remembered() : null;
+    if (!last || last.project !== project) {
+      remember(null);
+      void begin();
+      return;
+    }
+    api
+      .get<ChatResume>(`/chat/sessions/${last.sid}`)
+      .then((r) => {
+        setStart(r);
+        refreshAllowance();
+        // Files come back by name; the chat's attachments give each one its thumbnail (D95).
+        const byName = new Map(r.attachments.map((a) => [a.file_name, a]));
+        const shown = (names: string[]): Shown[] =>
+          names.map((name) => {
+            const a = byName.get(name);
+            return { key: a?.id ?? name, name, size: a?.size_bytes, src: a && isImage(a.mime_type) ? `/api/files/${a.id}` : null };
+          });
+        setTurns(r.turns.map((turn) => ({ ...turn, files: turn.files.length ? shown(turn.files) : undefined })));
+        setSent(r.turns.flatMap((turn) => shown(turn.files)));
+        setTool(r.tool);
+        setCardsOpen(!r.tool);
+        setDuplicates(r.duplicates);
+        setCard(r.card && r.card_hash ? { card: r.card, hash: r.card_hash } : null);
+        setText("");
         setMode("chat");
       })
-      .catch((e: unknown) => {
-        if (e instanceof ApiError && e.status === 429) setError(e.message);
-        setMode("fallback");
+      .catch(() => {
+        remember(null);
+        void begin();
       });
   }, [project, round, refreshAllowance]);
 
@@ -140,6 +198,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const userTyped = turns.filter((t) => t.role === "user").map((t) => t.text).join("\n\n");
 
   const finish = useCallback((s: Saved, plusOne: boolean) => {
+    remember(null);
     setSaved({ saved: s, plusOne });
     setMode("done");
   }, []);
@@ -287,6 +346,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   function again() {
     Object.values(previews).forEach((src) => URL.revokeObjectURL(src));
     setPreviews({});
+    remember(null);
     setSaved(null);
     setFallbackReason(null);
     setProject(null);
@@ -309,6 +369,11 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
           </p>
           <p className="text-sm text-muted-foreground">{sig === "offline" ? "Not available right now" : "Smoke Signal's feedback assistant"}</p>
         </div>
+        {mode === "chat" && !firstMessage && (
+          <Button variant="ghost" className="ml-auto h-11 rounded-xl" onClick={again} disabled={busy}>
+            <RotateCcw aria-hidden="true" /> New chat
+          </Button>
+        )}
       </header>
 
       {mode === "starting" && (

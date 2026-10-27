@@ -167,6 +167,12 @@ class ChatStartOut(UploadLimits):
     usual: list[str] = []
 
 
+class ChatTurnOut(Out):
+    role: Literal["user", "agent"]
+    text: str
+    files: list[str] = []
+
+
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     attachment_ids: list[uuid.UUID] = Field(default=[], max_length=5)
@@ -193,6 +199,18 @@ class AttachmentOut(Out):
     mime_type: str
     size_bytes: int
     created_at: datetime
+
+
+class ChatResumeOut(ChatStartOut):
+    """A chat picked up again after a refresh: what was said, and the card or matches still showing."""
+
+    turns: list[ChatTurnOut] = []
+    card: dict[str, Any] | None = None
+    card_hash: str | None = None
+    duplicates: list[dict[str, Any]] = []
+    # The tool once known, so the app cards stay gone (D99), and the chat's files for thumbnails (D95).
+    tool: str | None = None
+    attachments: list[AttachmentOut] = []
 
 
 class TrackerFileOut(AttachmentOut):
