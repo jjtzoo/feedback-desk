@@ -84,3 +84,15 @@ Pass: 95.0 % project, 95.0 % work type, 97.5 % assignee, 0 incomplete briefs (ga
 - Web: production build passes.
 - Browser tests on the stub model (ports 8032 / 8033 / 3132): 243 passed, 1 skipped by design (S10.09 needs Docker's Mailpit). No app code was changed to make a test pass.
 - Mutation record for section 3 (`npm run test:e2e:mutation -- 03`): all 22 broken tests failed as they should (`web/e2e/evidence/mutation-s03.json`).
+
+### Third part: D85 to D87 and the faster runner (27 October)
+
+`evals.run_conversations --parallel 4` runs four chats at once (default 1); the full set took about 10 minutes instead of 25 to 30. Cost about A$4.08 (260 calls).
+
+- The 4 cases that were not run or still failing, one at a time on Gemini: typo-go-forms-extention, one-word-bug-staff-admin, two-problems-same-tool and after-card-wrong-tool all passed.
+- Full set after D85 to D87: **87 of 89** (81 of 89 before). Backend: Ruff and mypy clean, 133 tests. Browser tests (ports 8032 / 8033 / 3132): 243 passed, 1 skipped by design (S10.09); D87 changed none.
+- Still failing: **answers-steps-when-asked-tool** (silent turn on the second message, so no tool chips and no card; Gemini latency, 4 timeouts in the run) and **two-problems-same-tool** (one silent turn; it passed on its own run, so it moves between runs).
+
+### Tool question asked twice (open)
+
+answers-impact-when-asked-tool and answers-steps-when-asked-tool expect the tool chips twice, but the instruction says to ask the tool once only. The product owner's steer: don't ignore a non-tool answer, point the person back to the tool, and fall back to their division's usual tool. Tried: take the answer in, then ask the tool once more. answers-impact then passed, but no-tool-page-slow and no-tool-system failed (the judge's rule 1, no question asked twice, applies to them), so 81 of 89 again. Reverted; the instruction stays "ask once". The conflict is between those two cases and rule 1, not a model fault: Marc or the product owner should decide which wins. The `never_repeat: [which tool]` on answers-steps contradicted its own expected chips; it now says `what happens when you upload` (steps still may not be asked again).

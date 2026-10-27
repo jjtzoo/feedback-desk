@@ -338,7 +338,7 @@ cases:
     card: {project: CPD Tracker, kind: problem}
     chips: [tools, tools, card]
     never_ask: [what happens when you upload]
-    never_repeat: [which tool]
+    never_repeat: [what happens when you upload]
 
   - name: answers-question-with-question
     messages:

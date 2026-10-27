@@ -21,6 +21,7 @@ cost from the usage ledger. Scored on Gemini; the stub only shows the scripted b
     uv run python -m evals.run_conversations                # both sets
     uv run python -m evals.run_conversations --set real     # only conversation_cases_real.yaml
     uv run python -m evals.run_conversations --only real-15
+    uv run python -m evals.run_conversations --parallel 4   # four chats at once
 """
 
 import argparse
@@ -261,8 +262,14 @@ async def cost() -> tuple[int, float]:
         return int(row[0]), float(row[1])
 
 
-async def run(cases: list[dict[str, Any]]) -> list[Result]:
-    return [await run_case(n, case) for n, case in enumerate(cases, 1)]
+async def run(cases: list[dict[str, Any]], parallel: int = 1) -> list[Result]:
+    gate = asyncio.Semaphore(parallel)
+
+    async def one(n: int, case: dict[str, Any]) -> Result:
+        async with gate:
+            return await run_case(n, case)
+
+    return list(await asyncio.gather(*(one(n, case) for n, case in enumerate(cases, 1))))
 
 
 def load(which: str) -> list[dict[str, Any]]:
@@ -274,6 +281,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--set", choices=["all", *SETS], default="all", help="which case file to run")
     parser.add_argument("--only", help="run only cases whose name starts with this")
+    parser.add_argument("--parallel", type=int, default=1, help="chats at the same time (rate limits can add timeouts)")
     args = parser.parse_args()
 
     from scripts.local_db import start
@@ -300,7 +308,7 @@ def main() -> None:
     choice = model_choice()
 
     async def go() -> tuple[list[Result], tuple[int, float]]:
-        results = await run(cases)
+        results = await run(cases, args.parallel)
         return results, await cost()
 
     results, (calls, aud) = asyncio.run(go())
