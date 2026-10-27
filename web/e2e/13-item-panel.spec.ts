@@ -182,7 +182,8 @@ test("S13.03 The Brief tab shows the recommendation first, then the brief's rows
   await expect(row("Actual")).toContainText("blank screen");
   await expect(row("Submitter's words")).toHaveText(new RegExp(`^“${words}\\.?”$`));
   await expect(row("Submitter's words")).toHaveClass(/italic/);
-  await expect(row("Context")).toHaveText("Laptop · Chrome 130 · 1440x900 · /reports/12 · 2026-10-22T09:00:00+10:00");
+  // The time in the app's style, in the browser's time zone (D76), never the raw string.
+  await expect(row("Context")).toHaveText(/^Laptop · Chrome 130 · 1440x900 · \/reports\/12 · [A-Z][a-z]{2},? 2[12] Oct,? \d{1,2}:00\s?[ap]m$/);
   await expect(row("Open gaps")).toContainText("Steps to reproduce");
   await expect(panel.locator('dt:text-is("Open gaps")')).toHaveClass(/text-warning/);
 

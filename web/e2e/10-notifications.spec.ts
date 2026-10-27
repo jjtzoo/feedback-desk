@@ -16,6 +16,8 @@ const clearBell = (page: Page) => postJson(page, "/notifications/read");
 
 /** The bell's row for an item, found by the words in its title. */
 const row = (page: Page, text: RegExp) => page.getByRole("link", { name: text });
+/** The same, only inside the open bell, for pages that also link to the item (My feedback). */
+const bellRow = (page: Page, text: RegExp) => page.locator("[data-slot=popover-content]").getByRole("link", { name: text });
 
 test("S10.01 A bell in the staff header and the console header, with an unread count", async ({ page, signIn, team }) => {
   await signIn("Liam");
@@ -137,7 +139,7 @@ test("S10.06 Approve, start, update, reply, resolve and close each notify the pe
   await expect(bell(page)).toHaveAccessibleName("Notifications, 6 unread");
   await openBell(page);
   // One row for the item (D78): the latest on top and every step under it.
-  const item = row(page, new RegExp(ref));
+  const item = bellRow(page, new RegExp(ref));
   await expect(item).toHaveCount(1);
   await expect(item).toContainText(`${ref} is fixed`);
   await expect(item).toContainText("Steps so far: Planned, then In progress, then Update, then Reply, then Resolved, then Fixed");
@@ -241,7 +243,7 @@ test("S10.11 Each notification's badge shows the item's stage now, for the owner
   await page.goto("/my");
   await openBell(page);
   // Liam's "is planned" was sent at stage 2; it now says where the item is.
-  const planned = row(page, new RegExp(ref));
+  const planned = bellRow(page, new RegExp(ref));
   await expect(planned).toContainText("Planned, then In progress");
   await expect(planned).toContainText("In progress");
 });
@@ -292,7 +294,7 @@ test("S10.13 One bell row per item: the latest step on top, the steps so far und
 
   await rows.click();
   await expect(page).toHaveURL(new RegExp(`item=${ref}`));
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: title })).toBeVisible();
   await page.keyboard.press("Escape"); // the panel covers the header while it is open
   await openBell(page);
   await expect(page.getByRole("link", { name: new RegExp(ref) })).not.toHaveAccessibleName(/Unread/);
