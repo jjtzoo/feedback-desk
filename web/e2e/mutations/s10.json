@@ -11,6 +11,6 @@
   "S10.11": ["toContainText(\"In progress\")", "toContainText(\"Resolved\")"],
   "S10.12": ["/^1 item waiting for your approval/", "/^2 items waiting for your approval/"],
   "S10.13": ["Assigned, then Needs approval, then Approved", "Needs approval, then Approved"],
-  "S10.14": ["toHaveClass(/ring-2/)", "not.toHaveClass(/ring-2/)"],
+  "S10.14": ["toHaveClass(/ring-2/)", "toHaveClass(/ring-9/)"],
   "S10.15": ["toHaveCount(0);", "toHaveCount(1);"]
 }

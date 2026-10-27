@@ -316,8 +316,9 @@ test("S10.14 A notification opens where the news is: the reply in the panel, the
   const panel = page.getByRole("dialog");
   await expect(panel.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
   const message = panel.locator("li[id^='msg-']").filter({ hasText: reply });
-  await expect(message).toBeInViewport();
+  // The ring fades after 2.5 s (D81), so it is checked before the wait for the scroll to settle.
   await expect(message).toHaveClass(/ring-2/);
+  await expect(message).toBeInViewport();
 
   await postJson(page, `/console/items/${ref}/update`, { body: "Found it: the second page loads the wrong policy." });
   await liam.goto("/my");
