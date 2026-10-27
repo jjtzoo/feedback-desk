@@ -25,6 +25,7 @@ from app.models import (
     Project,
     UserPreference,
 )
+from app.models.entities import stamp
 from app.models.enums import (
     APPROVAL_STATUSES,
     CATEGORIES,
@@ -357,12 +358,14 @@ async def detail(db: AsyncSession, user: User, ref_no: str) -> Detail:
     if fb.assignee_id is not None and fb.assignee_id == user.staff_id and fb.assignee_opened_at is None:
         fb.assignee_opened_at = now
         events.log(db, fb.id, user.actor, "opened", public_text=f"{user.name} opened your feedback")
+    # Stamped like messages, so one written in the same clock tick still counts as after this read.
+    read_at = stamp()
     read = await db.get(ItemRead, (user.email, fb.id))
     last_read_at = read.read_at if read else None
     if read is None:
-        db.add(ItemRead(email=user.email, feedback_id=fb.id, read_at=now))
+        db.add(ItemRead(email=user.email, feedback_id=fb.id, read_at=read_at))
     else:
-        read.read_at = now
+        read.read_at = read_at
     messages = list(
         await db.scalars(
             select(FeedbackMessage)

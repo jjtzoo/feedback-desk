@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
 import { getJson, pdf, postJson, raise, signOut } from "./helpers";
@@ -234,7 +234,7 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
   await expect(overdue).toBeVisible();
   await expect(overdue).toHaveClass(/text-destructive/);
   await expect(busy.getByText("Has files")).toHaveCount(1);
-  await expect(busy.getByLabel("Unread reply from the submitter")).toBeVisible();
+  await expect(busy.getByText("New reply", { exact: true })).toBeVisible();
   await expect(busy.getByText("Flagged")).toHaveCount(0);
 
   // A card with a date far ahead says "Due", not red.
@@ -250,7 +250,7 @@ test("S12.04 A card shows its reference, work type, priority badge (P1 outlined)
   await expect(plain.getByText("RAKE Agent · Tom Nguyen", { exact: true })).toBeVisible();
   await expect(plain.getByText(/^P\d · /)).not.toHaveClass(/border-primary/);
   await expect(plain.getByText("Has files")).toHaveCount(0);
-  await expect(plain.getByLabel("Unread reply from the submitter")).toHaveCount(0);
+  await expect(plain.getByText("New reply", { exact: true })).toHaveCount(0);
   await expect(plain.getByText(/^(Due|Overdue)/)).toHaveCount(0);
   await expect(plain.getByText("Flagged")).toHaveCount(0);
 
@@ -569,7 +569,8 @@ test("S12.14 List view has the columns Ref, Title, Project, Type, Priority, Stag
   await expect(page.getByRole("columnheader")).toHaveText(["Ref", "Title", "Project", "Type", "Priority", "Stage", "Assignee", "Age", "Expected by", "Actions"]);
 
   const overdue = page.getByRole("row").filter({ hasText: world.p1 });
-  await expect(overdue.getByRole("cell")).toHaveText([world.p1, TEXT.p1, "RAKE Agent", "Fix", "P1 · Blocking", "Approved", "Darlene", /^(now|\d+ [mhd])$/, /15 Sep/, ""]);
+  // Its submitter replied since Darlene last looked, so the title carries New reply (D82).
+  await expect(overdue.getByRole("cell")).toHaveText([world.p1, `New reply${TEXT.p1}`, "RAKE Agent", "Fix", "P1 · Blocking", "Approved", "Darlene", /^(now|\d+ [mhd])$/, /15 Sep/, ""]);
   await expect(overdue.getByRole("cell").nth(8)).toHaveClass(/text-destructive/);
 
   const ahead = page.getByRole("row").filter({ hasText: world.due });
@@ -658,4 +659,26 @@ test("S12.16 The Archive lists every ended item under how it ended; the Ended as
   await expect(page).not.toHaveURL(/ending=/);
   await page.getByRole("button", { name: "Filter", exact: true }).click();
   await expect(page.getByRole("menuitem", { name: "Ended as", exact: true })).toHaveCount(0);
+});
+
+test("S12.17 A Resolved card, its list row and the Archive show the priority in grey with its icon and words", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const ref = await raise(await team.as("Liam"), "The RAKE Agent print preview shows an error when I open it", IMPACT, "rake-agent");
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+  await postJson(page, `/console/items/${ref}/start`);
+  const priority = (where: Locator) => where.getByText("P2 · Major", { exact: true });
+
+  await openWork(page, "Board");
+  await expect(priority(boardCard(page, ref))).toHaveClass(/text-warning/); // still open: it keeps its colour
+  await postJson(page, `/console/items/${ref}/resolve`, { body: "Fixed: print preview opens again." });
+  await reloadWork(page);
+  await expect(priority(boardCard(page, ref))).toHaveClass(/text-muted-foreground/);
+  await expect(priority(boardCard(page, ref)).locator("svg")).toHaveCount(1);
+
+  await openWork(page, "List");
+  await expect(priority(page.getByRole("row", { name: new RegExp(ref) }))).toHaveClass(/text-muted-foreground/);
+  await postJson(page, `/console/items/${ref}/close`, { reason: "" });
+  await openWork(page, "List", "?inbox=archive");
+  await expect(priority(page.getByRole("row", { name: new RegExp(ref) }))).toHaveClass(/text-muted-foreground/);
+  await openWork(page, "Board");
 });

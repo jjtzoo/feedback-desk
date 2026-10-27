@@ -435,16 +435,22 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         for i, s in enumerate(STAGES)
     ]
 
-    # A Resolve note is written just before the status event; the two show as one entry, "Resolved"
-    # with the note under it, so the words appear once (D80).
-    resolved_at = [
-        e.created_at for e in public_events if e.event_type == "status" and e.after.get("status") == "resolved"
-    ]
+    # A Resolve note is written just before its status event, whose text quotes it; the two show as one
+    # entry, "Resolved by" with the note under it, so the words appear once (D80).
+    resolved = [e for e in public_events if e.event_type == "status" and (e.public_text or "").startswith("Resolved: ")]
     notes: dict[datetime, FeedbackMessage] = {}
     # Messages first, so an update wins a tie with the event logged in the same moment.
     history: list[TimelineEntry] = []
     for m in messages:
-        note_of = next((at for at in resolved_at if timedelta(0) <= at - m.created_at < timedelta(seconds=1)), None)
+        note_of = next(
+            (
+                e.created_at
+                for e in resolved
+                if e.public_text == f"Resolved: {m.body.strip()[:140]}"
+                and timedelta(0) <= e.created_at - m.created_at < timedelta(seconds=1)
+            ),
+            None,
+        )
         if m.message_type == "progress" and note_of is not None:
             notes[note_of] = m
         elif m.message_type == "progress":

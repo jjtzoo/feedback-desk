@@ -128,7 +128,8 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
                   <span className="min-w-0 flex-1">
                     <span className={cn("block text-sm", unreadRow && "font-semibold")}>{n.outcome ?? n.title}</span>
                     {trail.length > 1 && (
-                      <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground" aria-label={`Steps so far: ${trail.join(", then ")}`}>
+                      <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <span className="sr-only">Steps so far: {trail.join(", then ")}</span>
                         {trail.map((step, i) => (
                           <span key={`${step}-${i}`} className="inline-flex items-center gap-1" aria-hidden="true">
                             {i > 0 && <ArrowRight className="size-3" />}

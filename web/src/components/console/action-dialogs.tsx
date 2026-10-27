@@ -39,8 +39,8 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
   },
   resolve: {
     title: "Resolve",
-    description: "They see this on their tracker and by email, with It's fixed and Still happening to answer. Close as fixed once it's confirmed.",
-    field: "What was done, for the person who raised it",
+    description: "Write it for the person who raised it: they see it on their tracker and by email, with It's fixed and Still happening to answer. Close as fixed once it's confirmed.",
+    field: "What was done",
     button: "Resolve",
     required: true,
     placeholder: "Fixed: a failed submission no longer clears your form. Please try it and tell us if it still happens.",
@@ -199,7 +199,6 @@ export function ActionDialog({
                 mode="single"
                 locale={enAU}
                 selected={expectedBy ? new Date(`${expectedBy}T00:00:00`) : undefined}
-                disabled={{ before: new Date() }}
                 onSelect={(d) => {
                   setExpectedBy(d ? isoDay(d) : "");
                   setPicking(false);

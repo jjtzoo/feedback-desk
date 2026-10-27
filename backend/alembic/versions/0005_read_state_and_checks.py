@@ -11,8 +11,8 @@ Create Date: 2026-10-27 12:00:00
   the current assignee's item_reads row.
 - feedback_messages.asks_check: an update or Resolve note that asks the person who raised it to
   try it. Existing Resolve notes (the progress message written just before the status event that
-  resolved the item) are marked, because Resolved is the step that asks them to check. Other rows
-  stay false.
+  resolved the item, whose text quotes it) are marked, because Resolved is the step that asks them
+  to check. Other rows stay false.
 - notifications.step: the stage in a word or two ("Approved", "Fixed") for the item's trail in
   the bell. Existing rows are filled from their type, and stage notifications from their title.
   Rows without an item (the approvals count, digests) stay empty.
@@ -62,6 +62,7 @@ def upgrade() -> None:
             SELECT 1 FROM app.feedback_events e
             WHERE e.feedback_id = m.feedback_id AND e.event_type = 'status'
                 AND e.after ->> 'status' = 'resolved'
+                AND e.public_text = 'Resolved: ' || left(btrim(m.body), 140)
                 AND e.created_at >= m.created_at AND e.created_at < m.created_at + interval '1 second'
         )
         """

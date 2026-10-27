@@ -97,21 +97,23 @@ test("S15.02 'Reply to submitter' shows 'Reply from Darlene' on the tracker and 
   await expect(page.getByRole("dialog").getByText(`Darlene replied on ${ref}`)).toBeVisible();
 });
 
-test("S15.03 A progress update shows as 'Update: …' on the tracker", async ({ page, signIn, team }) => {
+test("S15.03 A progress update shows on the tracker as 'Update from Darlene' with its words, once", async ({ page, signIn, team }) => {
   await signIn("Tom");
   const update = "Found the cause and a fix goes out on Thursday";
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I share a saved search");
 
   const darlene = await team.as("Darlene");
   await openPanel(darlene, ref);
-  await darlene.getByRole("button", { name: "Post update", exact: true }).click();
-  const dialog = darlene.getByRole("dialog", { name: "Post a progress update" });
+  await darlene.getByRole("button", { name: /^Update [A-Z][a-z]+$/ }).click();
+  const dialog = darlene.getByRole("dialog", { name: /^Update [A-Z][a-z]+ on progress$/ });
   await dialog.getByRole("textbox", { name: "Update", exact: true }).fill(update);
-  await dialog.getByRole("button", { name: "Post update", exact: true }).click();
+  await dialog.getByRole("button", { name: "Send update", exact: true }).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
 
   await openTracker(page, ref);
-  await expect(historyOf(page).getByRole("listitem").first()).toContainText(`Update: ${update}`);
+  const entry = historyOf(page).getByRole("listitem").first();
+  await expect(entry).toContainText(`Update from Darlene${update}`);
+  await expect(entry.getByText(update, { exact: true })).toHaveCount(1);
   await expect(page.getByRole("region", { name: "Latest update" })).toContainText(update);
 });
 

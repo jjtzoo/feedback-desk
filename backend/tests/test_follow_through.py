@@ -223,3 +223,16 @@ async def test_other_fixes_wait_for_the_open_decision(
         assert list(await db.scalars(select(Notification).where(Notification.type == "fixed"))) == []
         checked = list(await db.scalars(select(FeedbackEvent).where(FeedbackEvent.event_type == "checked")))
         assert checked == []
+
+
+async def test_an_update_just_before_resolve_keeps_its_own_entry(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    ref = await started(staff, marc, darlene)
+    await darlene.post(f"/api/console/items/{ref}/update", json={"body": "Found the cause"})
+    await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fix deployed"})
+    history = (await staff.get(f"/api/feedback/{ref}/tracker")).json()["history"]
+    assert [(h["text"], h["detail"]) for h in history[:2]] == [
+        ("Resolved by Darlene", "Fix deployed"),
+        ("Update from Darlene", "Found the cause"),
+    ]
