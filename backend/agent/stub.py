@@ -8,6 +8,7 @@ scored against Gemini, not this.
 
 import re
 from collections.abc import AsyncGenerator
+from datetime import date
 from typing import Any
 
 from google.adk.models.base_llm import BaseLlm
@@ -337,6 +338,10 @@ def _next_step(contents: list[types.Content], data: dict[str, Any]) -> LlmRespon
 
 
 def _after_duplicates(candidates: list[dict[str, Any]]) -> LlmResponse:
+    fixed = next((c for c in candidates if c.get("fixed_on")), None)
+    if fixed:
+        when = date.fromisoformat(fixed["fixed_on"]).strftime("%d %b").lstrip("0")
+        return _say(f"This was fixed on {when} ({fixed['reference']}), so I'll note it may be back.\n\n{SHOW_SUMMARY}")
     if candidates:
         c = candidates[0]
         return _say(

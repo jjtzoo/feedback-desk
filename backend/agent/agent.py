@@ -33,10 +33,10 @@ def instruction(ctx: ReadonlyContext) -> str:
 
 def build_agent(choice: ModelChoice) -> LlmAgent:
     s = get_settings()
-    # Every call stays small (D36): replies are a sentence or two plus tool calls.
+    # Replies are a sentence or two plus tool calls; the cap leaves room for Gemini 3's thinking (D88).
     config = types.GenerateContentConfig(
         max_output_tokens=s.model_max_output_tokens,
-        thinking_config=types.ThinkingConfig(thinking_budget=s.model_thinking_budget),
+        thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel(s.model_thinking_level.upper())),
     )
     return LlmAgent(
         name="feedback_agent",

@@ -12,8 +12,9 @@ import math
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import or_, select
+from sqlalchemy import ColumnElement, and_, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -199,6 +200,8 @@ class Similar:
     created_at_iso: str
     status: str
     similarity: float
+    # When it was fixed (resolved, or closed as fixed), for a match that may have come back (review item 37).
+    fixed_at_iso: str | None = None
 
 
 async def find_similar(
@@ -208,16 +211,22 @@ async def find_similar(
     *,
     exclude_id: uuid.UUID | None = None,
     limit: int = 3,
+    fixed_days: int = 0,
 ) -> list[Similar]:
-    """Open items in the same project above the threshold, most similar first."""
+    """Open items in the same project above the threshold, most similar first; with `fixed_days`, also
+    items closed as fixed within that many days, so a bug that comes back is linked to its fix."""
     vector, model = await embed(text)
     distance = FeedbackEmbedding.embedding.cosine_distance(vector)
+    searched: ColumnElement[bool] = Feedback.status.in_(OPEN_STATUSES)
+    if fixed_days > 0:
+        since = datetime.now(UTC) - timedelta(days=fixed_days)
+        searched = or_(searched, and_(Feedback.ending == "fixed", Feedback.resolved_at >= since))
     query = (
         select(Feedback, distance.label("distance"))
         .join(FeedbackEmbedding, FeedbackEmbedding.feedback_id == Feedback.id)
         .where(
             Feedback.project_id == project_id,
-            Feedback.status.in_(OPEN_STATUSES),
+            searched,
             Feedback.duplicate_of.is_(None),
             FeedbackEmbedding.model == model,
         )
@@ -231,5 +240,16 @@ async def find_similar(
     for fb, dist in await db.execute(query):
         similarity = 1.0 - float(dist)
         if similarity >= cutoff:
-            out.append(Similar(fb.id, fb.ref_no, fb.title, fb.created_at.isoformat(), fb.status, round(similarity, 3)))
+            fixed = fb.resolved_at if fb.status == "resolved" or fb.ending == "fixed" else None
+            out.append(
+                Similar(
+                    fb.id,
+                    fb.ref_no,
+                    fb.title,
+                    fb.created_at.isoformat(),
+                    fb.status,
+                    round(similarity, 3),
+                    fixed.isoformat() if fixed else None,
+                )
+            )
     return out

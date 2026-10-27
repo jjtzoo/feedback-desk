@@ -99,7 +99,8 @@ async def run_turn(
     user: User, session_id: str, parts: list[types.Part], state_delta: dict[str, Any]
 ) -> AsyncIterator[str]:
     """Send one user message (text and file parts); yield each piece of text the agent says.
-    The tokens each model call reports are recorded once the turn ends, even if it is cut short (D36)."""
+    The tokens each model call reports, thinking included, are recorded once the turn ends, even if it
+    is cut short (D36, D88)."""
     message = types.Content(role="user", parts=parts)
     calls = input_tokens = output_tokens = 0
     try:
@@ -110,6 +111,11 @@ async def run_turn(
                 calls += 1
                 input_tokens += int(event.usage_metadata.prompt_token_count or 0)
                 output_tokens += int(event.usage_metadata.candidates_token_count or 0)
+                output_tokens += int(event.usage_metadata.thoughts_token_count or 0)
+            if event.error_code and not event.partial:
+                # A model call that ended without a reply (MAX_TOKENS, MODEL_RETURNED_NO_CONTENT, ...): ADK
+                # ends the turn quietly, so say why. Codes only, never what was said.
+                log.warning("model call ended without a reply session=%s reason=%s", session_id, event.error_code)
             if event.partial or not event.content or event.author == "user":
                 continue
             for part in event.content.parts or []:

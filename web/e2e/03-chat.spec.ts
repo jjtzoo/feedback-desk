@@ -275,6 +275,16 @@ test("S03.21 A question about Sig gets a short answer, with no chips and no card
   await expect(page.getByRole("region", { name: "Your feedback" })).toHaveCount(0);
 });
 
+test("S03.22 'Something else' after the impact chips puts the cursor in the message box and sends nothing", async ({ page }) => {
+  await chatSay(page, BUG);
+  const chips = page.getByRole("listitem", { name: "Quick answers" });
+  await chips.getByRole("button", { name: "Something else" }).click();
+  await expect(page.getByLabel("Your message")).toBeFocused();
+  // Nothing was sent: the only message from the person is still the bug they typed.
+  await expect(page.getByText("Something else", { exact: true })).toHaveCount(1);
+  await expect(chips).toBeVisible();
+});
+
 // D99: a new chat opens with the app cards. D95: screenshots by paste and, on phones, the camera.
 
 const cards = (page: Page) => page.getByRole("region", { name: /Which tool is it about/ });

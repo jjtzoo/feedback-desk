@@ -6,6 +6,9 @@ whatever model the settings choose, then compares the saved item with its labels
     uv run python -m evals.run_routing             # against .env's model (Gemini once the key lands)
     uv run python -m evals.run_routing --limit 5
 
+Runs in a throwaway local database of its own (pgserver, database "feedback_routing", recreated each
+run), as run_conversations does, so no eval items reach the developer's database.
+
 Gate: 85 % project, 85 % work type, 80 % assignee, and every item has a developer brief.
 With the stub model the scores only show the keyword baseline; the gate is judged on Gemini.
 """
@@ -13,6 +16,7 @@ With the stub model the scores only show the keyword baseline; the gate is judge
 import argparse
 import asyncio
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -21,10 +25,6 @@ import httpx
 import yaml
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-
-from app.db import session_scope
-from app.main import app
-from app.models import Feedback
 
 SET = Path(__file__).resolve().parent / "routing_set.yaml"
 GATE = {"project": 0.85, "work_type": 0.85, "assignee": 0.80}
@@ -84,6 +84,9 @@ async def _converse(client: httpx.AsyncClient, item: dict[str, Any]) -> str | No
 
 
 async def _saved(ref: str) -> tuple[dict[str, Any], bool]:
+    from app.db import session_scope
+    from app.models import Feedback
+
     async with session_scope() as db:
         fb = await db.scalar(
             select(Feedback)
@@ -97,6 +100,8 @@ async def _saved(ref: str) -> tuple[dict[str, Any], bool]:
 
 
 async def run(items: list[dict[str, Any]], domain: str = "redadair.example") -> Score:
+    from app.main import app
+
     score = Score()
     for n, item in enumerate(items, 1):
         score.total += 1
@@ -126,8 +131,28 @@ def report(score: Score) -> str:
     return "\n".join(lines)
 
 
-if __name__ == "__main__":
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
+
+    from scripts.local_db import start
+
+    os.environ["DATABASE_URL"] = start(database="feedback_routing", fresh=True)
+    os.environ.setdefault("APP_ENV", "local")
+    os.environ.setdefault("DEV_LOGIN", "true")
+    os.environ.setdefault("ALLOWED_DOMAINS", "redadair.com.au,redadair.example")
+    os.environ.setdefault("EMAIL_BACKEND", "off")
+
+    from alembic.config import Config
+
+    from alembic import command
+    from app.seed import run as seed
+
+    command.upgrade(Config(str(SET.parent.parent / "alembic.ini")), "head")
+    asyncio.run(seed())
     print(report(asyncio.run(run(load_items(args.limit)))))
+
+
+if __name__ == "__main__":
+    main()

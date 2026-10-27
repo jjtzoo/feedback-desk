@@ -78,8 +78,13 @@ export function historyLine(e: FeedbackEvent, projects: Project[]): string {
       return after.ask === "owner" ? "Asked the owner a question" : "Asked the person who raised it for more information";
     case "impact":
       return `Now affects ${IMPACT_LABEL[String(after.impact)] ?? "more people"} after another report`;
-    case "linked":
-      return after.merged ? `${String(after.merged)} was merged into this` : "Linked another item";
+    case "linked": {
+      if (after.merged) return `${String(after.merged)} was merged into this`;
+      // The chat matched an item fixed before (D73): the owner checks whether it has come back.
+      const fixed = after.regression_of as { reference?: string; fixed_on?: string } | undefined;
+      if (fixed?.reference) return `Possible regression of ${fixed.reference}, fixed ${fixed.fixed_on ? day(fixed.fixed_on) : "before"}`;
+      return "Linked another item";
+    }
     default:
       return e.public_text ?? "Updated it";
   }

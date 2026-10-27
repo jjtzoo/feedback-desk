@@ -221,6 +221,11 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     input.current?.focus();
   }
 
+  function pick(chip: Chip) {
+    if (chip.own_words) input.current?.focus();
+    else void send(chip.value);
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     void send(text);
@@ -397,10 +402,10 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                   {chips.some((c) => c.usual) && (
                     <div className="grid gap-1.5">
                       <p className="text-xs font-medium text-muted-foreground">Your usual tools</p>
-                      <ChipRow chips={chips.filter((c) => c.usual)} onPick={(v) => void send(v)} />
+                      <ChipRow chips={chips.filter((c) => c.usual)} onPick={pick} />
                     </div>
                   )}
-                  <ChipRow chips={chips.filter((c) => !c.usual)} onPick={(v) => void send(v)} />
+                  <ChipRow chips={chips.filter((c) => !c.usual)} onPick={pick} />
                 </li>
               )}
               {duplicates.length > 0 && !busy && (
@@ -509,11 +514,11 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   );
 }
 
-function ChipRow({ chips, onPick }: { chips: Chip[]; onPick: (value: string) => void }) {
+function ChipRow({ chips, onPick }: { chips: Chip[]; onPick: (chip: Chip) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {chips.map((c) => (
-        <button key={c.value} type="button" onClick={() => onPick(c.value)} className="min-h-11 rounded-full border px-4 text-sm font-medium hover:bg-muted">
+        <button key={c.value} type="button" onClick={() => onPick(c)} className="min-h-11 rounded-full border px-4 text-sm font-medium hover:bg-muted">
           {c.label}
         </button>
       ))}
