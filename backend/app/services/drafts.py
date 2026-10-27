@@ -178,9 +178,40 @@ CHECK_SEND_CHIPS = [
 ]
 
 
+def _is_idea(draft: Draft) -> bool:
+    return draft.get("work_type") in ("improvement", "new_feature") or draft.get("category") == "feature_request"
+
+
 def impact_chips(draft: Draft) -> list[dict[str, Any]]:
-    idea = draft.get("work_type") in ("improvement", "new_feature") or draft.get("category") == "feature_request"
-    return [*(IMPACT_IDEA if idea else IMPACT_FAULT), OWN_WORDS_CHIP]
+    return [*(IMPACT_IDEA if _is_idea(draft) else IMPACT_FAULT), OWN_WORDS_CHIP]
+
+
+# The question for a step, said for Sig when a turn signalled it but had no words even after the
+# retry (D85): the chips then sit under the question they belong to.
+def step_line(step: str | None, draft: Draft) -> str | None:
+    idea = _is_idea(draft)
+    lines = {
+        "ask_tool": "Which tool is this about?",
+        "ask_details": "What would you like it to do?" if idea else "Can you tell me a bit more about what happened?",
+        "ask_work_type": "Does this exist today but isn't working, or is it something new?",
+        "check_send": "Want me to send that to the team?",
+    }
+    if step == "ask_impact" and not draft.get("priority"):
+        return (
+            "Would it save you time every day, or is it more of a nice-to-have?"
+            if idea
+            else "Can you still work, or is it stopping you?"
+        )
+    return lines.get(step or "")
+
+
+# Sig asking which tool in words without the ask_tool step (D86): the page still offers the tool chips.
+TOOL_QUESTION = re.compile(r"\bwhich (tool|app|system|platform)\b|\bis (this|it) about\b|\bwhat (tool|app)\b", re.I)
+
+
+def project_known(draft: Draft) -> bool:
+    slug = draft.get("project_slug")
+    return bool(slug) and slug != GENERAL and float((draft.get("confidence") or {}).get("project", 1.0)) >= 0.7
 
 
 REPLIES_MAX = 3

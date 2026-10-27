@@ -588,6 +588,77 @@ COMPLETE = {
 }
 
 
+FAULT = COMPLETE | {"work_type": "fix", "category": "bug", "summary": "RAKE gives a blank answer"}
+
+
+def _model_leaves(state: dict[str, Any]) -> Any:
+    """A model turn that says nothing, even when asked to go on, and leaves `state` (27 Oct run)."""
+
+    async def turn(user: Any, session_id: str, parts: Any, delta: dict[str, Any]) -> Any:
+        await agent_runtime.update_state(user, session_id, delta | state)
+        return
+        yield  # pragma: no cover
+
+    return turn
+
+
+async def test_a_silent_turn_still_asks_the_question_its_step_signalled(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D85: answers-steps-when-asked-tool showed "lost my train of thought" with no tool chips."""
+    sid = await start_chat(staff)
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({"step": "ask_tool"}))
+    events = await say(staff, sid, "it keeps giving me grief")
+    assert texts(events) == ["Which tool is this about?"]
+    assert (first(events, "chips") or {}).get("kind") == "project"
+
+
+async def test_a_silent_turn_shows_the_card_it_edited_or_the_one_its_question_led_to(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D85: after-card-wrong-tool swapped the tool in silence; two-problems-same-tool went silent after
+    its question about the problem."""
+    sid = await start_chat(staff)
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(SHOW_SUMMARY, {"draft": FAULT, "step": "show_card"}))
+    assert first(await say(staff, sid, "RAKE gives a blank answer, every time"), "draft") is not None
+    swapped = FAULT | {"project_slug": "training-portal"}
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({"draft": swapped}))
+    events = await say(staff, sid, "sorry I meant the training portal")
+    assert texts(events) == [SHOW_SUMMARY]
+    assert (first(events, "draft") or {})["card"]["project"] == "Training Portal"
+
+    sid = await start_chat(staff)
+    question = "Which screen was it on, and does it happen every time?"
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(question, {"draft": FAULT, "step": "ask_details"}))
+    assert first(await say(staff, sid, "RAKE gives a blank answer"), "draft") is None
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({}))
+    events = await say(staff, sid, "the leave page, every time since this morning")
+    assert texts(events) == [SHOW_SUMMARY] and first(events, "draft") is not None
+
+
+async def test_the_tool_asked_in_words_without_its_step_still_gets_the_tool_chips(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D86: the page offered no chips under "Which tool is this about?" when the step was left out."""
+    sid = await start_chat(staff)
+    question = "Sorry to hear that. Which tool is this about?"
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(question, {"draft": {"category": "bug"}}))
+    assert (first(await say(staff, sid, "something keeps crashing"), "chips") or {}).get("kind") == "project"
+    # Once the tool is known, the same words offer nothing.
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(question, {"draft": FAULT}))
+    assert first(await say(staff, sid, "RAKE, I said"), "chips") is None
+
+
+async def test_words_about_the_card_show_the_card_without_its_step(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D87: one-word-bug-staff-admin said "Hit the Confirm button on the card" with no card up."""
+    sid = await start_chat(staff)
+    line = "Hit the Confirm button on the card to send it off, or let me know what to change."
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(line, {"draft": FAULT}))
+    assert first(await say(staff, sid, "leave balance wrong"), "draft") is not None
+
+
 async def test_an_answer_with_a_complete_draft_shows_no_card_without_the_card_step(
     staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -159,6 +159,14 @@ async def update_draft(
         if next_step not in NEXT_STEPS:
             errors.append(f"next_step must be one of: {', '.join(NEXT_STEPS)}.")
         else:
+            second_ask = next_step == "ask_details" and tool_context.state.get("details_asked")
+            if second_ask and not missing(draft) and "note" not in result:
+                # One answer about the problem is enough (D69, D87): the card comes now.
+                next_step = "show_card"
+                result["note"] = (
+                    "You already asked about the problem once and the draft is complete: no second "
+                    "question. Say the card line now; put whatever is still missing in open_gaps."
+                )
             # The page reads it after this turn; the API clears it before the next one.
             tool_context.state["step"] = next_step
             if next_step == "show_card" and missing(draft):

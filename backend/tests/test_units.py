@@ -278,6 +278,18 @@ async def test_editing_the_draft_clears_the_confirmation() -> None:
     assert ctx.state["draft_confirmed"] is False
 
 
+async def test_a_second_question_about_the_problem_becomes_the_card() -> None:
+    """D87: typo-go-forms-extention (27 Oct) asked what it does when it breaks twice."""
+    ctx = FakeContext(state={"draft": dict(COMPLETE), "user_text": "RAKE gives a blank answer"})
+    assert (await tools.update_draft(ctx, next_step="ask_details"))["next_step"] == "ask_details"  # type: ignore[arg-type]
+    ctx.state["details_asked"] = True
+    result = await tools.update_draft(ctx, next_step="ask_details")  # type: ignore[arg-type]
+    assert result["next_step"] == "show_card" and "card line" in result["note"]
+    # Still missing something: the question stays.
+    ctx.state["draft"] = {k: v for k, v in COMPLETE.items() if k != "priority"}
+    assert (await tools.update_draft(ctx, next_step="ask_details"))["next_step"] == "ask_details"  # type: ignore[arg-type]
+
+
 async def test_submit_tool_refuses_without_confirm_even_if_the_guard_is_skipped() -> None:
     ctx = FakeContext(
         state={"draft": dict(COMPLETE), "draft_confirmed": False, "user": {"email": "a@redadair.example", "name": "A"}}

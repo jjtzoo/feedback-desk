@@ -14,6 +14,7 @@ Messages stream back as server-sent events:
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
@@ -47,11 +48,14 @@ from app.services.drafts import (
     CHECK_SEND_CHIPS,
     CONTINUE,
     GENERAL,
+    TOOL_QUESTION,
     card,
     draft_hash,
     first_sentence,
     impact_chips,
     is_complete,
+    project_known,
+    step_line,
 )
 from app.services.privacy import mask
 from app.services.ratelimit import RateLimiter
@@ -63,6 +67,10 @@ session_limiter = RateLimiter(get_settings().chat_sessions_per_user_per_hour, 36
 SHOW_SUMMARY_LEAD = "Here's what I'll send"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
 NO_WORDS = "Sorry, I lost my train of thought there. Could you say that again?"
+# Words that point at the card ("Hit the Confirm button on the card"), said without the card step (D87).
+CARD_LINE = re.compile(
+    rf"{re.escape(SHOW_SUMMARY_LEAD)}|\bconfirm\b[^.?!\n]*\bcard\b|\bcard\b[^.?!\n]*\bconfirm\b", re.IGNORECASE
+)
 
 
 @router.post("/chat/sessions", response_model=ChatStartOut)
@@ -252,6 +260,11 @@ async def _project_chips(user: User, state: dict[str, Any]) -> list[dict[str, An
     ]
 
 
+def _asks_tool(text: str) -> bool:
+    """A question in the reply that asks which tool (D86)."""
+    return any(s.rstrip().endswith("?") and TOOL_QUESTION.search(s) for s in re.split(r"(?<=[.!?])\s+|\n", text))
+
+
 def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False, default=str)}
 
@@ -260,12 +273,14 @@ async def _stream(
     user: User, session_id: str, parts: list[types.Part], delta: dict[str, Any]
 ) -> AsyncIterator[dict[str, str]]:
     said = False
+    words = ""
     try:
         # Gemini 3.8 Flash sometimes ends a turn after a tool call with no words: ask it once to go on.
         for attempt in (parts, [types.Part(text=CONTINUE)]):
             async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
                 async for raw in runtime.run_turn(user, session_id, attempt, delta if attempt is parts else {}):
                     said = said or bool(raw.strip())
+                    words += raw
                     yield _sse("message", {"text": _without_card_fields(raw)})
             if said or (await runtime.get_state(user, session_id) or {}).get("saved"):
                 break
@@ -299,17 +314,24 @@ async def _stream(
     replies = state.get("replies") or []
     shown = draft_hash(draft) if is_complete(draft) else None
     keep = step == "show_card" or (step is None and shown is not None and state.get("card_hash") == shown)
+    if shown and not keep and step is None:
+        # Sig said the card line without the card step (D87), or said nothing after editing a card that
+        # was up or after its question about the problem (D85): the card it means shows.
+        after_question = bool(state.get("card_hash") or state.get("details_asked"))
+        keep = CARD_LINE.search(words) is not None if said else after_question
+    asked_tool = step is None and not keep and not project_known(draft) and _asks_tool(words)
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
     if not said:
-        # The model can end a turn with tool calls and no words (seen on Gemini 3.8 Flash): never an empty reply.
-        yield _sse("message", {"text": SHOW_SUMMARY if keep and shown else NO_WORDS})
+        # The model can end a turn with tool calls and no words (seen on Gemini 3.8 Flash): never an empty
+        # reply. The step it signalled still says what comes next (D85).
+        yield _sse("message", {"text": SHOW_SUMMARY if keep and shown else step_line(step, draft) or NO_WORDS})
     if keep and shown:
         async with session_scope() as db:
             slug = draft.get("project_slug")
             project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
         yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": shown})
-    elif step == "ask_tool":
+    elif step == "ask_tool" or asked_tool:
         yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
     elif step == "ask_impact" and not draft.get("priority"):
         yield _sse("chips", {"kind": "impact", "options": impact_chips(draft)})
@@ -318,8 +340,11 @@ async def _stream(
     elif step and replies:
         yield _sse("chips", {"kind": "reply", "options": [{"label": r, "value": r} for r in replies]})
     after: dict[str, Any] = {"card_hash": shown if keep else None}
-    if step and step.startswith("ask_"):
+    if (step and step.startswith("ask_")) or asked_tool:
         # Only intake questions count towards the 3 (brief §4.1.3); chat about Sig does not.
         after["questions"] = int(state.get("questions") or 0) + 1
+    if step == "ask_details":
+        # Its one question about the problem (D69): update_draft turns a second one into the card (D87).
+        after["details_asked"] = True
     await runtime.update_state(user, session_id, after)
     yield _sse("end", {})
