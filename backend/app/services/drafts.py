@@ -205,6 +205,11 @@ def step_line(step: str | None, draft: Draft) -> str | None:
     return lines.get(step or "")
 
 
+def has_report(draft: Draft) -> bool:
+    """Something of the report is saved besides the tool: a silent turn has something to go on (D88)."""
+    return any(draft.get(k) for k in ("summary", "title", *BRIEF_TEXT, *BRIEF_LISTS))
+
+
 # Sig asking which tool in words without the ask_tool step (D86): the page still offers the tool chips.
 TOOL_QUESTION = re.compile(r"\bwhich (tool|app|system|platform)\b|\bis (this|it) about\b|\bwhat (tool|app)\b", re.I)
 

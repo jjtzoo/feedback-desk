@@ -7,9 +7,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from google.adk.models.llm_response import LlmResponse
+from google.genai import types
 from sqlalchemy import select, update
 
-from agent import callbacks, model, tools
+from agent import agent, callbacks, model, tools
 from app import agent_runtime
 from app.config import get_settings
 from app.db import session_scope
@@ -313,6 +315,25 @@ def test_choosing_gemini_exports_the_key_before_the_agent_is_built(monkeypatch: 
         assert os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] == "false"
     finally:
         agent_runtime.reset()
+
+
+def test_the_model_thinks_by_level_with_room_to_reply() -> None:
+    """D88: thinking_budget 0 doesn't stop 3.8 Flash thinking, and thinking filled a 1,024 cap (MAX_TOKENS)."""
+    config = agent.build_agent(model.ModelChoice("stub", "stub", True, "")).generate_content_config
+    assert config is not None and config.thinking_config is not None
+    assert config.thinking_config.thinking_level == types.ThinkingLevel.LOW
+    assert config.thinking_config.thinking_budget is None
+    assert (config.max_output_tokens or 0) >= 8192
+
+
+def test_thinking_tokens_count_as_output() -> None:
+    """Thinking is billed as output (D88), so the per-chat cost log counts it."""
+    ctx = FakeContext()
+    usage = types.GenerateContentResponseUsageMetadata(
+        prompt_token_count=1000, candidates_token_count=40, thoughts_token_count=900
+    )
+    callbacks.after_model(ctx, LlmResponse(usage_metadata=usage))  # type: ignore[arg-type]
+    assert ctx.state["usage"] == {"calls": 1, "input_tokens": 1000, "output_tokens": 940}
 
 
 def test_a_summary_about_the_user_is_refused() -> None:

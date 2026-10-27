@@ -613,6 +613,18 @@ async def test_a_silent_turn_still_asks_the_question_its_step_signalled(
     assert (first(events, "chips") or {}).get("kind") == "project"
 
 
+async def test_a_silent_turn_with_a_report_and_no_tool_asks_for_the_tool(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D88: answers-steps-when-asked-tool went silent with no step after the person gave their steps."""
+    sid = await start_chat(staff)
+    report = {"summary": "Certificate upload does nothing", "steps": ["Click upload", "Pick the PDF"]}
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({"draft": report}))
+    events = await say(staff, sid, "I click upload, pick the pdf, then nothing happens")
+    assert texts(events) == ["Which tool is this about?"]
+    assert (first(events, "chips") or {}).get("kind") == "project"
+
+
 async def test_a_silent_turn_shows_the_card_it_edited_or_the_one_its_question_led_to(
     staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

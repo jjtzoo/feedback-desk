@@ -52,6 +52,7 @@ from app.services.drafts import (
     card,
     draft_hash,
     first_sentence,
+    has_report,
     impact_chips,
     is_complete,
     project_known,
@@ -319,6 +320,9 @@ async def _stream(
         # was up or after its question about the problem (D85): the card it means shows.
         after_question = bool(state.get("card_hash") or state.get("details_asked"))
         keep = CARD_LINE.search(words) is not None if said else after_question
+    if not said and step is None and not keep and has_report(draft) and not project_known(draft):
+        # A silent turn with a report under way and no tool yet asks for the tool (D88).
+        step = "ask_tool"
     asked_tool = step is None and not keep and not project_known(draft) and _asks_tool(words)
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})

@@ -96,3 +96,24 @@ Pass: 95.0 % project, 95.0 % work type, 97.5 % assignee, 0 incomplete briefs (ga
 ### Tool question asked twice (decided: once)
 
 answers-steps-when-asked-tool expects the tool chips twice (answers-impact-when-asked-tool did too, and passes with "once" in the final run), but the instruction says to ask the tool once only. The product owner's steer: don't ignore a non-tool answer, point the person back to the tool, and fall back to their division's usual tool. Tried: take the answer in, then ask the tool once more. answers-impact then passed, but no-tool-page-slow and no-tool-system failed (the judge's rule 1, no question asked twice, applies to them), so 81 of 89 again. Reverted. The product owner decided on 2026-10-27 to keep "ask once"; answers-steps-when-asked-tool stays as the recorded conflict with rule 1, not loosened and not a model fault. The `never_repeat: [which tool]` on answers-steps contradicted its own expected chips; it now says `what happens when you upload` (steps still may not be asked again).
+
+### Silent turns: cause and fix (D88)
+
+The two misses of the 87 run were "Sorry, I lost my train of thought": Gemini returned no words twice in a turn. A diagnostic run (12 chats, 88 model calls, every model call logged without the message text) found the cause. Every silent attempt (17 of 39) was a model call that ended `MAX_TOKENS` with no parts at all: 3.8 Flash thought for 809 to 984 tokens of the 1,024 output cap and had nothing left for the reply or the tool call. `thinking_budget` 0 does not stop 3.8 Flash thinking; Google's docs say Gemini 3 Flash can't turn thinking off and that `thinking_budget` is deprecated for Gemini 3. The retry recovered about half. The timeouts had the same cause: a call that thinks hard takes 8 to 10 s, and two or three of them passed the 20 s limit. Rate limits, lost thought signatures, malformed tool calls and safety blocks were ruled out; running 4 chats at once did not slow the calls. In some chats the model did not think at all, which is why the misses moved between runs. `thinking_level` low alone did not reduce the thinking.
+
+D88: `MODEL_THINKING_LEVEL` low in place of the budget, `MODEL_MAX_OUTPUT_TOKENS` 8,192, `AGENT_TURN_TIMEOUT_SECONDS` 60, thinking counted as output in the cost log (it was left out, so the costs above are under-counted), an empty model reply logged with its reason code, and a silent turn with a report under way and no tool yet asks the tool question. 3 new tests (136 pass).
+
+| Run (after D88) | Result | Empty model replies | Timeouts | Cost |
+| --- | --- | --- | --- | --- |
+| 1 | 83 of 89 | 0 | 1 | about A$4.46 (242 calls, thinking counted) |
+| 2 | 82 of 89 | 0 | 0 | about A$4.42 (240 calls, thinking counted) |
+
+Routing gate after D88: pass, 95.0 % project, 95.0 % work type, 97.5 % assignee, 0 incomplete briefs, the same three misses as before (the Flipbook tile 404 went to `intranet`; "How do I reset my CPD points for the new year?" saved nothing, after one timeout; the helpers platform idea was `new_feature`). Browser tests after D88: 243 passed, 1 skipped by design.
+
+No silent turns are left. The score sits where the earlier runs did (81, 81 and 87 of 89): the misses that remain are the model's choice of question, and most of them failed in earlier runs too.
+
+- answers-impact-when-asked-tool, answers-steps-when-asked-tool (both runs): they expect the tool asked twice; Sig asks it once (product owner, 27 Oct), so these are the recorded conflict.
+- real-23-goformz-slow-then-submit-fails (both runs): the card leaves out the opening "so slow".
+- pushback-i-just-told-you (both runs): asked which page and since when on turn 1; the case never allows a details question there.
+- typo-go-forms-extention (both runs): a timeout in run 1; in run 2 the impact question instead of the card.
+- vent-then-useful, impact-stated-cant-work (run 2), answers-question-with-question (run 1): tool chips under a vent, "stopping you" said in sympathy (a forbidden phrase in that case), impact chips under a reworded question.

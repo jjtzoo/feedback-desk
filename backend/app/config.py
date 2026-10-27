@@ -41,7 +41,8 @@ class Settings(BaseSettings):
     # (2.5 Flash was retired on 2026-10-20; 2.5 Flash-Lite is closed to new users.)
     model_name: str = "gemini-3.8-flash"
     embedding_model: str = "gemini-embedding-001"
-    agent_turn_timeout_seconds: float = 20.0
+    # Each model call can think for 10 to 40 s on 3.8 Flash (D88); one turn is often two calls.
+    agent_turn_timeout_seconds: float = 60.0
     google_api_key: str = ""
     google_genai_use_enterprise: bool = False
     google_genai_use_vertexai: bool = False
@@ -59,9 +60,10 @@ class Settings(BaseSettings):
     # 1.50 / 7.50 on 2027-01-01; 3.1 Flash-Lite USD 0.25 / 1.50, i.e. AUD 0.38 / 2.28). At USD 1 = AUD 1.52.
     model_price_input_aud_per_m: float = 1.14
     model_price_output_aud_per_m: float = 5.70
-    # Caps on each model call (D36): a short reply, no hidden "thinking" tokens (billed as output).
-    model_max_output_tokens: int = 1024
-    model_thinking_budget: int = 0
+    # Caps on each model call (D36, D88). Gemini 3 can't turn thinking off, and its thinking counts
+    # towards max_output_tokens (billed as output): at 1,024 a turn that thought hard came back empty.
+    model_max_output_tokens: int = 8192
+    model_thinking_level: Literal["low", "medium", "high"] = "low"
     embedding_price_aud_per_m: float = 0.23
     project_confidence_gate: float = 0.7
 
