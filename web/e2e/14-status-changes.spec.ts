@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { postJson, raiseBug } from "./helpers";
+import { moveTo, postJson, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 14: Digital Staff change an item's status from the console panel.
 // Staff raise RAKE Agent, IT Asset, Workflow Atlas, AFSS Portal and Fire Safety Blog Agent bugs (all
@@ -44,7 +44,7 @@ async function openPanel(page: Page, ref: string) {
   return panel;
 }
 
-/** A button in the panel's header (Start work, Update <name>, Resolve, Close). */
+/** A button in the panel's header, such as Update <name>; stage moves are in the Status menu (D91). */
 const headerButton = (panel: Locator, name: string) => panel.locator("header").getByRole("button", { name, exact: true });
 
 /** The panel's update button and its dialog are named for the person who raised it (D79): "Update Aisha". */
@@ -82,17 +82,17 @@ const band = (page: Page) => page.getByRole("heading", { level: 1 }).locator("..
 const history = (page: Page) => page.getByRole("region", { name: "Tracking history" });
 const bell = (page: Page) => page.getByRole("button", { name: /^Notifications/ });
 
-test("S14.01 Start work on an Approved item gives In progress in one click, the tracker updates and the submitter is notified", async ({ page, signIn, team }) => {
+test("S14.01 Status, then Start work, on an Approved item gives In progress in one click, the tracker updates and the submitter is notified", async ({ page, signIn, team }) => {
   await signIn("Liam");
   const ref = await approved(page, team, "rake-agent", "RAKE Agent weekly summary");
 
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
   await expect(panel.locator("header").getByText("Approved", { exact: true })).toBeVisible();
-  await headerButton(panel, "Start work").click();
+  await moveTo(darlene, panel, "Start work");
   await expect(panel.locator("header").getByText("In progress", { exact: true })).toBeVisible();
-  await expect(headerButton(panel, "Start work")).toHaveCount(0);
-  await expect(headerButton(panel, "Resolve")).toBeVisible();
+  // The menu now offers only the moves from In progress (D91).
+  expect(await statusMoves(darlene, panel)).toEqual(["Resolve…", "Close…"]);
 
   await openTracker(page, ref);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
@@ -202,7 +202,7 @@ test("S14.05 Resolve needs a note; with a note it becomes the tracker's last ent
 
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
-  await headerButton(panel, "Resolve").click();
+  await moveTo(darlene, panel, "Resolve…");
   const dialog = actionDialog(darlene, "Resolve");
 
   // No note: refused, and the item is still being worked on.
@@ -234,7 +234,7 @@ test("S14.06 Close asks how it ends and shows the reason on the tracker; Won't f
 
   // No longer needed, with a reason.
   const panel = await openPanel(darlene, closing);
-  await headerButton(panel, "Close").click();
+  await moveTo(darlene, panel, "Close…");
   const dialog = actionDialog(darlene, "Close");
   await dialog.getByRole("radio", { name: /No longer needed/ }).check();
   await dialog.getByLabel("Reason (shown to staff)").fill(reason);
@@ -249,7 +249,7 @@ test("S14.06 Close asks how it ends and shows the reason on the tracker; Won't f
   const liam = await team.as("Liam");
   const declining = await approved(liam, team, "it-asset", "IT Asset licence register");
   const second = await openPanel(darlene, declining);
-  await headerButton(second, "Close").click();
+  await moveTo(darlene, second, "Close…");
   const wontFix = actionDialog(darlene, "Close");
   await submit(wontFix).click();
   await expect(wontFix.getByRole("alert")).toHaveText("Choose how it ends.");
@@ -271,25 +271,37 @@ test("S14.06 Close asks how it ends and shows the reason on the tracker; Won't f
   await expect(liam.getByText("Reason: Duplicate of the register rebuild")).toBeVisible();
 });
 
-test("S14.08 On a Resolved item Close becomes 'Close as fixed': one confirm, no reason asked, and the tracker ends on Fixed", async ({ page, signIn, team }) => {
+test("S14.08 On a Resolved item Darlene's Status menu has no Close; as Chris, Close as fixed asks for a reason only the team sees, and the tracker ends on Fixed", async ({ page, signIn, team }) => {
   await signIn("Tom");
   const ref = await inProgress(page, team, "rake-agent", "RAKE Agent glossary");
   const darlene = await team.as("Darlene");
   await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Glossary entries restored" });
 
-  const panel = await openPanel(darlene, ref);
-  await expect(headerButton(panel, "Close")).toHaveCount(0);
-  await headerButton(panel, "Close as fixed").click();
-  const dialog = actionDialog(darlene, "Close as fixed");
+  // The person who raised it closes it, or the clock does (D92): the holder can only start it again.
+  const held = await openPanel(darlene, ref);
+  expect(await statusMoves(darlene, held)).toEqual(["Start work again"]);
+  const refused = await darlene.request.post(`/api/console/items/${ref}/close`, { data: { reason: "Works", ending: "fixed" } });
+  expect(refused.status()).toBe(409);
+
+  const chris = await team.as("Chris");
+  const panel = await openPanel(chris, ref);
+  await moveTo(chris, panel, "Close as fixed…");
+  const dialog = actionDialog(chris, "Close as fixed");
   await expect(dialog.getByRole("radio")).toHaveCount(0);
-  await expect(dialog.getByRole("textbox")).toHaveCount(0);
   await submit(dialog).click();
-  await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("alert")).toHaveText("Reason (only the Digital team sees it) is needed.");
+  await dialog.getByLabel("Reason (only the Digital team sees it)").fill("Tom confirmed it on the phone");
+  await submit(dialog).click();
+  await expect(chris.getByText("Saved", { exact: true })).toBeVisible();
   await expect(panel.locator("header").getByText("Fixed", { exact: true })).toBeVisible();
+  await panel.getByRole("tab", { name: "Activity" }).click();
+  await expect(panel.getByRole("region", { name: "History" })).toContainText("Chris · Closed as fixed for them: Tom confirmed it on the phone");
 
   await openTracker(page, ref);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fixed");
   await expect(page.getByText("Reason:")).toHaveCount(0);
+  await expect(page.getByText("Tom confirmed it on the phone")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Tracking history" }).getByRole("listitem").first()).toContainText("Closed as fixed by Chris");
   const last = page.getByRole("region", { name: "Progress" }).getByRole("listitem").filter({ hasText: "Fixed" });
   await expect(last).toContainText("current stage");
 });
@@ -330,7 +342,7 @@ test("S14.09 Update Liam says when to use it and picks Expected by on a calendar
   await expect(update.getByRole("checkbox", { name: /Ask them to check it/ })).toBeVisible();
   await update.getByRole("button", { name: "Cancel" }).click();
 
-  await headerButton(panel, "Resolve").click();
+  await moveTo(page, panel, "Resolve…");
   const resolve = actionDialog(page, "Resolve");
   await expect(resolve.getByRole("textbox")).toHaveAttribute("placeholder", /Please try it and tell us if it still happens/);
 });

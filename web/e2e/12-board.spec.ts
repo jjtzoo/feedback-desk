@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, pdf, postJson, raise, signOut } from "./helpers";
+import { getJson, moveTo, pdf, postJson, raise, signOut, statusMoves } from "./helpers";
 
 // Manual checklist section 12 (Digital Staff: the board): landing, columns, counts, cards, moving cards
 // with the mouse and the keyboard, saved view, inbox tabs, filters, List and Cards. The people and items
@@ -83,7 +83,8 @@ async function buildWorld(team: Team): Promise<World> {
   await postJson(darlene, `/console/items/${refs.resolved}/resolve`, { body: "Dark mode is on the list for the next release" });
   await postJson(darlene, `/console/items/${refs.closed}/start`);
   await postJson(darlene, `/console/items/${refs.closed}/resolve`, { body: "The download works again" });
-  await postJson(darlene, `/console/items/${refs.closed}/close`, { ending: "fixed" });
+  // The person who raised it confirms the fix (D92).
+  await postJson(mei, `/feedback/${refs.closed}/fixed`);
   for (const [key, expected_by] of [["p1", PAST], ["overdue2", PAST_TOO], ["progress", PAST], ["due", FAR_AHEAD]] as const) {
     await postJson(darlene, `/console/items/${refs[key]}/update`, { body: "Chasing this up", expected_by });
   }
@@ -281,8 +282,9 @@ test.describe("moving cards", () => {
     return ref;
   }
 
-  /** Drag a card onto a column with the mouse: press on it, move past the 6 px it takes to pick it up, glide over, let go. */
-  async function drag(page: Page, ref: string, to: string) {
+  /** Drag a card onto a column with the mouse: press on it, move past the 6 px it takes to pick it up, glide over, let go.
+   *  `allowed` is whether the card's moves include that column: only then does it light up (D91). */
+  async function drag(page: Page, ref: string, to: string, allowed = true) {
     const card = await boardCard(page, ref).boundingBox();
     const target = column(page, to);
     const box = await target.boundingBox();
@@ -292,8 +294,8 @@ test.describe("moving cards", () => {
     await page.mouse.down();
     await page.mouse.move(x + 12, y, { steps: 3 });
     await page.mouse.move(box.x + box.width / 2, box.y + Math.min(80, box.height / 2), { steps: 20 });
-    // The column lights up under the card: where it will land, as the person sees it.
-    await expect(target).toHaveClass(/ring-2/);
+    // The column lights up under the card where it can land; elsewhere it stays dimmed, as the person sees it.
+    await expect(target).toHaveClass(allowed ? /ring-2/ : /opacity-60/);
     await page.mouse.up();
   }
 
@@ -340,7 +342,7 @@ test.describe("moving cards", () => {
     await expect(cardIn(page, "In progress", ref)).toHaveCount(0);
   });
 
-  test("S12.07 A Resolved card has no Fixed column to drag to; Close as fixed on its panel takes it off the board into the Archive's Fixed column", async ({ page, signIn, team }) => {
+  test("S12.07 A Resolved card has no Fixed column to drag to; Chris's Close as fixed on its panel takes it off the board into the Archive's Fixed column", async ({ page, signIn, team }) => {
     const darlene = await team.as("Darlene");
     const ref = await item(team, "Tom", "RAKE Agent spell checker underlines Australian spelling", "rake-agent");
     await postJson(darlene, `/console/items/${ref}/start`);
@@ -352,17 +354,19 @@ test.describe("moving cards", () => {
     await expect(cardIn(page, "Resolved", ref)).toBeVisible();
     await expect(page.locator(`${COLUMN} h2`)).toHaveText([/^Approved \d+$/, /^In progress \d+$/, /^Resolved \d+$/]);
 
-    await page.goto(`/console?item=${ref}`);
+    // Tom confirms it, or the clock closes it; an Admin can close it for him with a reason (D92).
+    await signIn("Chris");
+    await page.goto(`/console?inbox=open&item=${ref}`);
     const panel = page.getByRole("dialog").filter({ hasText: ref });
-    await panel.locator("header").getByRole("button", { name: "Close as fixed", exact: true }).click();
+    await moveTo(page, panel, "Close as fixed…");
     const dialog = page.getByRole("dialog", { name: "Close as fixed", exact: true });
-    await expect(dialog.getByText("The work is done. The item ends as Fixed for everyone following it.")).toBeVisible();
-    await expect(dialog.getByRole("textbox")).toHaveCount(0);
+    await expect(dialog.getByText("The person who raised it usually confirms the fix, or it closes by itself if they don't answer.", { exact: false })).toBeVisible();
+    await dialog.getByLabel("Reason (only the Digital team sees it)").fill("Tom confirmed it in the team meeting");
     await dialog.locator('button[type="submit"]').click();
     await expect(dialog).toHaveCount(0);
 
     // Gone from the board; the Archive's board has it under Fixed.
-    await gotoWork(page);
+    await page.goto("/console?inbox=open");
     await expect(page.locator(CARD).filter({ hasText: new RegExp(`${ref}(?!\d)`) })).toHaveCount(0);
     await inboxTab(page, "Archive").click();
     await expect(inboxTab(page, "Archive")).toHaveAttribute("aria-selected", "true");
@@ -375,10 +379,41 @@ test.describe("moving cards", () => {
     await gotoWork(page);
     await expect(cardIn(page, "Awaiting approval", ref)).toBeVisible();
 
-    await drag(page, ref, "In progress");
-    await expect(page.getByText("Only approved items can be started. Ask an Admin to approve it first.", { exact: true })).toBeVisible();
+    // Its moves are Approve and Close (D91), so In progress doesn't light up and the drop is refused.
+    await drag(page, ref, "In progress", false);
+    await expect(page.getByText(`${ref} can't move to In progress from Awaiting approval.`, { exact: true })).toBeVisible();
     await expect(cardIn(page, "Awaiting approval", ref)).toBeVisible();
     await expect(cardIn(page, "In progress", ref)).toHaveCount(0);
+  });
+
+  test("S12.18 The row menu's Status and the board offer the panel's moves only: Darlene's Approved item gives Start work, Resolve and Close; Mario's drop on In progress is refused", async ({ page, signIn, team }) => {
+    const ref = await item(team, "Grace", "RAKE Agent glossary search ignores capital letters", "rake-agent");
+    const listMoves = async (who: Page) => {
+      await who.goto("/console?inbox=open");
+      await who.getByRole("radio", { name: "List" }).click();
+      await who.getByRole("button", { name: `Actions for ${ref}` }).click();
+      await who.getByRole("menuitem", { name: "Status" }).click();
+      const items = await who.getByRole("menu").last().getByRole("menuitem").allInnerTexts();
+      await who.keyboard.press("Escape");
+      return items.map((i) => i.trim());
+    };
+
+    // Darlene has it: the same three moves in the row menu as in the panel's Status menu.
+    await signIn("Darlene");
+    expect(await listMoves(page)).toEqual(["Start work", "Resolve…", "Close…"]);
+    await page.goto(`/console?inbox=open&item=${ref}`);
+    expect(await statusMoves(page, page.getByRole("dialog").filter({ hasText: ref }))).toEqual(["Start work", "Resolve…", "Close…"]);
+    // The other board tests expect Darlene's saved view to be Board.
+    await page.request.put("/api/console/view", { data: { view: "board" } });
+
+    // Mario doesn't hold it: Close only, and the board won't take it to In progress.
+    await signIn("Mario");
+    expect(await listMoves(page)).toEqual(["Close…"]);
+    await page.getByRole("radio", { name: "Board" }).click();
+    await expect(cardIn(page, "Approved", ref)).toBeVisible();
+    await drag(page, ref, "In progress", false);
+    await expect(page.getByText(`${ref} can't move to In progress from Approved.`, { exact: true })).toBeVisible();
+    await expect(cardIn(page, "Approved", ref)).toBeVisible();
   });
 
   test("S12.09 As Marc, dragging an Awaiting approval card to Approved approves it", async ({ page, signIn, team }) => {
@@ -677,7 +712,7 @@ test("S12.17 A Resolved card, its list row and the Archive show the priority in 
 
   await openWork(page, "List");
   await expect(priority(page.getByRole("row", { name: new RegExp(ref) }))).toHaveClass(/text-muted-foreground/);
-  await postJson(page, `/console/items/${ref}/close`, { reason: "" });
+  await postJson(await team.as("Liam"), `/feedback/${ref}/fixed`); // Liam confirms the fix (D92)
   await openWork(page, "List", "?inbox=archive");
   await expect(priority(page.getByRole("row", { name: new RegExp(ref) }))).toHaveClass(/text-muted-foreground/);
   await openWork(page, "Board");

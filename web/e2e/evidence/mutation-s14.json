@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-27T01:28:11.875Z",
-  "commit": "311667b",
+  "ran": "2026-10-27T22:53:34.760Z",
+  "commit": "2d3ada0",
   "uncommitted": true,
   "spec": "14-status-changes.spec.ts",
-  "fingerprint": "ea2c6b6a36ca9271",
+  "fingerprint": "cb194f2ccf19d14e",
   "caught": {
     "S14.01": true,
     "S14.02": true,

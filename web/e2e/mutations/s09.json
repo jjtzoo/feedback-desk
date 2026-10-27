@@ -1,7 +1,11 @@
 {
   "S09.01": ["Added. The owner has been told.", "Added. The owner has been toldx."],
   "S09.02": ["added details", "added detailsx"],
-  "S09.03": ["Reopened after you added details", "Reopened after you added detailsx"],
+  "S09.03": ["not.toContainText(\"Reopened\")", "toContainText(\"Reopened\")"],
   "S09.04": ["toHaveCount(0)", "toHaveCount(1)"],
-  "S09.05": ["Reply from the console instead.", "Reply from the console insteadx."]
+  "S09.05": ["Reply from the console instead.", "Reply from the console insteadx."],
+  "S09.07": ["toContainText(\"Liam Carter confirmed it's fixed\")", "toContainText(\"Liam Carter confirmed it's fixedx\")"],
+  "S09.08": ["toContainText(\"Reopened: Liam Carter still has an issue\")", "toContainText(\"Reopened: Liam Carter still has an issuex\")"],
+  "S09.09": ["toHaveText(\"Being worked on\")", "toHaveText(\"Resolved\")"],
+  "S09.10": ["toBeFocused();", "not.toBeFocused();"]
 }

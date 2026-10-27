@@ -1,8 +1,11 @@
 import { expect, resetDatabase, test } from "./fixtures";
-import { postJson, raiseBug } from "./helpers";
+import { getJson, postJson, raiseBug } from "./helpers";
 import type { Page } from "@playwright/test";
 
-// Manual checklist section 9: Staff: reply and reopen.
+// Manual checklist section 9: Staff: reply and reopen. A Resolved item asks the person who raised it
+// Is it fixed? (D92): Yes, close it, or I still have an issue, which is the only way it reopens.
+
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
 
 test.beforeAll(resetDatabase);
 
@@ -58,23 +61,32 @@ test("S09.02 Darlene sees New reply on the card and a bell notification that Lia
   await expect(darlene.getByText(`${ref}: Liam Carter added details`)).toBeVisible();
 });
 
-test("S09.03 On a Resolved item the helper says 'Still not right? Replying reopens it.' and a reply returns it to In progress", async ({ page, signIn, team }) => {
-  await signIn("Liam");
+/** The same, started and resolved by Darlene. */
+async function resolvedBug(liam: Page, team: { as: (first: string) => Promise<Page> }, title: string) {
+  const ref = await approvedBug(liam, await team.as("Marc"), title);
   const darlene = await team.as("Darlene");
-  const ref = await approvedBug(page, await team.as("Marc"), "RAKE Agent loses my filters");
   await postJson(darlene, `/console/items/${ref}/start`);
   await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fix deployed" });
+  return ref;
+}
+
+const question = (page: Page, name = "Is it fixed?") => page.getByRole("region", { name });
+
+test("S09.03 On a Resolved item a reply no longer reopens it: it stays Resolved and history shows 'You added details'", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await resolvedBug(page, team, "RAKE Agent loses my filters");
 
   await page.goto(`/track/${ref}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
-  await expect(page.getByText("Still not right? Replying reopens it.")).toBeVisible();
-  await reply(page, "Still blank on my phone");
+  await expect(page.getByText("Replying reopens it.")).toHaveCount(0);
+  await reply(page, "Thanks, I'll check it on my phone tonight");
 
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
-  await expect(page.getByLabel("Progress").getByRole("listitem").filter({ hasText: "In progress" })).toContainText("current stage");
+  await expect(page.getByText("Added. The owner has been told.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
   const history = await expandHistory(page);
-  await expect(history).toContainText("Reopened after you added details");
-  await expect(history).toContainText("You added details");
+  await expect(history.getByRole("listitem").first()).toContainText("You added details");
+  await expect(history).not.toContainText("Reopened");
+  await expect(question(page)).toBeVisible();
 });
 
 test("S09.04 A Closed or Declined item has no reply box", async ({ page, signIn, team }) => {
@@ -93,6 +105,87 @@ test("S09.04 A Closed or Declined item has no reply box", async ({ page, signIn,
   await page.goto(`/track/${declined}`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Declined");
   await expect(page.getByLabel("Reply or add details")).toHaveCount(0);
+});
+
+test("S09.07 Is it fixed? on a Resolved item: Yes, close it ends it as Fixed by Liam, and Darlene is told", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await resolvedBug(page, team, "RAKE Agent forgets my language");
+  await page.goto(`/track/${ref}`);
+  await expect(question(page)).toContainText(/it closes as fixed on [A-Z][a-z]{2},? \d{1,2} [A-Z][a-z]{2}/);
+  await question(page).getByRole("button", { name: "Yes, close it" }).click();
+
+  await expect(page.getByText("Closed as fixed. Thanks for letting us know.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fixed");
+  await expect(page.getByRole("region", { name: "Tracking history" }).getByRole("listitem").first()).toContainText("Liam Carter confirmed it's fixed");
+  // The question becomes Still not right?, with I still have an issue only.
+  await expect(question(page, "Still not right?").getByRole("button")).toHaveText(["I still have an issue"]);
+
+  const darlene = await team.as("Darlene");
+  await darlene.goto("/console");
+  await darlene.getByRole("button", { name: /^Notifications/ }).click();
+  await expect(darlene.getByText(`${ref}: Liam Carter confirmed it's fixed`)).toBeVisible();
+});
+
+test("S09.08 I still have an issue needs words, takes a screenshot, and sends it back to Darlene in progress; she is told", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await resolvedBug(page, team, "RAKE Agent hides my saved answers");
+  await page.goto(`/track/${ref}`);
+  await question(page).getByRole("button", { name: "I still have an issue" }).click();
+  const box = page.getByLabel("What's still wrong?");
+  await expect(box).toBeFocused();
+  await question(page).getByRole("button", { name: "Send it back" }).click();
+  await expect(question(page).getByRole("alert")).toHaveText("Say what is still wrong.");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
+
+  await box.fill("Still empty on my phone");
+  await page.locator("#still-wrong-file").setInputFiles({ name: "phone.png", mimeType: "image/png", buffer: PNG });
+  await expect(question(page)).toContainText("phone.png");
+  await question(page).getByRole("button", { name: "Send it back" }).click();
+
+  await expect(page.getByText("Thanks. It's back with the owner.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
+  await expect(question(page)).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Who has it" })).toContainText("Darlene");
+  await expect(page.getByRole("region", { name: "What you sent" })).toContainText("phone.png");
+  const history = await expandHistory(page);
+  await expect(history.getByRole("listitem").first()).toContainText("Reopened: Liam Carter still has an issue");
+  await expect(history).toContainText("Still empty on my phone");
+
+  const darlene = await team.as("Darlene");
+  await darlene.goto("/console");
+  await darlene.getByRole("button", { name: /^Notifications/ }).click();
+  // One bell row per item (D78): the screenshot came last, and Reopened is a step in its trail.
+  await expect(darlene.getByRole("link", { name: new RegExp(`${ref}: Liam Carter added a file`) })).toContainText(/Steps so far: .*Reopened/);
+});
+
+test("S09.09 After Yes, close it, I still have an issue reopens a Fixed item until the date shown", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await resolvedBug(page, team, "RAKE Agent shows last week's roster");
+  await postJson(page, `/feedback/${ref}/fixed`);
+  await page.goto(`/track/${ref}`);
+  const until = (await getJson<{ is_it_fixed: { reopen_until: string } }>(page, `/feedback/${ref}/tracker`)).is_it_fixed.reopen_until;
+  const shown = new Date(until).toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+  await expect(question(page, "Still not right?")).toContainText(`You can send it back to the team until ${shown}.`);
+  await expect(page.getByLabel("Reply or add details")).toHaveCount(0);
+
+  await question(page, "Still not right?").getByRole("button", { name: "I still have an issue" }).click();
+  await page.getByLabel("What's still wrong?").fill("It's back to last week's roster");
+  await question(page, "Still not right?").getByRole("button", { name: "Send it back" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
+  await expect(page.getByLabel("Reply or add details")).toBeVisible();
+});
+
+test("S09.10 The email's answers open the tracker ready: ?fixed=yes focuses Yes, close it and ?fixed=no opens What's still wrong?", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await resolvedBug(page, team, "RAKE Agent mixes up my shifts");
+  await page.goto(`/track/${ref}?fixed=yes`);
+  await expect(question(page).getByRole("button", { name: "Yes, close it" })).toBeFocused();
+  // Opening the link changes nothing by itself.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
+
+  await page.goto(`/track/${ref}?fixed=no`);
+  await expect(page.getByLabel("What's still wrong?")).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
 });
 
 test("S09.05 Darlene replying on Liam's tracker is refused with 'Reply from the console instead.'", async ({ page, signIn, team }) => {

@@ -90,7 +90,7 @@ The agent can also answer `general` when nothing fits; general items go to Needs
 | F10 | Backup form | 2 | If the model fails or times out, the chat falls back to a simple form so feedback is never lost. | A model outage still lets a user submit; the item lands in Needs review. |
 | F11 | Management console | 3 | Board (default), List and Cards views; inbox filters; filters and search; a detail panel with the brief, classification, duplicates, attachments, transcript and history; all actions. | Moving a card changes its stage; every manual change is in `feedback_events`; the view choice is remembered per user. |
 | F12 | Approvals | 3 | Admins approve, decline (reason required) or ask for info, from an Approvals view and an Admin-only board column. | One decision from any Admin moves the item on; nobody can start an item that isn't approved. |
-| F13 | Staff tracker | 3 | Parcel-style page: status header with Expected by, a five-stage stepper, who has it, the latest update, full history, and Reply or add details. | Staff see every public stage and update; internal notes never show; a reply on a Resolved item reopens it. Who has it shows name and role only (D75); when the owner asks them to try it, the tracker leads with It's fixed and Still happening (D80). |
+| F13 | Staff tracker | 3 | Parcel-style page: status header with Expected by, a five-stage stepper, who has it, the latest update, full history, and Reply or add details. | Staff see every public stage and update; internal notes never show; a Resolved item asks the person who raised it Is it fixed?, and only I still have an issue reopens it (D92). Who has it shows name and role only (D75); when the owner asks them to try it, the tracker leads with It's fixed and Still happening (D80). |
 | F14 | Notifications | 3 | In-app bell (live over SSE, 30-second polling fallback) plus email for the same event. Per-item mute. | Every stage change, update and reply notifies the submitter in the app and by email; notifications are kept 90 days. One bell row per item with its steps as a trail, and notifications due together go as one email (D78); each opens where the news is (D81); a fixed P1 is told to everyone who can see Triage (D84). |
 | F15 | Project channels | 3 | A private channel per project for Digital Staff, with @mentions, #FB links, pinned notes and files. | Staff never see channel content. |
 | F16 | Dashboard and daily digest | 3 (first to slip) | Open items per project, assignee and category; weekly trend; time to first response; a daily digest of stale Needs review items. | Numbers match `feedback` and `feedback_events`. |
@@ -386,6 +386,29 @@ New ──triaged──► Awaiting approval ──Admin approves──► Appro
 
 How an item ended is the `feedback.ending` column (D44): **Fixed** and **No longer needed** are status Closed; **Won't fix**, **Duplicate** and **Declined** are status Declined (D21); praise (Acknowledged) has no ending. A Resolved item closes only as Fixed, an open one only as Won't fix or No longer needed (D45).
 
+**How a Resolved item ends (D92).** Resolve asks the person who raised it **Is it fixed?** on their tracker, in the app and by email (notification type `is_it_fixed`, to them only; followers hear "is resolved"). The email carries both answers as tracker links (`?fixed=yes`, `?fixed=no`) that open the answer ready for one more click, so a mail scanner opening them changes nothing.
+
+| Who | What happens | Event (`feedback_events`, type `status`) | Tracker shows | Owner is told |
+| --- | --- | --- | --- | --- |
+| The person who raised it: **Yes, close it** (`POST /feedback/{ref}/fixed`) | Closed, Fixed | actor staff, `after.by = submitter` | Mei Lin confirmed it's fixed | Yes |
+| The same: **I still have an issue** (`POST /feedback/{ref}/still-an-issue`, words required, a screenshot through the usual upload) | Back to In progress, same owner; works while Resolved and for `REOPEN_DAYS` (14) after it closed as Fixed; after that the API refuses (409 `reopen_window`) and they raise new feedback | actor staff, `after.reopened = true` | Reopened: Mei Lin still has an issue, and their words | Yes, at the message |
+| The worker, after `RESOLVED_REMINDER_DAYS` (3) | One reminder, "Is FB-0001 fixed?", to the person who raised it; a `reminded` event (internal, System) marks it sent, so it goes once even when they have muted the item | `reminded` | nothing | No |
+| The worker, after `RESOLVED_AUTO_CLOSE_DAYS` (7) | Closed, Fixed | actor system, `after.by = system` | Closed as fixed: no reply in 7 days | Yes |
+| An Admin, Status, then Close as fixed, with a reason | Closed, Fixed; the reason stays in the console | actor admin, `after.by = admin`, `after.reason` | Closed as fixed by Chris | Yes |
+| Digital Staff | Refused: 409 `resolved_admin_only`; the Status menu doesn't offer it | | | |
+
+A plain reply on a Resolved item no longer reopens it. Days count from `resolved_at`, in calendar days; starting work again clears it, so the clock restarts at the next Resolve. D80's It's fixed and Still happening stay for an update that asks them to try a fix still In progress; a Resolve note no longer sets `asks_check`, because Resolved asks Is it fixed? instead.
+
+**Moves in the console (D91).** `web/src/lib/moves.ts` is the one list of moves from each status, for the signed-in person: the panel's **Status** button (it reads "Status: In progress" and replaces the status badge while there is a move), the board drag (only columns in the list light up; another drop is refused in plain words) and the row menu's Status submenu. Approving keeps its own Approve, Decline and Ask for info buttons in the panel; the board and the row menu offer Approve as a move.
+
+| Status | Moves offered |
+| --- | --- |
+| Needs review, Awaiting approval | Approve (Admin; board and row menu), Close… |
+| Approved | Start work (the holder, or anyone when nobody has it), Resolve… (the holder), Close… |
+| In progress | Resolve… (the holder), Close… |
+| Resolved | Start work again (the holder), Close as fixed… (Admin, with a reason) |
+| Closed, Declined, Acknowledged | none |
+
 ## Data model
 
 All tables in schema `app` (ADK sessions in schema `adk`). Ids are UUIDs; times are `timestamptz` in UTC. Keep it relational; pgvector for duplicate search, no separate vector store. Reporting is computed from `feedback` and `feedback_events`; no metrics store.
@@ -430,6 +453,8 @@ All tables in schema `app` (ADK sessions in schema `adk`). Ids are UUIDs; times 
 | Progress update | Digital Staff | Update from Darlene, with its words under it (D80) |
 | Submitter reply | Staff | You added details |
 | Resolved | Digital Staff | Resolved by Darlene, with the note under it (D80) |
+| Confirmed fixed, closed by the clock or by an Admin (D92) | Staff, System or Admin | Mei Lin confirmed it's fixed; Closed as fixed: no reply in 7 days; Closed as fixed by Chris |
+| Reopened (D92) | Staff | Reopened: Mei Lin still has an issue |
 | It's fixed or Still happening | Staff | Mario said it's fixed; Reopened: still happening (D80) |
 | Closed, merged, declined, won't fix | Digital Staff or Admin | Duplicate of FB-0138 |
 
@@ -443,7 +468,7 @@ All under `/api`; errors are `{"error": {"code", "message"}}`. Every route excep
 | Admin | CRUD on `/admin/projects`, `/admin/digital-staff`, `/admin/routing-rules` | 1 |
 | Chat | `POST /chat/sessions` (`project_slug?`, context), `POST /chat/sessions/{id}/messages` (SSE), `POST /chat/sessions/{id}/attachments`, `POST /chat/sessions/{id}/confirm` (draft hash), `POST /chat/sessions/{id}/plus-one` | 2 |
 | Backup form | `POST /feedback/fallback` | 2 |
-| Staff | `GET /my/feedback`, `GET /feedback/{ref}/tracker`, `POST /feedback/{ref}/replies` (with files), `POST /feedback/{ref}/check` (It's fixed or Still happening, D80), `GET /whats-new` | 2–4 |
+| Staff | `GET /my/feedback`, `GET /feedback/{ref}/tracker`, `POST /feedback/{ref}/replies` (with files), `POST /feedback/{ref}/check` (It's fixed or Still happening on an update, D80), `POST /feedback/{ref}/fixed` and `POST /feedback/{ref}/still-an-issue` (D92), `GET /whats-new` | 2–4 |
 | Console | `GET /console/items` (view, inbox, filters, search, page), `GET /console/counts` (one number per inbox and the Admin's approvals), `GET /console/items/{id}`, `PATCH /console/items/{id}`, `POST /console/items/{id}/{start,update,resolve,reply,note,merge}`, `POST /console/items/{id}/{assign-to-me,take-over,hand-over}` (D53), bulk hand over and close | 3 |
 | Approvals | `GET /console/approvals`, `POST /console/items/{id}/{approve,decline,ask-info}` | 3 |
 | Files | `GET /files/{id}` (signed URL, role checked) | 2 |
@@ -594,6 +619,7 @@ Built against this spec, ahead of the sprint gates; merged to `main`, nothing de
 | Deployment (S1-1, S4-2) | Written, not run: `deploy.sh`, `deploy.ps1`, Cloud Run YAML, worker job, scheduler, CI workflow. Needs Google Cloud access (asks 1, 9) and the company GitHub repository (ask 5). Agent Engine deployment still to do once access exists. |
 | Pilot and launch (S4-3, S4-4) | Not started. |
 | Browser tests | Playwright tests of the manual checklist on the stub model and a local database: 219 of 227 items have a test; on the full run of 2026-10-25, 216 pass, 2 are known bugs awaiting a product decision (S22.01 allowance meter, S22.05 limit mid-chat, D36) and 1 is skipped (S10.09, needs Docker, which this machine does not have); 214 tests are shown able to fail; 91 of them also passed 10 runs in a row on 2026-10-23; mobile (S27), dark mode (S29) and reduced motion (S30) have no test yet. Random test failures on 2026-10-25 were traced to the API committing after it replied; fixed (`Db` in `app/api/deps.py` commits before the response) and covered by a backend test. Per requirement F1 to F18: `docs/testing/feature-evidence.md`; run reports: `docs/testing/browser-tests-2026-10-22.md`, `docs/testing/browser-tests-2026-10-23.md`; bugs: `web/e2e/FINDINGS.md`. Not run on staging or against Gemini. |
+| Sprint 5A Lifecycle (D91, D92) | Built on branch `claude/lifecycle-status-menu-e47636` (cut from `feat/chris-review-plan`, with `fix/console-tracker-27oct` merged in first because D92 replaces D80's buttons on a Resolved item). One Status menu in the panel and the shared move list for the board and the row menu; Is it fixed? on the tracker and in the email; I still have an issue with a screenshot; reminder and auto-close in the worker (`app/services/lifecycle.py`); the reopen window; Admin-only close of a Resolved item with a reason. No migration: the reminder is marked by a `reminded` event. Backend tests in `tests/test_resolved_items.py`; browser tests S08.13, S09.03, S09.07 to S09.10, S12.07, S12.08, S12.18, S14.01, S14.08 and the panel tests that now use the Status menu. Settles D80's open decision 3 for Resolved items. |
 | Checks | Backend: 82 tests, Ruff, mypy strict. Web: ESLint, TypeScript, production build. Screens checked in a browser at desktop and 375 px, light and dark. |
 
 ## UI

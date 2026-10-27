@@ -19,7 +19,7 @@ export function StatusMenu({ status, moves, busy, onMove }: { status: Status; mo
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant={next ? "default" : "outline"} className="h-10 rounded-xl" disabled={busy}>
-          Status: {STATUS_LABEL[status]} <ChevronDown aria-hidden="true" />
+          Status: <span>{STATUS_LABEL[status]}</span> <ChevronDown aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52">

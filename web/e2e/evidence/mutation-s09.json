@@ -1,14 +1,18 @@
 {
-  "ran": "2026-10-26T00:24:43.529Z",
-  "commit": "8858e8f",
+  "ran": "2026-10-27T22:37:20.262Z",
+  "commit": "2d3ada0",
   "uncommitted": true,
   "spec": "09-reply-reopen.spec.ts",
-  "fingerprint": "c9d8dc038a4359bf",
+  "fingerprint": "e06f62bcc5814347",
   "caught": {
     "S09.01": true,
     "S09.02": true,
     "S09.03": true,
     "S09.04": true,
-    "S09.05": true
+    "S09.05": true,
+    "S09.07": true,
+    "S09.08": true,
+    "S09.09": true,
+    "S09.10": true
   }
 }

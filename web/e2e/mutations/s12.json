@@ -5,8 +5,8 @@
   "S12.04": ["toHaveClass(/border-primary/)", "toHaveClass(/border-primaryx/)"],
   "S12.05": ["moved to In progress`", "moved to In progressx`"],
   "S12.06": ["\"What was done is needed.\"", "\"What was done is neededx.\""],
-  "S12.07": ["name: \"Close as fixed\", exact: true", "name: \"Close as fixedx\", exact: true"],
-  "S12.08": ["\"Only approved items can be started.", "\"Only approved items can be startedx."],
+  "S12.07": [".fill(\"Tom confirmed it in the team meeting\")", ".fill(\"\")"],
+  "S12.08": ["can't move to In progress from Awaiting approval.`", "can't move to In progress from Awaiting approvalx.`"],
   "S12.09": ["approved`", "approvedx`"],
   "S12.10": ["moved to In progress`", "moved to In progressx`"],
   "S12.11": ["viewButton(page, \"List\")).toHaveAttribute(\"aria-checked\", \"true\")", "viewButton(page, \"List\")).toHaveAttribute(\"aria-checked\", \"false\")"],
@@ -15,5 +15,6 @@
   "S12.14": ["\"Expected by\", \"Actions\"]", "\"Expected byx\", \"Actions\"]"],
   "S12.15": ["toEqual(refsOf(urgent))", "toEqual(refsOf(urgent).reverse())"],
   "S12.16": ["ending=wont_fix(&|$)", "ending=wont_fixx(&|$)"],
-  "S12.17": ["toHaveClass(/text-muted-foreground/);", "toHaveClass(/text-warning/);"]
+  "S12.17": ["toHaveClass(/text-muted-foreground/);", "toHaveClass(/text-warning/);"],
+  "S12.18": ["toEqual([\"Close…\"])", "toEqual([\"Start work\", \"Close…\"])"]
 }
