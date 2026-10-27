@@ -40,7 +40,7 @@ test("S09.01 A reply on an open item toasts 'Added. The owner has been told.' an
   await expect(history.getByRole("listitem").first()).toContainText("It also fails on my phone");
 });
 
-test("S09.02 Darlene sees an unread-reply dot on the card and a bell notification that Liam added details", async ({ page, signIn, team }) => {
+test("S09.02 Darlene sees New reply on the card and a bell notification that Liam added details", async ({ page, signIn, team }) => {
   await signIn("Liam");
   const darlene = await team.as("Darlene");
   const ref = await approvedBug(page, await team.as("Marc"), "RAKE Agent prints blank pages");
@@ -48,11 +48,11 @@ test("S09.02 Darlene sees an unread-reply dot on the card and a bell notificatio
   await reply(page, "It happens every time");
   await expect(page.getByText("Added. The owner has been told.")).toBeVisible();
 
-  // The unread dot is only on the card, so the item panel stays closed. A real <button>
+  // New reply is only on the card, so the item panel stays closed. A real <button>
   // is picked because the board's drag wrapper is a second element with role "button".
   await darlene.goto("/console");
   const card = darlene.locator("button", { hasText: ref });
-  await expect(card.getByLabel("Unread reply from the submitter")).toBeVisible();
+  await expect(card.getByText("New reply", { exact: true })).toBeVisible();
 
   await darlene.getByRole("button", { name: /^Notifications/ }).click();
   await expect(darlene.getByText(`${ref}: Liam Carter added details`)).toBeVisible();

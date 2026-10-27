@@ -15,6 +15,7 @@ from app.models.enums import STAGE_OF
 from app.schemas import (
     AllowanceOut,
     AttachmentOut,
+    CheckIn,
     MuteIn,
     MyItemOut,
     ProjectOut,
@@ -93,6 +94,7 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         ],
         can_reply=v.can_reply,
         muted=v.muted,
+        check=v.check,
     )
 
 
@@ -104,6 +106,13 @@ async def tracker(ref: str, db: Db, user: CurrentUser) -> TrackerOut:
 @router.post("/feedback/{ref}/replies", response_model=TrackerOut)
 async def add_details(ref: str, body: ReplyIn, db: Db, user: CurrentUser) -> TrackerOut:
     await feedback_service.submitter_reply(db, user, ref, body.body)
+    return await _tracker(db, user, ref)
+
+
+@router.post("/feedback/{ref}/check", response_model=TrackerOut)
+async def answer_check(ref: str, body: CheckIn, db: Db, user: CurrentUser) -> TrackerOut:
+    """It's fixed or Still happening, when an update or the Resolve note asked them to check (D80)."""
+    await feedback_service.answer_check(db, user, ref, body.fixed, body.comment)
     return await _tracker(db, user, ref)
 
 
@@ -123,6 +132,7 @@ async def add_file(ref: str, db: Db, user: CurrentUser, file: UploadFile = File(
             title=f"{fb.ref_no}: {user.name} added a file",
             body=att.file_name,
             actor_email=user.email,
+            tab="files",
         )
     return AttachmentOut.model_validate(att)
 

@@ -76,14 +76,15 @@ function events(body: string): { name: string; data: Record<string, unknown> }[]
 
 /**
  * Raise feedback as the signed-in person without the screen, to set up what a test then looks at.
+ * `context` is what the page would send with the chat (device, browser, time).
  * Answers any question the stub asks until the card shows (a yes to "Want me to send that to the team?"
  * for praise and questions, D64), then confirms. Returns the reference.
  */
-export async function raise(page: Page, message: string, answers: string[] = [], project: string | null = null) {
+export async function raise(page: Page, message: string, answers: string[] = [], project: string | null = null, context: Record<string, string> = {}) {
   const api = page.request;
   // Every response is kept, so a failed setup says what the API actually sent back.
   const seen: string[] = [];
-  const opened = await api.post("/api/chat/sessions", { data: { project_slug: project, context: {} }, timeout: TIMEOUT });
+  const opened = await api.post("/api/chat/sessions", { data: { project_slug: project, context }, timeout: TIMEOUT });
   const startBody = await opened.text();
   seen.push(`start ${opened.status()} ${startBody.slice(0, 300)}`);
   const start = opened.ok() ? (JSON.parse(startBody) as { session_id?: string; mode?: string }) : {};

@@ -169,8 +169,8 @@ test("S13.03 The Brief tab shows the recommendation first, then the brief's rows
 
   const panel = await openItem(page, ref);
   await expect(panel.getByRole("tab", { name: "Brief" })).toHaveAttribute("aria-selected", "true");
-  await expect(panel.getByText("Recommendation: implement.")).toBeVisible();
-  await expect(panel.getByText("Recommendation: implement.").locator("xpath=../..")).toContainText("Raised by staff; see the brief. Effort S. Impact: one person.");
+  await expect(panel.getByText("Recommendation: Implement.")).toBeVisible();
+  await expect(panel.getByText("Recommendation: Implement.").locator("xpath=..")).toContainText("Raised by staff; see the brief. Effort: small. Affects one person.");
 
   // The rows the agent filled in for a bug, in the brief's order. Steps to reproduce, Who needs it
   // and Done when appear when the agent captured them; the stub never does, so they are not checked here.
@@ -181,7 +181,8 @@ test("S13.03 The Brief tab shows the recommendation first, then the brief's rows
   await expect(row("Actual")).toContainText("blank screen");
   await expect(row("Submitter's words")).toHaveText(new RegExp(`^“${words}\\.?”$`));
   await expect(row("Submitter's words")).toHaveClass(/italic/);
-  await expect(row("Context")).toHaveText("Laptop · Chrome 130 · 1440x900 · /reports/12 · 2026-10-22T09:00:00+10:00");
+  // The time in the app's style, in the browser's time zone (D76), never the raw string.
+  await expect(row("Context")).toHaveText(/^Laptop · Chrome 130 · 1440x900 · \/reports\/12 · [A-Z][a-z]{2},? 2[12] Oct,? \d{1,2}:00\s?[ap]m$/);
   await expect(row("Open gaps")).toContainText("Steps to reproduce");
   await expect(panel.locator('dt:text-is("Open gaps")')).toHaveClass(/text-warning/);
 
@@ -446,14 +447,15 @@ test("S13.11 Darlene opening an Awaiting approval item sees 'Waiting for an Admi
   await expect(panel.getByRole("button", { name: "Start work" })).toHaveCount(0);
 });
 
-test("S13.12 Mario opening an item Darlene has sees Take over, but no Start work, Post update or Resolve", async ({ page, signIn, team }) => {
+test("S13.12 Mario opening an item Darlene has sees Take over, but no Start work, Update or Resolve", async ({ page, signIn, team }) => {
   const ref = await raiseBug(await team.as("Liam"), "rake-agent", "RAKE Agent loses my filters when I go back");
   await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
   await signIn("Mario");
   const panel = await openItem(page, ref);
   await expect(panel.getByRole("region", { name: "Who has it" })).toContainText("Darlene");
   await expect(panel.getByRole("button", { name: "Take over", exact: true })).toBeVisible();
-  for (const name of ["Start work", "Post update", "Resolve", "Hand over to…"]) await expect(panel.getByRole("button", { name, exact: true })).toHaveCount(0);
+  for (const name of ["Start work", "Resolve", "Hand over to…"]) await expect(panel.getByRole("button", { name, exact: true })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: /^Update [A-Z][a-z]+$/ })).toHaveCount(0);
 });
 
 test("S13.13 Take over names whose it is and their latest step; Darlene is told, the tracker says Now with Mario, the submitter gets no notification", async ({ page, signIn, team }) => {
@@ -545,6 +547,64 @@ test("S13.17 An item saved with open gaps says 'Needs detail' on its card and pa
   await postJson(liam, `/feedback/${ref}/replies`, { body: "It happens after I sign out and back in" });
   await page.reload();
   await expect(card).not.toContainText("Needs detail");
+});
+
+test("S13.18 What came since you last looked shows as New reply on the list and card and New in the panel", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const liam = await team.as("Liam");
+  const ref = await raiseBug(liam, "rake-agent", "RAKE Agent crashes when I open the safety manual");
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+  await postJson(page, `/console/items/${ref}/start`); // opens it: nothing on it is new yet
+  await postJson(await team.as("Marc"), `/console/items/${ref}/note`, { body: "Please prioritise this one" });
+  await postJson(liam, `/feedback/${ref}/replies`, { body: "It crashes on the second chapter" });
+
+  await page.request.put("/api/console/view", { data: { view: "board" } });
+  await page.goto("/console");
+  await expect(page.locator('[aria-roledescription^="Draggable card"]').filter({ hasText: new RegExp(`${ref}(?!\\d)`) })).toContainText("New reply");
+  await page.request.put("/api/console/view", { data: { view: "list" } });
+  await page.goto("/console");
+  await expect(page.getByRole("row", { name: new RegExp(ref) })).toContainText("New reply");
+
+  const panel = await openItem(page, ref);
+  await openActivity(panel, "Messages");
+  for (const text of ["Please prioritise this one", "It crashes on the second chapter"]) {
+    await expect(panel.getByRole("listitem").filter({ hasText: text }).getByText("New", { exact: true })).toBeVisible();
+  }
+  await page.keyboard.press("Escape");
+  const again = await openItem(page, ref);
+  await openActivity(again, "Messages");
+  await expect(again.getByRole("listitem").filter({ hasText: "It crashes on the second chapter" })).toBeVisible();
+  await expect(again.getByText("New", { exact: true })).toHaveCount(0);
+  await page.request.put("/api/console/view", { data: { view: "board" } });
+});
+
+test("S13.19 History says Newest first and keeps the intake steps in the order they happened", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const ref = await raiseBug(await team.as("Liam"), "rake-agent", "RAKE Agent crashes when I search the forms list");
+  const panel = await openItem(page, ref);
+  await openActivity(panel, "History");
+  const history = panel.getByRole("region", { name: "History" });
+  await expect(history.getByRole("heading")).toContainText("Newest first");
+  const lines = await history.getByRole("listitem").allTextContents();
+  const oldest = lines.slice(-4);
+  for (const [i, words] of ["Assigned to Darlene by routing", "Sent for approval", "Classified: Bug", "Received via chat"].entries()) {
+    expect(oldest[i], `line ${i} of the last four`).toContain(words);
+  }
+});
+
+test("S13.20 The recommendation and the Context time are in words, never raw values", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const context = { browser: "Chrome", time: "Tue Oct 27 2026 05:25:56 GMT+0800 (Philippine Standard Time)" };
+  const ref = await raise(await team.as("Liam"), "RAKE Agent crashes when I open the incident form", ["Slowing me down", "I expected it to open but got a blank screen"], "rake-agent", context);
+  const panel = await openItem(page, ref);
+  const recommendation = panel.getByText(/^Recommendation:/).locator("..");
+  await expect(recommendation).toContainText("Recommendation: Implement.");
+  await expect(recommendation).toContainText("Affects one person.");
+  await expect(recommendation).not.toContainText("_");
+  const shown = panel.getByRole("definition").filter({ hasText: "Chrome" });
+  // The hour follows the browser's time zone; the minutes and the app's date style don't.
+  await expect(shown).toHaveText(/^Chrome · Tue,? 27 Oct,? \d{1,2}:25\s?[ap]m$/);
+  await expect(shown).not.toContainText("GMT");
 });
 
 test("S13.21 A reply to the submitter can carry an image, which shows on their tracker under From the team; a note can't", async ({ page, signIn, team }) => {

@@ -1,11 +1,11 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CircleHelp, FileText, ImagePlus, Lock, TrendingUp, Users } from "lucide-react";
+import { ArrowDown, ChevronDown, ChevronUp, CircleHelp, FileText, ImagePlus, Lock, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { FileThumbs, IMAGES, ScreenshotNote, pastedImages, preview, withinLimits } from "@/components/attach";
-import { PriorityBadge, StatusBadge } from "@/components/badges";
+import { NewMark, PriorityBadge, StatusBadge } from "@/components/badges";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
 import { RoutingLine } from "@/components/console/routing-line";
 import { useMe } from "@/components/me";
@@ -16,8 +16,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { api, errorText, type Detail, type Project, type Staff } from "@/lib/api";
-import { CATEGORIES, CATEGORY_LABEL, PRIORITIES, PRIORITY_LABEL, WORK_TYPES, WORK_TYPE_LABEL, ago, day, fileSize, when } from "@/lib/format";
+import { api, errorText, type Detail, type Message, type Project, type Staff } from "@/lib/api";
+import {
+  CATEGORIES,
+  CATEGORY_LABEL,
+  PRIORITIES,
+  PRIORITY_LABEL,
+  WORK_TYPES,
+  WORK_TYPE_LABEL,
+  ago,
+  contextText,
+  day,
+  fileSize,
+  isSettled,
+  recommendationText,
+  when,
+} from "@/lib/format";
 import { actorName, historyLine } from "@/lib/history";
 import { ownership } from "@/lib/ownership";
 import { cn } from "@/lib/utils";
@@ -32,15 +46,18 @@ const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
   ["done_when", "Done when"],
   ["submitter_quote", "Submitter's words"],
 ];
-const MESSAGE_LABEL: Record<string, string> = { chat: "Chat", reply: "Reply", note: "Internal note", progress: "Progress update", follow_up: "Follow-up" };
+const MESSAGE_LABEL: Record<string, string> = { chat: "Chat", reply: "Reply", note: "Internal note", progress: "Update", follow_up: "Follow-up" };
 
 function percent(n: number | undefined) {
   return n === undefined ? "–" : `${Math.round(n * 100)}%`;
 }
 
-/** The detail panel beside the board (brief §4.4): developer brief first, then everything else. */
+/** The detail panel beside the board (brief §4.4): developer brief first, then everything else.
+ *  A notification opens it on the tab it is about, at its message, briefly highlighted (D81). */
 export function ItemPanel({
   reference,
+  focusTab = null,
+  focusMessage = null,
   projects,
   staff,
   previous,
@@ -50,6 +67,8 @@ export function ItemPanel({
   onChanged,
 }: {
   reference: string | null;
+  focusTab?: string | null;
+  focusMessage?: string | null;
   projects: Project[];
   staff: Staff[];
   previous: string | null;
@@ -62,6 +81,10 @@ export function ItemPanel({
   const [item, setItem] = useState<Detail | null>(null);
   const [dialog, setDialog] = useState<{ kind: ActionKind; text?: string } | null>(null);
   const [composer, setComposer] = useState<"reply" | "note">("reply");
+  const [tab, setTab] = useState(focusMessage ? "activity" : (focusTab ?? "brief"));
+  const [highlight, setHighlight] = useState(focusMessage);
+  // When this person last looked before this visit; kept while the panel stays open, so acting doesn't clear New (D82).
+  const [lastRead, setLastRead] = useState<string | null | undefined>(undefined);
   const [feedFilter, setFeedFilter] = useState<"all" | "messages" | "history">("all");
   const [justSent, setJustSent] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -75,7 +98,10 @@ export function ItemPanel({
     if (!reference) return;
     api
       .get<Detail>(`/console/items/${reference}`)
-      .then(setItem)
+      .then((d) => {
+        setItem(d);
+        setLastRead((seen) => (seen === undefined ? d.last_read_at : seen));
+      })
       .catch((e: unknown) => setLoadError(errorText(e)));
   }, [reference]);
 
@@ -99,7 +125,7 @@ export function ItemPanel({
 
   async function onDialog(kind: ActionKind, r: ActionResult): Promise<boolean> {
     const call: Record<ActionKind, [string, unknown]> = {
-      update: ["update", { body: r.text, expected_by: r.expectedBy ?? null }],
+      update: ["update", { body: r.text, expected_by: r.expectedBy ?? null, asks_check: r.asksCheck ?? false }],
       resolve: ["resolve", { body: r.text }],
       fix: ["close", { ending: "fixed" }],
       close: ["close", { reason: r.text, ending: r.ending }],
@@ -151,12 +177,23 @@ export function ItemPanel({
     return () => clearTimeout(timer);
   }, [justSent, item]);
 
+  // The message a notification pointed at comes into view and stays marked for a moment (D81).
+  useEffect(() => {
+    if (!highlight || !item) return;
+    document.getElementById(`msg-${highlight}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const timer = setTimeout(() => setHighlight(null), 2500);
+    return () => clearTimeout(timer);
+  }, [highlight, item]);
+
   const chat = item?.messages.filter((m) => m.message_type === "chat") ?? [];
   const talk = item?.messages.filter((m) => m.message_type !== "chat") ?? [];
   const awaiting = item && (item.status === "awaiting_approval" || item.status === "needs_review");
   const open = item && !["declined", "closed", "acknowledged"].includes(item.status);
   const changeField = (field: string, value: string | null) => void act("", { [field]: value }, "patch");
   const can = item ? ownership(item, me, staff) : null;
+  // Someone else's words since you last looked; on an item you never opened, only when it's yours (D82).
+  const isNew = (m: Message) => m.author_name !== me.name && (lastRead ? m.created_at > lastRead : lastRead === null && Boolean(can?.holder));
+  const firstName = item?.submitter_name.split(" ")[0] ?? "";
   // The Take over dialog says whose it is and what they last did, so nobody grabs work that is moving (D53).
   const holder = item?.assignee?.name;
   const takeOverText = !item
@@ -197,7 +234,7 @@ export function ItemPanel({
             <header className="sticky top-0 z-10 border-b bg-card px-5 pt-5 pb-4">
               <div className="flex flex-wrap items-center gap-1.5 pr-8">
                 <span className="font-mono text-sm font-semibold">{item.reference}</span>
-                <PriorityBadge showCode priority={item.priority} />
+                <PriorityBadge showCode quiet={isSettled(item.status)} priority={item.priority} />
                 <StatusBadge status={item.status} ending={item.ending} />
                 {item.reporters > 1 && (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
@@ -254,7 +291,7 @@ export function ItemPanel({
                 )}
                 {open && !awaiting && can?.holder && (
                   <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "update" })}>
-                    Post update
+                    Update {firstName}
                   </Button>
                 )}
                 {open && can?.canAssignToMe && item.status !== "approved" && (
@@ -305,7 +342,7 @@ export function ItemPanel({
                 </div>
               </aside>
 
-              <Tabs defaultValue="brief" className="min-w-0">
+              <Tabs value={tab} onValueChange={setTab} className="min-w-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="brief">Brief</TabsTrigger>
                   <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -339,10 +376,8 @@ export function ItemPanel({
                 )}
                 {item.ai_recommendation?.decision && (
                   <p className="rounded-2xl bg-muted p-3 text-sm">
-                                        <span>
-                      <strong>Recommendation: {item.ai_recommendation.decision.replace("_", " ")}.</strong> {item.ai_recommendation.reason}
-                      {item.effort && ` Effort ${item.effort}.`} {item.impact && `Impact: ${item.impact.replace("_", " ")}.`}
-                    </span>
+                    <strong>Recommendation: {recommendationText(item.ai_recommendation, item.effort, item.impact).head}.</strong>{" "}
+                    {recommendationText(item.ai_recommendation, item.effort, item.impact).rest}
                   </p>
                 )}
                 <dl className="grid gap-x-4 gap-y-3 text-sm sm:grid-cols-[10rem_1fr]">
@@ -369,12 +404,7 @@ export function ItemPanel({
                     );
                   })}
                   <dt className="font-medium text-muted-foreground">Context</dt>
-                  <dd className="text-muted-foreground">
-                    {["device", "browser", "screen", "source", "time"]
-                      .map((k) => item.context[k])
-                      .filter(Boolean)
-                      .join(" · ") || "Not captured"}
-                  </dd>
+                  <dd className="text-muted-foreground">{contextText(item.context) || "Not captured"}</dd>
                   {item.dev_brief.open_gaps && item.dev_brief.open_gaps.length > 0 && (
                     <>
                       <dt className="font-medium text-warning">Open gaps</dt>
@@ -432,18 +462,20 @@ export function ItemPanel({
                           {talk.map((m, i) => (
                             <li
                               key={m.id}
-                              id={justSent && i === talk.length - 1 ? "sent-just-now" : undefined}
+                              id={justSent && i === talk.length - 1 ? "sent-just-now" : `msg-${m.id}`}
                               className={cn(
                                 "rounded-2xl border p-3 text-sm transition-shadow",
                                 m.is_internal && "border-dashed border-warning/60 bg-warning-tint",
                                 !m.is_internal && m.author_type === "staff" && "bg-muted/50",
-                                justSent && i === talk.length - 1 && "ring-2 ring-ring",
+                                ((justSent && i === talk.length - 1) || highlight === m.id) && "ring-2 ring-ring",
                               )}
                             >
                               <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                {isNew(m) && <NewMark />}
                                 <span className="font-semibold text-foreground">{m.author_type === "system" ? "System" : (m.author_name ?? "Someone")}</span>
                                 {m.is_internal && <Lock className="size-3" aria-hidden="true" />}
-                                {MESSAGE_LABEL[m.message_type]} · {when(m.created_at)}
+                                {MESSAGE_LABEL[m.message_type]}
+                                {m.asks_check && " · asked them to check"} · {when(m.created_at)}
                                 {justSent && i === talk.length - 1 && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">Sent just now</span>}
                               </p>
                               <p className="whitespace-pre-wrap">{m.body}</p>
@@ -519,21 +551,25 @@ export function ItemPanel({
 
                   {feedFilter !== "messages" && (
                     <section aria-label="History" className="grid gap-2">
-                      <h3 className="text-sm font-semibold">History</h3>
+                      <h3 className="flex items-baseline gap-2 text-sm font-semibold">
+                        History
+                        <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                          <ArrowDown className="size-3" aria-hidden="true" /> Newest first
+                        </span>
+                      </h3>
+                      {/* In the API's order: newest first, steps written together in the order they happened (D77). */}
                       <ol className="grid gap-2">
-                        {[...item.events]
-                          .sort((x, y) => x.created_at.localeCompare(y.created_at))
-                          .map((e, i) => (
-                            <li key={`${e.created_at}-${i}`} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
-                              <span>
-                                <span className="font-medium">{actorName(e)}</span> · {historyLine(e, projects)}
-                                {!e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
-                              </span>
-                              <time className="font-mono text-xs text-muted-foreground" dateTime={e.created_at}>
-                                {when(e.created_at)}
-                              </time>
-                            </li>
-                          ))}
+                        {item.events.map((e) => (
+                          <li key={e.id} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
+                            <span>
+                              <span className="font-medium">{actorName(e)}</span> · {historyLine(e, projects)}
+                              {!e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
+                            </span>
+                            <time className="font-mono text-xs text-muted-foreground" dateTime={e.created_at}>
+                              {when(e.created_at)}
+                            </time>
+                          </li>
+                        ))}
                       </ol>
                     </section>
                   )}
@@ -559,7 +595,7 @@ export function ItemPanel({
               key={`${dialog?.kind}-${dialog?.text}`}
               kind={dialog?.kind ?? null}
               initialText={dialog?.text}
-              title={dialog?.kind === "take_over" ? `Take ${item.reference} over from ${holder}?` : undefined}
+              title={dialog?.kind === "take_over" ? `Take ${item.reference} over from ${holder}?` : dialog?.kind === "update" ? `Update ${firstName} on progress` : undefined}
               description={dialog?.kind === "take_over" ? `${takeOverText} They are told in the app and by email; the stage, Expected by date and updates stay as they are.` : undefined}
               people={staff.filter((s) => s.active && s.id !== item.assignee?.id)}
               onClose={() => setDialog(null)}

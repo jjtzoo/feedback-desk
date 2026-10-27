@@ -97,7 +97,7 @@ test("S18.01 Approvals lists waiting items P1 first with a red outline, each wit
   // Who has it, and why routing chose them (D56).
   await expect(card).toContainText("Auto-assigned to Marc · owner of Training Portal");
   await expect(card.locator("p").filter({ hasText: title }).first()).toBeVisible();
-  await expect(card).toContainText("implement: Raised by staff; see the brief. Effort S, impact one person.");
+  await expect(card).toContainText("Implement: Raised by staff; see the brief. Effort: small. Affects one person.");
   for (const name of ["Approve", "Decline", "Ask for info"]) await expect(card.getByRole("button", { name, exact: true })).toBeVisible();
 });
 
@@ -213,7 +213,7 @@ test("S18.06 The person who raised it gets a bell notification with the question
   await expect(notice).toContainText(question.slice(0, 30));
 
   await notice.click();
-  await expect(aisha).toHaveURL(new RegExp(`/track/${ref}$`));
+  await expect(aisha).toHaveURL(new RegExp(`/track/${ref}#latest$`)); // at Latest update (D81)
   const latest = aisha.getByRole("region", { name: "Latest update" });
   await expect(latest).toContainText(question);
   await expect(latest).toContainText("Chris");

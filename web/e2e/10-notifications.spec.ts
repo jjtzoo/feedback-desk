@@ -16,6 +16,8 @@ const clearBell = (page: Page) => postJson(page, "/notifications/read");
 
 /** The bell's row for an item, found by the words in its title. */
 const row = (page: Page, text: RegExp) => page.getByRole("link", { name: text });
+/** The same, only inside the open bell, for pages that also link to the item (My feedback). */
+const bellRow = (page: Page, text: RegExp) => page.locator("[data-slot=popover-content]").getByRole("link", { name: text });
 
 test("S10.01 A bell in the staff header and the console header, with an unread count", async ({ page, signIn, team }) => {
   await signIn("Liam");
@@ -136,8 +138,11 @@ test("S10.06 Approve, start, update, reply, resolve and close each notify the pe
   await page.goto("/my");
   await expect(bell(page)).toHaveAccessibleName("Notifications, 6 unread");
   await openBell(page);
-  const titles = [`${ref} is planned`, `${ref} is being worked on`, `Update on ${ref}`, `replied on ${ref}`, `${ref} is resolved`, `${ref} is fixed`];
-  for (const title of titles) await expect(row(page, new RegExp(title)), title).toBeVisible();
+  // One row for the item (D78): the latest on top and every step under it.
+  const item = bellRow(page, new RegExp(ref));
+  await expect(item).toHaveCount(1);
+  await expect(item).toContainText(`${ref} is fixed`);
+  await expect(item).toContainText("Steps so far: Planned, then In progress, then Update, then Reply, then Resolved, then Fixed");
 });
 
 test("S10.07 A new item notifies the owner on assignment and again when the submitter replies", async ({ page, signIn, team }) => {
@@ -154,8 +159,10 @@ test("S10.07 A new item notifies the owner on assignment and again when the subm
   await darlene.goto("/console");
   await expect(bell(darlene)).toHaveAccessibleName("Notifications, 2 unread");
   await openBell(darlene);
-  await expect(row(darlene, new RegExp(`New feedback assigned to you: ${ref}`))).toBeVisible();
-  await expect(row(darlene, new RegExp(`${ref}: Liam Carter added details`))).toBeVisible();
+  // One row for the item (D78): the reply on top, the assignment before it.
+  const item = row(darlene, new RegExp(`${ref}: Liam Carter added details`));
+  await expect(item).toBeVisible();
+  await expect(item).toContainText("Steps so far: Assigned, then Reply");
 });
 
 test("S10.08 Mute stops notifications for the item and Unmute brings them back", async ({ page, signIn, team }) => {
@@ -222,7 +229,9 @@ test("S10.11 Each notification's badge shows the item's stage now, for the owner
   const darlene = await team.as("Darlene");
   await darlene.goto("/console");
   await openBell(darlene);
-  const assigned = row(darlene, new RegExp(`New feedback assigned to you: ${ref}`));
+  // The item's one row (D78): "assigned to you" now, "ready to start" once approved.
+  const assigned = row(darlene, new RegExp(ref));
+  await expect(assigned).toContainText("New feedback assigned to you");
   await expect(assigned).toContainText("Awaiting approval");
 
   await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
@@ -234,7 +243,8 @@ test("S10.11 Each notification's badge shows the item's stage now, for the owner
   await page.goto("/my");
   await openBell(page);
   // Liam's "is planned" was sent at stage 2; it now says where the item is.
-  const planned = row(page, new RegExp(`${ref} is planned`));
+  const planned = bellRow(page, new RegExp(ref));
+  await expect(planned).toContainText("Planned, then In progress");
   await expect(planned).toContainText("In progress");
 });
 
@@ -264,4 +274,78 @@ test("S10.12 Each Admin has one standing 'N items waiting for your approval' row
   await openBell(page);
   await expect(row(page, /items? waiting for your approval/)).toHaveCount(0);
   await expect(approvals).toHaveAccessibleName("Approvals");
+});
+
+test("S10.13 One bell row per item: the latest step on top, the steps so far under it, read together", async ({ page, signIn, team }) => {
+  // Marc owns Training Portal and is an Admin: a P1 there is assigned to him and needs approval.
+  await signIn("Marc");
+  await clearBell(page);
+  const title = "Training Portal blocks me from opening my course";
+  const ref = await raise(await team.as("Liam"), title, ["Blocking my work", "I expected the course to open but got an error"], "training-portal");
+  await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
+
+  await page.goto("/console");
+  await openBell(page);
+  const rows = page.getByRole("link", { name: new RegExp(ref) });
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText(`Approved, ready to start: ${ref}`);
+  await expect(rows).toContainText("Steps so far: Assigned, then Needs approval, then Approved");
+  await expect(rows).toHaveAccessibleName(/Unread/);
+
+  await rows.click();
+  await expect(page).toHaveURL(new RegExp(`item=${ref}`));
+  await expect(page.getByRole("dialog", { name: title })).toBeVisible();
+  await page.keyboard.press("Escape"); // the panel covers the header while it is open
+  await openBell(page);
+  await expect(page.getByRole("link", { name: new RegExp(ref) })).not.toHaveAccessibleName(/Unread/);
+});
+
+test("S10.14 A notification opens where the news is: the reply in the panel, the tracker at Latest update", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const liam = await team.as("Liam");
+  const ref = await raiseBug(liam, "rake-agent", "RAKE Agent crashes when I open the leave policy");
+  await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
+  await postJson(page, `/console/items/${ref}/start`);
+  const reply = "Tested again this morning, it still crashes on the second page.";
+  await postJson(liam, `/feedback/${ref}/replies`, { body: reply });
+
+  await page.goto("/console");
+  await openBell(page);
+  await row(page, new RegExp(`${ref}: Liam Carter added details`)).click();
+  await expect(page).toHaveURL(/tab=activity&msg=/);
+  const panel = page.getByRole("dialog");
+  await expect(panel.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
+  const message = panel.locator("li[id^='msg-']").filter({ hasText: reply });
+  // The ring fades after 2.5 s (D81), so it is checked before the wait for the scroll to settle.
+  await expect(message).toHaveClass(/ring-2/);
+  await expect(message).toBeInViewport();
+
+  await postJson(page, `/console/items/${ref}/update`, { body: "Found it: the second page loads the wrong policy." });
+  await liam.goto("/my");
+  await openBell(liam);
+  await row(liam, new RegExp(`Update on ${ref}`)).click();
+  await expect(liam).toHaveURL(new RegExp(`/track/${ref}#latest$`));
+  await expect(liam.getByRole("region", { name: "Latest update" })).toBeInViewport();
+});
+
+test("S10.15 A fixed P1 is told to every Admin and the triage lead; a P2 is not", async ({ page, signIn, team }) => {
+  await signIn("Chris");
+  const liam = await team.as("Liam");
+  const darlene = await team.as("Darlene");
+  const marc = await team.as("Marc");
+  const p1 = await raise(liam, "RAKE Agent gives a blank answer when I ask about my roster.", ["It's blocking my work", "I expected an answer about my roster, but got an empty box"], "rake-agent");
+  const p2 = await raiseBug(liam, "rake-agent", "RAKE Agent is slow to answer about my roster");
+  for (const ref of [p1, p2]) {
+    await postJson(marc, `/console/items/${ref}/approve`);
+    await postJson(darlene, `/console/items/${ref}/start`);
+    await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fixed: answers about rosters work again." });
+    await postJson(darlene, `/console/items/${ref}/close`, { reason: "" });
+  }
+
+  await page.goto("/console");
+  await openBell(page);
+  const fixed = page.getByRole("link", { name: new RegExp(`Fixed: ${p1}`) });
+  await expect(fixed).toBeVisible();
+  await expect(fixed).toContainText(/Steps so far: .*then Resolved, then Fixed/);
+  await expect(page.getByRole("link", { name: new RegExp(p2) })).toHaveCount(0);
 });

@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorText, type Detail } from "@/lib/api";
-import { WORK_TYPE_LABEL, age } from "@/lib/format";
+import { WORK_TYPE_LABEL, age, recommendationText } from "@/lib/format";
 
 /** Approvals queue for Admins (brief §4.5): P1 first, a recommendation on every item, one decision is enough. */
 export default function ApprovalsPage() {
@@ -111,8 +111,7 @@ export default function ApprovalsPage() {
           {i.dev_brief.problem && <p className="mt-3">{i.dev_brief.problem}</p>}
           {i.ai_recommendation?.decision && (
             <p className="mt-3 rounded-2xl bg-muted p-3 text-sm">
-              <strong>{i.ai_recommendation.decision.replace("_", " ")}</strong>: {i.ai_recommendation.reason} Effort {i.effort ?? "?"}, impact{" "}
-              {(i.impact ?? "unknown").replace("_", " ")}.
+              <strong>{recommendationText(i.ai_recommendation, i.effort, i.impact).head}:</strong> {recommendationText(i.ai_recommendation, i.effort, i.impact).rest}
             </p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">

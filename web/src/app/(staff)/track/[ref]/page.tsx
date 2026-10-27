@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BellOff, Check, Loader2, Mail, Paperclip, Send } from "lucide-react";
+import { Bell, BellOff, Check, Loader2, Paperclip, Send } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError, errorText, type Attachment, type Tracker, type TrackerFile } from "@/lib/api";
-import { day, initials, when } from "@/lib/format";
+import { day, initials, isSettled, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const PREVIEW_ENTRIES = 4;
@@ -28,7 +28,9 @@ function shownFiles(files: TrackerFile[]): Shown[] {
 }
 
 /** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, who has it,
- *  the latest update, and the full history newest first. */
+ *  the latest update, and the full history newest first. When the owner asks them to try it,
+ *  that comes first with It's fixed and Still happening (D80). A notification about news opens
+ *  it at #latest (D81). */
 export default function TrackerPage() {
   const { ref } = useParams<{ ref: string }>();
   const [t, setT] = useState<Tracker | null>(null);
@@ -38,6 +40,11 @@ export default function TrackerPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [muteError, setMuteError] = useState<string | null>(null);
+  const [comment, setComment] = useState("");
+  const [answering, setAnswering] = useState<"fixed" | "still" | null>(null);
+  const [answerError, setAnswerError] = useState<string | null>(null);
+  // Only the skeleton renders before the item loads, so reading the address here can't upset hydration.
+  const [pointed, setPointed] = useState(() => typeof window !== "undefined" && window.location.hash === "#latest");
   // Files to send with the reply, each with a local preview if it's an image.
   const [adding, setAdding] = useState<{ file: File; src: string | null }[]>([]);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -65,6 +72,29 @@ export default function TrackerPage() {
     const gone = adding[Number(key)];
     if (gone?.src) URL.revokeObjectURL(gone.src);
     setAdding((a) => a.filter((_, i) => String(i) !== key));
+  }
+
+  // Opened from a notification about news: bring Latest update into view once it has loaded, marked for a moment.
+  const loaded = t !== null;
+  useEffect(() => {
+    if (!loaded || window.location.hash !== "#latest") return;
+    document.getElementById("latest")?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const timer = setTimeout(() => setPointed(false), 2500);
+    return () => clearTimeout(timer);
+  }, [loaded]);
+
+  async function answer(fixed: boolean) {
+    setAnswering(fixed ? "fixed" : "still");
+    setAnswerError(null);
+    try {
+      setT(await api.post<Tracker>(`/feedback/${ref}/check`, { fixed, comment }));
+      setComment("");
+      toast.success(fixed ? "Thanks. The owner has been told it's fixed." : "Thanks. It's back with the owner.");
+    } catch (err) {
+      setAnswerError(errorText(err, "We couldn't send that. Please try again."));
+    } finally {
+      setAnswering(null);
+    }
   }
 
   async function sendReply(e: FormEvent) {
@@ -231,11 +261,6 @@ export default function TrackerPage() {
                     <p className="font-semibold">{t.assignee.name}</p>
                     <p className="truncate text-sm text-muted-foreground">{t.assignee.role}</p>
                   </div>
-                  <Button asChild variant="outline" size="icon-lg" className="size-11 rounded-full">
-                    <a href={`mailto:${t.assignee.email}?subject=${encodeURIComponent(t.reference)}`} aria-label={`Email ${t.assignee.name}`}>
-                      <Mail className="size-5" />
-                    </a>
-                  </Button>
                 </div>
               ) : (
                 <p className="mt-3 text-sm text-muted-foreground">The Digital team is checking who it belongs to.</p>
@@ -248,7 +273,7 @@ export default function TrackerPage() {
               </h2>
               <p className="mt-2 font-semibold">{t.title}</p>
               {t.summary !== t.title && <p className="mt-1 text-sm text-muted-foreground">{t.summary}</p>}
-              <PriorityBadge priority={t.priority} className="mt-3 flex w-fit" />
+              <PriorityBadge priority={t.priority} quiet={isSettled(t.status)} className="mt-3 flex w-fit" />
               <FileThumbs files={sentFiles} className="mt-4" />
             </section>
 
@@ -264,9 +289,36 @@ export default function TrackerPage() {
           </div>
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
-            {t.latest_update && (
-              <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="latest">
-                <h2 id="latest" className="text-sm font-semibold text-muted-foreground">
+            {t.check && (
+              <section id="latest" className={cn("rounded-3xl border-2 border-foreground bg-card p-5 shadow-card transition-shadow", pointed && "ring-2 ring-ring")} aria-labelledby="check">
+                <h2 id="check" className="font-semibold">
+                  {t.check.by ?? "The team"} asked you to check this
+                </h2>
+                <p className="mt-2 whitespace-pre-wrap">{t.check.body}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{when(t.check.at)}</p>
+                <label htmlFor="check-comment" className="mt-4 block text-sm font-medium">
+                  Comment (optional)
+                </label>
+                <Textarea id="check-comment" rows={2} value={comment} maxLength={4000} onChange={(e) => setComment(e.target.value)} className="mt-1 rounded-xl text-base" />
+                {answerError && (
+                  <p className="mt-2 text-sm text-destructive" role="alert">
+                    {answerError}
+                  </p>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button className="h-11 rounded-xl px-5" disabled={answering !== null} onClick={() => void answer(true)}>
+                    {answering === "fixed" ? <Loader2 className="animate-spin" /> : <Check />} It&apos;s fixed
+                  </Button>
+                  <Button variant="outline" className="h-11 rounded-xl px-5" disabled={answering !== null} onClick={() => void answer(false)}>
+                    {answering === "still" && <Loader2 className="animate-spin" />} Still happening
+                  </Button>
+                </div>
+              </section>
+            )}
+
+            {t.latest_update && t.latest_update.at !== t.check?.at && (
+              <section id={t.check ? undefined : "latest"} className={cn("rounded-3xl border bg-card p-5 shadow-card transition-shadow", pointed && !t.check && "ring-2 ring-ring")} aria-labelledby="latest-heading">
+                <h2 id="latest-heading" className="text-sm font-semibold text-muted-foreground">
                   Latest update
                 </h2>
                 <p className="mt-2 whitespace-pre-wrap">{t.latest_update.body}</p>

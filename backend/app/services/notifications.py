@@ -8,6 +8,10 @@ after masking so a card number split at the cut cannot slip through.
 A notification that asks for an action settles once anyone takes it: it turns read for everyone
 who got it and says what happened instead (D54). Each Admin has one standing "N items waiting
 for your approval" row, updated in place and gone at zero (D55).
+
+Each row about an item carries its step in a word or two ("Approved", "Fixed"): the bell shows
+one row per item with the steps as a trail (D78). Links open the item where the news is: the
+console panel on the message, the tracker at its Latest update (D81).
 """
 
 import uuid
@@ -35,14 +39,34 @@ ASKS = DECIDE + START + ANSWER
 # The standing approvals count (bell only) and the daily approvals email (email only, D55).
 APPROVALS_WAITING = "approvals_waiting"
 EMAIL_ONLY = ("approvals_summary",)
+# The step each kind of notification stands for; stage notifications name their own (D78).
+STEPS = {
+    "assigned": "Assigned",
+    "approval_p1": "Needs approval",
+    "flagged": "Flagged",
+    "approved": "Approved",
+    "ask_info": "Question",
+    "praise": "Thanks",
+    "plus_one": "Reported again",
+    "submitter_reply": "Reply",
+    "taken_over": "Taken over",
+    "handed_over": "Handed over",
+    "progress": "Update",
+    "reply": "Reply",
+    "mention": "Mention",
+}
 
 
-def tracker_link(fb: Feedback) -> str:
-    return f"/track/{fb.ref_no}"
+def tracker_link(fb: Feedback, latest: bool = False) -> str:
+    """The staff tracker; at its Latest update when that is the news."""
+    return f"/track/{fb.ref_no}" + ("#latest" if latest else "")
 
 
-def console_link(fb: Feedback) -> str:
-    return f"/console?item={fb.ref_no}"
+def console_link(fb: Feedback, message_id: uuid.UUID | None = None, tab: str | None = None) -> str:
+    """The item's panel; on its Activity tab at one message when the news is a message."""
+    if message_id:
+        return f"/console?item={fb.ref_no}&tab=activity&msg={message_id}"
+    return f"/console?item={fb.ref_no}" + (f"&tab={tab}" if tab else "")
 
 
 async def notify(
@@ -55,6 +79,7 @@ async def notify(
     body: str = "",
     feedback_id: uuid.UUID | None = None,
     actor_email: str | None = None,
+    step: str | None = None,
 ) -> int:
     emails = {e.lower() for e in recipients if e} - {(actor_email or "").lower()}
     if feedback_id is not None and emails:
@@ -78,6 +103,7 @@ async def notify(
                 body=body,
                 link=link,
                 email_status=email_status,
+                step=step or (STEPS.get(type) if feedback_id else None),
             )
         )
     return len(emails)
@@ -90,22 +116,41 @@ async def submitters(db: AsyncSession, fb: Feedback) -> list[str]:
 
 
 async def notify_submitters(
-    db: AsyncSession, fb: Feedback, *, type: str, title: str, body: str = "", actor_email: str | None = None
+    db: AsyncSession,
+    fb: Feedback,
+    *,
+    type: str,
+    title: str,
+    body: str = "",
+    actor_email: str | None = None,
+    step: str | None = None,
+    latest: bool = False,
 ) -> int:
+    """Everyone who raised it, merged duplicates included: merging makes their people followers."""
     return await notify(
         db,
         await submitters(db, fb),
         type=type,
         title=title,
         body=body,
-        link=tracker_link(fb),
+        link=tracker_link(fb, latest),
         feedback_id=fb.id,
         actor_email=actor_email,
+        step=step,
     )
 
 
 async def notify_assignee(
-    db: AsyncSession, fb: Feedback, *, type: str, title: str, body: str = "", actor_email: str | None = None
+    db: AsyncSession,
+    fb: Feedback,
+    *,
+    type: str,
+    title: str,
+    body: str = "",
+    actor_email: str | None = None,
+    message_id: uuid.UUID | None = None,
+    tab: str | None = None,
+    step: str | None = None,
 ) -> int:
     if fb.assignee_id is None:
         return 0
@@ -118,9 +163,10 @@ async def notify_assignee(
         type=type,
         title=title,
         body=body,
-        link=console_link(fb),
+        link=console_link(fb, message_id, tab),
         feedback_id=fb.id,
         actor_email=actor_email,
+        step=step,
     )
 
 
@@ -141,6 +187,31 @@ async def triage_lead_emails(db: AsyncSession) -> list[str]:
         )
     )
     return leads or await admin_emails(db)
+
+
+async def triage_viewers(db: AsyncSession) -> list[str]:
+    """Everyone who can see Triage (Needs review): the Admins and the triage lead."""
+    return sorted(set(await admin_emails(db)) | set(await triage_lead_emails(db)))
+
+
+async def notify_fixed(db: AsyncSession, fb: Feedback, *, step: str, title: str, actor_email: str) -> int:
+    """Close the loop with the people told a P1 was blocking: everyone who can see Triage hears it is
+    resolved or fixed, at once (D84). Those who raised it hear it as reporters, not twice. Fixes of
+    other priorities wait on an open decision (at once too, or in the daily digest)."""
+    if fb.priority != "P1":
+        return 0
+    reporters = {e.lower() for e in await submitters(db, fb)}
+    return await notify(
+        db,
+        [e for e in await triage_viewers(db) if e.lower() not in reporters],
+        type="fixed",
+        title=title,
+        body=fb.title,
+        link=console_link(fb),
+        feedback_id=fb.id,
+        actor_email=actor_email,
+        step=step,
+    )
 
 
 async def settle(
@@ -216,13 +287,13 @@ def _bell(email: str) -> list[Any]:
     ]
 
 
-async def list_for(db: AsyncSession, email: str, limit: int = 30) -> tuple[list[Notification], int]:
+async def list_for(db: AsyncSession, email: str, limit: int = 60) -> tuple[list[Notification], int]:
     rows = list(
         await db.scalars(
             select(Notification)
             .options(selectinload(Notification.feedback))
             .where(*_bell(email))
-            .order_by(Notification.created_at.desc())
+            .order_by(Notification.created_at.desc(), Notification.id)
             .limit(limit)
         )
     )
