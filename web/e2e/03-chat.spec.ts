@@ -198,12 +198,14 @@ test("S03.15 an item raised from an intranet link carries device, browser, scree
   await expect(context).toHaveText(/Desktop · \w+ on .+ · \d+x\d+ · https:\/\/intranet\.example\/assets · \S+/);
 });
 
-test("S03.16 pressing F5 mid-chat loses the conversation and starts a new one", async ({ page }) => {
+test("S03.16 pressing F5 mid-chat keeps the conversation, and New chat starts a fresh one", async ({ page }) => {
   await chatSay(page, "hi");
   await expect(page.getByText("I'm here for feedback on our intranet tools")).toBeVisible();
   await page.reload();
+  await expect(page.getByText("You: hi")).toBeVisible();
+  await expect(page.getByText("I'm here for feedback on our intranet tools")).toBeVisible();
+  await page.getByRole("button", { name: "New chat" }).click();
   await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
-  await expect(page.getByText("I'm here for feedback on our intranet tools")).toHaveCount(0);
   await expect(page.getByText("You: hi")).toHaveCount(0);
 });
 
