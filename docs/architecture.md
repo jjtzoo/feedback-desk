@@ -11,7 +11,7 @@ How the system fits together, per the company handover manual §17. Decisions (D
 | API | `backend/app/` (FastAPI) | Sign-in, every business rule (`app/services/`), the router that assigns owners, approvals, notifications, files, channels, releases, reports. Roles checked on every call. |
 | Agent | `backend/agent/` (Google ADK, Gemini 3.8 Flash; 3.1 Flash-Lite as fallback by config, D36) | One LlmAgent: chats with staff first and starts a report only when there is something to report (D64), classifies, writes the developer brief, calls `list_projects`, `update_draft`, `find_duplicates`, `submit_feedback`. Runs in the API process locally; on Vertex AI Agent Engine in production (D7). |
 | Worker | `backend/app/worker.py` | Sends the email for each notification (3 tries), runs the daily digest and the Friday release drafter. A loop locally; a Cloud Run job started every minute by Cloud Scheduler in the cloud (D33). |
-| Database | PostgreSQL + pgvector | Schema `app` (everything below) and schema `adk` (agent sessions, owned by ADK). |
+| Database | PostgreSQL + pgvector | Schema `app` (everything below) and schema `adk` (agent sessions, owned by ADK). The chat page keeps its session id in the tab's sessionStorage and reloads the conversation from `GET /api/chat/sessions/{id}` after a refresh; New chat starts another (D81). |
 | Files | Local folder (local), private Cloud Storage bucket (cloud) | Attachments, served through 15-minute signed links. |
 
 Not used: Redis, Prisma, RAG Engine, Cloud Spanner, MCP servers (D26, D34). Live notifications poll Postgres; queues are Postgres tables.

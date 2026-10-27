@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, File, UploadFile
+from google.adk.sessions import Session
 from google.genai import types
 from sqlalchemy import select
 from sse_starlette.sse import EventSourceResponse
@@ -31,8 +32,10 @@ from app.errors import Conflict, NotFound, ServiceError
 from app.models import Attachment
 from app.schemas import (
     AttachmentOut,
+    ChatResumeOut,
     ChatStartIn,
     ChatStartOut,
+    ChatTurnOut,
     ConfirmIn,
     FallbackIn,
     MessageIn,
@@ -61,6 +64,7 @@ session_limiter = RateLimiter(get_settings().chat_sessions_per_user_per_hour, 36
 
 SHOW_SUMMARY_LEAD = "Here's what I'll send"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
+ATTACHED = "[Attached: "
 
 
 @router.post("/chat/sessions", response_model=ChatStartOut)
@@ -86,6 +90,29 @@ async def start_session(body: ChatStartIn, user: CurrentUser, db: Db) -> ChatSta
         return ChatStartOut(mode="fallback", project=project_out, projects=project_list)
     return ChatStartOut(
         mode="chat", session_id=sid, greeting=runtime.GREETING, project=project_out, projects=project_list
+    )
+
+
+@router.get("/chat/sessions/{session_id}", response_model=ChatResumeOut)
+async def resume_session(session_id: str, user: CurrentUser, db: Db) -> ChatResumeOut:
+    """The chat so far, so a refresh picks it up again. A sent or ended chat is not resumed."""
+    session = await _session(user, session_id)
+    state = dict(session.state)
+    projects = await catalog.list_projects(db)
+    hint = state.get("project_hint")
+    project = next((p for p in projects if p.slug == hint), None) if hint else None
+    draft = state.get("draft") or {}
+    shown = draft_hash(draft) if is_complete(draft) else None
+    showing = shown is not None and state.get("card_hash") == shown
+    return ChatResumeOut(
+        mode="chat",
+        session_id=session_id,
+        project=ProjectOut.model_validate(project) if project else None,
+        projects=[ProjectOut.model_validate(p) for p in projects],
+        turns=_turns(session),
+        card=await _card(draft) if showing else None,
+        card_hash=shown if showing else None,
+        duplicates=state.get("duplicates") or [],
     )
 
 
@@ -186,17 +213,45 @@ async def save_fallback(body: FallbackIn, user: CurrentUser, db: Db) -> SavedOut
 # --- helpers ------------------------------------------------------------------------------
 
 
-async def _state(user: User, session_id: str) -> dict[str, Any]:
+async def _session(user: User, session_id: str) -> Session:
     try:
-        state = await runtime.get_state(user, session_id)
+        session = await runtime.get_session(user, session_id)
     except Exception as exc:
         log.exception("could not read session %s", session_id)
         raise ServiceError("unavailable", "The chat isn't available right now.", 503) from exc
-    if state is None:
+    if session is None:
         raise NotFound("That chat has ended. Please start again.")
-    if state.get("saved"):
+    if session.state.get("saved"):
         raise Conflict("already_saved", "This chat's feedback is already sent.")
-    return state
+    return session
+
+
+async def _state(user: User, session_id: str) -> dict[str, Any]:
+    return dict((await _session(user, session_id)).state)
+
+
+def _turns(session: Session) -> list[ChatTurnOut]:
+    """What each side said, as the page showed it: no Confirm press, no file text, no tool calls."""
+    turns: list[ChatTurnOut] = []
+    for event in session.events:
+        parts = [p.text for p in (event.content.parts or []) if p.text and not p.thought] if event.content else []
+        if not parts:
+            continue
+        if event.author == "user":
+            if parts[0] == "Confirmed":
+                continue
+            files = [p.split("\n", 1)[0][len(ATTACHED) : -1] for p in parts[1:] if p.startswith(ATTACHED)]
+            turns.append(ChatTurnOut(role="user", text=parts[0], files=files))
+        else:
+            turns.extend(ChatTurnOut(role="agent", text=_without_card_fields(p)) for p in parts)
+    return turns
+
+
+async def _card(draft: dict[str, Any]) -> dict[str, Any]:
+    async with session_scope() as db:
+        slug = draft.get("project_slug")
+        project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
+    return card(draft, project.name if project else None)
 
 
 def _user_words(state: dict[str, Any]) -> str:
@@ -220,7 +275,7 @@ async def _message_parts(user: User, session_id: str, text: str, ids: list[uuid.
             )
         )
         for att in rows:
-            note = f"[Attached: {att.file_name}]"
+            note = f"{ATTACHED}{att.file_name}]"
             if att.extracted_text:
                 note += f"\nText from the file:\n{mask(att.extracted_text)[:6000]}"
             parts.append(types.Part(text=note))
@@ -294,10 +349,7 @@ async def _stream(
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
     if keep and shown:
-        async with session_scope() as db:
-            slug = draft.get("project_slug")
-            project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
-        yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": shown})
+        yield _sse("draft", {"card": await _card(draft), "hash": shown})
     elif step == "ask_tool":
         yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
     elif step == "ask_impact" and not draft.get("priority"):

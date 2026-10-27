@@ -161,6 +161,21 @@ class ChatStartOut(Out):
     max_files: int = Field(default_factory=lambda: get_settings().max_files_per_item)
 
 
+class ChatTurnOut(Out):
+    role: Literal["user", "agent"]
+    text: str
+    files: list[str] = []
+
+
+class ChatResumeOut(ChatStartOut):
+    """A chat picked up again after a refresh: what was said, and the card or matches still showing."""
+
+    turns: list[ChatTurnOut] = []
+    card: dict[str, Any] | None = None
+    card_hash: str | None = None
+    duplicates: list[dict[str, Any]] = []
+
+
 class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     attachment_ids: list[uuid.UUID] = Field(default=[], max_length=5)

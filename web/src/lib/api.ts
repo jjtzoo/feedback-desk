@@ -124,6 +124,14 @@ export interface ChatStart {
   max_files: number;
 }
 
+/** A chat picked up again after a refresh. */
+export interface ChatResume extends ChatStart {
+  turns: { role: "user" | "agent"; text: string; files: string[] }[];
+  card: ChatCard | null;
+  card_hash: string | null;
+  duplicates: Duplicate[];
+}
+
 export interface Saved {
   reference: string;
   assigned_to: string;

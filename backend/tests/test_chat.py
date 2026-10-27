@@ -199,6 +199,27 @@ async def test_chat_belongs_to_the_person_who_started_it(staff: httpx.AsyncClien
     await other.aclose()
 
 
+async def test_a_refresh_picks_the_chat_up_again_until_it_is_sent(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff, project="flipbook")
+    events = await say(staff, sid, "Flipbook pages are blank, it's annoying, I expected pages but got white screens")
+    shown = first(events, "draft")
+    r = await staff.get(f"/api/chat/sessions/{sid}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["project"]["slug"] == "flipbook"
+    assert [t["role"] for t in body["turns"]][:2] == ["agent", "user"]
+    assert body["turns"][1]["text"].startswith("Flipbook pages are blank")
+    assert [t["text"] for t in body["turns"] if t["role"] == "agent"][1:] == texts(events)
+    assert shown and body["card_hash"] == shown["hash"] and body["card"] == shown["card"]
+
+    other = await signed_in(STAFF2)
+    assert (await other.get(f"/api/chat/sessions/{sid}")).status_code == 404
+    await other.aclose()
+
+    await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": shown["hash"]})
+    assert (await staff.get(f"/api/chat/sessions/{sid}")).status_code == 409
+
+
 async def test_passwords_are_masked_before_storage(staff: httpx.AsyncClient) -> None:
     await submit_via_chat(
         staff, "Rake rejects my password: Hunter2 every time, it's annoying", ["I expected to get in but got an error"]

@@ -10,7 +10,7 @@ from typing import Any
 
 from google.adk.events import Event, EventActions
 from google.adk.runners import Runner
-from google.adk.sessions import BaseSessionService, DatabaseSessionService
+from google.adk.sessions import BaseSessionService, DatabaseSessionService, Session
 from google.genai import types
 
 from agent.agent import build_agent
@@ -89,8 +89,13 @@ async def create_session(user: User, project_hint: str | None, context: dict[str
     return session.id
 
 
+async def get_session(user: User, session_id: str) -> Session | None:
+    """The user's own session, with its events; another person's session is never found."""
+    return await _session_service().get_session(app_name=APP_NAME, user_id=user.email, session_id=session_id)
+
+
 async def get_state(user: User, session_id: str) -> dict[str, Any] | None:
-    session = await _session_service().get_session(app_name=APP_NAME, user_id=user.email, session_id=session_id)
+    session = await get_session(user, session_id)
     return dict(session.state) if session else None
 
 
