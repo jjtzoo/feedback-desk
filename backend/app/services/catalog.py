@@ -6,6 +6,7 @@ entry away from being recognised by the agent.
 
 import re
 import uuid
+from difflib import SequenceMatcher
 from typing import Any
 
 from sqlalchemy import func, select
@@ -19,6 +20,9 @@ from app.models.enums import CATEGORIES, OPEN_STATUSES, PROJECT_GROUPS, STAFF_RO
 LIKELY_TOOLS = 3
 
 # --- projects -------------------------------------------------------------------------
+
+# How close a misspelt tool name must be to count as naming it (0 to 1).
+TYPO_RATIO = 0.82
 
 
 async def list_projects(db: AsyncSession, active_only: bool = True) -> list[Project]:
@@ -37,10 +41,22 @@ async def project_by_slug(db: AsyncSession, slug: str, active_only: bool = True)
 
 
 def mentions(text: str, project: Any) -> bool:
-    """Whether the text names the project: its name, an alias or a keyword, as whole words."""
+    """Whether the text names the project: its name, an alias or a keyword, as whole words, or a name
+    or alias of 6 letters or more with a typo ("trainign protal", "afs portl")."""
     low = text.lower()
     words = [project.name, project.slug.replace("-", " "), *project.aliases, *project.keywords]
-    return any(re.search(rf"\b{re.escape(w.lower())}\b", low) for w in words if w)
+    if any(re.search(rf"\b{re.escape(w.lower())}\b", low) for w in words if w):
+        return True
+    said = re.findall(r"[a-z0-9]+", low)
+    for name in (project.name, *project.aliases):
+        target = name.lower()
+        size = len(target.split())
+        if len(target) < 6:
+            continue
+        windows = (" ".join(said[i : i + size]) for i in range(len(said) - size + 1))
+        if any(SequenceMatcher(None, target, w).ratio() >= TYPO_RATIO for w in windows):
+            return True
+    return False
 
 
 async def likely_projects(db: AsyncSession, email: str, source: str, projects: list[Project]) -> list[Project]:

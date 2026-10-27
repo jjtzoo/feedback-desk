@@ -195,6 +195,10 @@ def test_a_tool_only_counts_as_named_when_the_person_said_it() -> None:
     assert mentions("the Flipbook tile on the home page goes to a 404", intranet)
     rake = SimpleNamespace(name="RAKE Agent", slug="rake-agent", aliases=["rake"], keywords=["policy answer"])
     assert mentions("RAKE gives a blank answer", rake) and not mentions("the drake is broken", rake)
+    # Review item 19's typos name the tool too (D69); short names need the exact word.
+    portal = SimpleNamespace(name="Training Portal", slug="training-portal", aliases=[], keywords=[])
+    assert mentions("trainign protal wont load my certifcate pg", portal)
+    assert mentions("rake rgent keeps saying it doesnt know", rake) and not mentions("my app is slow", portal)
 
 
 def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:

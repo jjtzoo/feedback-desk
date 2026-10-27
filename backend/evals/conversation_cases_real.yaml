@@ -24,6 +24,7 @@
 #               them instead of stopping at the first card
 # asks_details: true when Sig must ask about the problem itself (not the tool, the impact or "send it?")
 #               at least once before the card (D63, review item 23)
+# revised:      why and when a case was changed after it was written (the record keeps the reason)
 # keeps:        the card's title, summary or what happened says one of these: nothing they said was dropped
 #
 # Checked on every reply of every case:
@@ -155,14 +156,16 @@ cases:
     messages:
       - "are you a real person"
       - "ok whatever. training portal won't let me finish the fire warden module, it freezes at 90%"
+      - "every time, since yesterday"
     expect: card
     require: []
     forbid: ["which tool", "—"]
     good: One line answer, then take the report as given; tool, problem and point of failure are already there.
     card: {project: Training Portal, kind: problem, impact: Blocking my work}
-    chips: [none, card]
+    chips: [none, no_impact, card]
     never_ask: [which tool, how much it affects their work]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: sig-who-reads-this
     messages:
@@ -180,14 +183,16 @@ cases:
     messages:
       - "what's the difference between you and rake"
       - "ok well rake told me 4 weeks notice for leave yesterday, it's 2 weeks"
+      - "yesterday, when I asked about annual leave notice"
     expect: card
     require: []
     forbid: ["which tool", "—"]
     good: Two line answer on the difference, then treat the wrong policy answer as a RAKE Agent problem; no card for the first question.
     card: {project: RAKE Agent, kind: problem, impact: Slowing me down}
-    chips: [none, card]
+    chips: [none, no_impact, card]
     never_ask: [which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: sig-can-you-fix-it
     messages:
@@ -249,15 +254,17 @@ cases:
     after_card: true
     messages:
       - "financial platform expense upload fails for pdfs over 5mb"
+      - "every time, since this morning"
       - "no that's not what I said, it fails over 5mb not under"
     expect: card
     require: []
     forbid: ["—"]
     good: Fix the summary on the card in one line and show it again; no apology paragraph, no new questions.
     card: {project: Financial Platform, kind: problem}
-    chips: [card, after]
+    chips: [no_impact, card, after]
     never_ask: [which tool, how much it affects their work]
     never_repeat: [what's wrong]
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   # Changing the subject halfway
 
@@ -350,15 +357,18 @@ cases:
   # Typos
 
   - name: typo-rake-rgent
-    messages: ["rake rgent keeps saying it doesnt know about the new ppe policy"]
+    messages:
+      - "rake rgent keeps saying it doesnt know about the new ppe policy"
+      - "since the new policy came out last week, every time I ask"
     expect: card
     require: []
     forbid: ["which tool", "—"]
     good: Read "rake rgent" as RAKE Agent and go straight to the card or one detail question.
     card: {project: RAKE Agent, kind: problem}
-    chips: [card]
+    chips: [no_impact, card]
     never_ask: [which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: typo-heavy-training-portal
     messages:
@@ -387,15 +397,18 @@ cases:
     never_repeat: []
 
   - name: typo-afs-portl-down
-    messages: ["afs portl is down"]
+    messages:
+      - "afs portl is down"
+      - "since about 9 this morning, it just won't load"
     expect: card
     require: []
     forbid: ["nuisance", "nice-to-have", "which tool", "—"]
     good: AFSS Portal, down means blocking; card straight away or one detail question.
     card: {project: AFSS Portal, kind: problem, impact: Blocking my work}
-    chips: [card]
+    chips: [no_impact, card]
     never_ask: [which tool, how much it affects their work]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   # One-word replies
 
@@ -458,39 +471,48 @@ cases:
     never_repeat: [which one first]
 
   - name: two-problems-same-tool
-    messages: ["staff admin portal: payslips won't download and the leave calendar shows the wrong dates"]
+    messages:
+      - "staff admin portal: payslips won't download and the leave calendar shows the wrong dates"
+      - "payslips first, the download button does nothing, every time since this morning"
     expect: card
     require: []
     forbid: ["which tool", "—"]
     good: Card for the first problem and say the second comes next, or ask which first; never drop one silently.
     card: {project: Staff Admin Portal, kind: problem}
-    chips: [no_impact]
+    chips: [no_impact, card]
     never_ask: [which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: praise-and-problem-together
-    messages: ["love the new atlas search, but the print button cuts off half the map"]
+    messages:
+      - "love the new atlas search, but the print button cuts off half the map"
+      - "every time, the right half of the map is missing"
     expect: card
     require: []
     forbid: ["which tool", "—"]
     good: Card for the print bug; mention the praise can go through too.
     card: {project: REDADAIR Workflow Atlas, kind: problem}
-    chips: [card]
+    chips: [no_impact, card]
     never_ask: [which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   # Sarcasm
 
   - name: sarcasm-love-that-for-me
-    messages: ["oh great, the financial platform is down AGAIN, love that for me"]
+    messages:
+      - "oh great, the financial platform is down AGAIN, love that for me"
+      - "since this morning, it won't load at all"
     expect: card
     require: []
     forbid: ["glad", "nuisance", "nice-to-have", "which tool", "—"]
     good: Read the sarcasm as frustration; down means blocking; card or one detail question.
     card: {project: Financial Platform, kind: problem, impact: Blocking my work}
-    chips: [card]
+    chips: [no_impact, card]
     never_ask: [which tool, how much it affects their work]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: sarcasm-wonderful-update
     messages:
@@ -509,14 +531,16 @@ cases:
     messages:
       - "wow another bot, just what we needed"
       - "fine. it asset still shows my old laptop"
+      - "since I swapped laptops last month"
     expect: card
     require: []
     forbid: ["—"]
     good: No defensiveness; one light line, then take the IT Asset report.
     card: {project: IT Asset, kind: problem}
-    chips: [none, card]
+    chips: [none, no_impact, card]
     never_ask: [which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   # Venting and swearing
 
@@ -602,92 +626,109 @@ cases:
     after_card: true
     messages:
       - "the training portal search is slow"
+      - "the course search, about 30 seconds a time since Monday"
       - "actually it's worse than that, I can't finish my induction because of it"
     expect: card
     require: []
     forbid: ["nuisance", "nice-to-have", "—"]
     good: First card says Slowing me down; update it to Blocking my work in one line.
     card: {project: Training Portal, kind: problem, impact: Blocking my work}
-    chips: [card, after]
+    chips: [no_impact, card, after]
     never_ask: [how much it affects their work, which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: after-card-wrong-tool
     after_card: true
     messages:
       - "the cpd thing won't show my certificate"
+      - "it just shows a blank page, every time since yesterday"
       - "sorry I meant the training portal not cpd"
     expect: card
     require: []
     forbid: ["—"]
     good: Swap the tool on the card, keep the rest.
     card: {project: Training Portal, kind: problem}
-    chips: [card, after]
+    chips: [no_impact, card, after]
     never_ask: []
     never_repeat: [which tool, what's wrong]
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: after-card-never-mind
     after_card: true
     messages:
       - "IT asset has the wrong serial for my phone"
+      - "it shows my old phone's serial, since the swap last month"
       - "actually never mind, I'll just email darlene"
     expect: card
     require: []
     forbid: ["—"]
     good: Card shows first; on "never mind" drop it with nothing saved and no persuading.
     card: {project: IT Asset, kind: problem}
-    chips: [card, none]
+    chips: [no_impact, card, none]
     never_ask: [why]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: after-card-add-detail
     after_card: true
     messages:
       - "goformz extension portal crashes when I attach photos"
+      - "every time, since the last update"
       - "oh and it's only on android"
     expect: card
     require: []
     forbid: ["—"]
     good: Add the Android detail to the card; no new questions.
     card: {project: GoFormz Extension Portal, kind: problem}
-    chips: [card, after]
+    chips: [no_impact, card, after]
     never_ask: [which tool, which device]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   # Impact already stated
 
   - name: impact-stated-painfully-slow
-    messages: ["the workflow atlas is painfully slow today"]
+    messages:
+      - "the workflow atlas is painfully slow today"
+      - "the procedure search, about a minute each time since this morning"
     expect: card
     require: []
     forbid: ["nuisance", "nice-to-have", "stopping you", "which tool", "—"]
     good: Card with Slowing me down, or one question about what is slow; never impact chips.
     card: {project: REDADAIR Workflow Atlas, kind: problem, impact: Slowing me down}
-    chips: [no_impact]
+    chips: [no_impact, card]
     never_ask: [how much it affects their work, which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: impact-stated-cant-work
-    messages: ["can't work, staff admin portal is just a white screen"]
+    messages:
+      - "can't work, staff admin portal is just a white screen"
+      - "since this morning, every time"
     expect: card
     require: []
     forbid: ["nuisance", "nice-to-have", "stopping you", "which tool", "—"]
     good: Blocking my work from the message; card straight away.
     card: {project: Staff Admin Portal, kind: problem, impact: Blocking my work}
-    chips: [card]
+    chips: [no_impact, card]
     never_ask: [how much it affects their work, which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   - name: impact-stated-not-urgent
-    messages: ["not urgent but the CPD tracker shows dates american style"]
+    messages:
+      - "not urgent but the CPD tracker shows dates american style"
+      - "the certificates list, it's been like that since I started"
     expect: card
     require: []
     forbid: ["stopping you", "which tool", "—"]
     good: Nice-to-have from "not urgent"; card.
     card: {project: CPD Tracker, kind: problem, impact: Nice-to-have}
-    chips: [card]
+    chips: [no_impact, card]
     never_ask: [how much it affects their work, which tool]
     never_repeat: []
+    revised: "2026-10-27, D69: written before review item 23, it expected the card straight after the first description; one answer to the question about the problem added"
 
   # Access, ideas and praise in staff words
 
@@ -714,12 +755,15 @@ cases:
     never_repeat: []
 
   - name: praise-afss-export
-    messages: ["just wanted to say the new AFSS export is awesome, saved me hours"]
+    messages:
+      - "just wanted to say the new AFSS export is awesome, saved me hours"
+      - "yes please"
     expect: card
     require: []
     forbid: ["what's wrong", "stopping you", "—"]
     good: Thank them and show a praise card; no problem or impact questions.
     card: {project: AFSS Portal, kind: praise}
-    chips: [card]
+    chips: [no_impact, card]
     never_ask: [what's wrong, how much it affects their work, which tool]
     never_repeat: []
+    revised: '2026-10-27: D64 (decided 2026-10-26) checks once before a praise card ("Want me to send that to the team?"); the yes added'

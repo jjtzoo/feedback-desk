@@ -25,7 +25,7 @@ from app.db import session_scope
 from app.models import Attachment, Feedback, FeedbackEvent, FeedbackMessage, Notification
 from app.services import auth
 from app.services import feedback as feedback_service
-from app.services.drafts import is_complete
+from app.services.drafts import CONTINUE, is_complete
 from tests.conftest import STAFF, STAFF2, first, parse_sse, say, signed_in, start_chat, submit_via_chat, texts
 from tests.test_units import PNG, _docx
 
@@ -430,6 +430,22 @@ async def test_a_turn_with_no_words_never_shows_an_empty_reply(
 
     monkeypatch.setattr(agent_runtime, "run_turn", silent)
     assert texts(await say(staff, sid, "I need access to the Financial Platform")) == [NO_WORDS]
+
+
+async def test_a_silent_turn_is_asked_once_to_go_on_and_the_nudge_is_not_the_persons(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sid = await start_chat(staff)
+    sent: list[str] = []
+
+    async def silent_then_words(user: Any, session_id: str, parts: Any, delta: Any) -> Any:
+        sent.append(parts[0].text)
+        if len(sent) == 2:
+            yield "Got it. Which screen was it on?"
+
+    monkeypatch.setattr(agent_runtime, "run_turn", silent_then_words)
+    assert texts(await say(staff, sid, "The CPD Tracker lost my points")) == ["Got it. Which screen was it on?"]
+    assert sent == ["The CPD Tracker lost my points", CONTINUE]
 
 
 async def test_sessions_survive_an_api_restart(staff: httpx.AsyncClient) -> None:

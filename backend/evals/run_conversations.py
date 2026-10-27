@@ -42,8 +42,13 @@ MAX_CHARS = 300  # about two lines in the chat on a laptop
 
 # The kinds of question Sig asks, to spot one asked twice in other words and to match chips to it.
 QUESTION_KINDS = {
-    "tool": re.compile(r"which (tool|app|system|platform)|is (this|it) about|what (tool|app) |which one", re.I),
-    "impact": re.compile(r"affect\w*|impact|stopping you|nuisance|how much|how bad|blocking|getting your work", re.I),
+    # "Which one first?" between two problems they named is not the tool question.
+    "tool": re.compile(
+        r"which (tool|app|system|platform)|is (this|it) about|what (tool|app) |which one(?![^?]*\bfirst\b)", re.I
+    ),
+    "impact": re.compile(
+        r"affect\w*|impact|stopping you|nuisance|how much|how bad|how urgent\w*|blocking|getting your work", re.I
+    ),
     "send": re.compile(r"send (that|this|it) to|pass (that|this|it) on", re.I),
     "work_type": re.compile(r"exist\w* today|something new|new feature", re.I),
     "details": re.compile(
@@ -87,6 +92,14 @@ def judge_turns(case: dict[str, Any], turns: list[Turn]) -> list[str]:
     problems: list[str] = []
     asked_before: dict[str, int] = {}
     expected_chips = case.get("chips") or []
+    # A case that expects the tool chips twice wants the tool asked again when the first answer was about
+    # something else ("it's really annoying" to "Which tool?"), unless it lists the tool question in never_repeat.
+    repeat_ok = (
+        {"tool"}
+        if expected_chips.count("tools") > 1
+        and "tool" not in {k for phrase in case.get("never_repeat") or [] for k in question_kinds(f"{phrase}?")}
+        else set()
+    )
     never_ask = {k for phrase in case.get("never_ask") or [] for k in question_kinds(f"{phrase}?")}
     person_so_far = ""
     for n, turn in enumerate(turns, 1):
@@ -94,7 +107,7 @@ def judge_turns(case: dict[str, Any], turns: list[Turn]) -> list[str]:
         reply = "\n".join(turn.replies)
         kinds = question_kinds(turn.replies[-1]) if turn.replies else set()
         at = f"turn {n}"
-        for kind in kinds:
+        for kind in kinds - repeat_ok:
             if kind in asked_before:
                 problems.append(f"{at}: asked the {kind} question again (first at turn {asked_before[kind]})")
             asked_before.setdefault(kind, n)

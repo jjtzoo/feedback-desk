@@ -17,7 +17,7 @@ from app.db import session_scope
 from app.services import catalog, embeddings
 from app.services import feedback as feedback_service
 from app.services.actors import User
-from app.services.drafts import GENERAL, NEXT_STEPS, apply_update, missing, quick_replies
+from app.services.drafts import CONTINUE, GENERAL, NEXT_STEPS, apply_update, missing, quick_replies
 
 log = logging.getLogger(__name__)
 UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
@@ -229,7 +229,7 @@ async def submit_feedback(tool_context: ToolContext) -> dict[str, Any]:
         if not event.content:
             continue
         text = "".join(p.text or "" for p in event.content.parts or [] if not p.thought).strip()
-        if text and text != "Confirmed":
+        if text and text not in ("Confirmed", CONTINUE):
             role = "user" if event.author == "user" else "agent"
             turns.append((role, text, datetime.fromtimestamp(event.timestamp, UTC)))
     first_user = next((t for r, t, _ in turns if r == "user"), "")

@@ -21,6 +21,8 @@ from app.models.enums import (
 )
 
 GENERAL = "general"
+# Sent to the model when a turn ended with tool calls and no words; never part of the saved transcript.
+CONTINUE = "(Your last turn showed the person nothing. Reply to them now, in words.)"
 REQUIRED = ("project_slug", "work_type", "category", "priority", "summary", "title")
 ENUMS: dict[str, tuple[str, ...]] = {
     "target_type": TARGET_TYPES,

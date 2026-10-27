@@ -45,6 +45,7 @@ from app.services import feedback as feedback_service
 from app.services.actors import User
 from app.services.drafts import (
     CHECK_SEND_CHIPS,
+    CONTINUE,
     GENERAL,
     card,
     draft_hash,
@@ -260,10 +261,14 @@ async def _stream(
 ) -> AsyncIterator[dict[str, str]]:
     said = False
     try:
-        async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
-            async for raw in runtime.run_turn(user, session_id, parts, delta):
-                said = said or bool(raw.strip())
-                yield _sse("message", {"text": _without_card_fields(raw)})
+        # Gemini 3.8 Flash sometimes ends a turn after a tool call with no words: ask it once to go on.
+        for attempt in (parts, [types.Part(text=CONTINUE)]):
+            async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
+                async for raw in runtime.run_turn(user, session_id, attempt, delta if attempt is parts else {}):
+                    said = said or bool(raw.strip())
+                    yield _sse("message", {"text": _without_card_fields(raw)})
+            if said or (await runtime.get_state(user, session_id) or {}).get("saved"):
+                break
     except TimeoutError:
         log.warning("agent turn timed out session=%s", session_id)
         yield _sse("fallback", {"reason": "timeout"})

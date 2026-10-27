@@ -75,8 +75,8 @@ The chat's duplicate check looks at open items and at items fixed in the last `D
 
 ```bash
 cd backend && uv run ruff check . && uv run mypy && uv run pytest
-cd backend && uv run python -m evals.run_routing      # 40-item routing set; the gate is judged on Gemini
-cd backend && uv run python -m evals.run_conversations  # 32 behaviour checks (follow-ups, misuse, privacy, no tool named, how people write)
+cd backend && uv run python -m evals.run_routing      # 40-item routing set in its own fresh local database; the gate is judged on Gemini
+cd backend && uv run python -m evals.run_conversations  # 89 conversation cases judged turn by turn, in their own fresh local database (Gemini)
 cd web && npm run lint && npm run build
 cd web && npm run test:e2e                            # browser tests (Playwright) of the manual checklist
 cd web && npm run test:e2e:coverage                   # which checklist items have a test -> web/e2e/COVERAGE.md, docs/testing/feature-evidence.md
