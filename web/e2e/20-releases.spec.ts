@@ -297,7 +297,8 @@ test("S20.07 Approve and publish publishes the release, tells the contributors a
   await expect(card.getByRole("listitem").filter({ hasText: NEW_ITEM })).toContainText("From your feedback");
   await expect(card).not.toContainText(FIXED_ITEM);
   await page.getByRole("button", { name: /^Notifications/ }).click();
-  await expect(page.getByText("Your feedback made it into this week's RAKE Agent fixes and updates")).toBeVisible();
+  // The bell row (D78) also lists the step in its trail, so find the row, not the text.
+  await expect(page.getByRole("link", { name: /Your feedback made it into this week's RAKE Agent fixes and updates/ })).toBeVisible();
 });
 
 test("S20.08 A draft left alone stays Draft and never appears on What's new", async ({ page, signIn, team }) => {

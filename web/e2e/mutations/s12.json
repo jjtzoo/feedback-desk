@@ -14,5 +14,6 @@
   "S12.13": ["${f.value}(&|$)", "${f.value}x(&|$)"],
   "S12.14": ["\"Expected by\", \"Actions\"]", "\"Expected byx\", \"Actions\"]"],
   "S12.15": ["toEqual(refsOf(urgent))", "toEqual(refsOf(urgent).reverse())"],
-  "S12.16": ["ending=wont_fix(&|$)", "ending=wont_fixx(&|$)"]
+  "S12.16": ["ending=wont_fix(&|$)", "ending=wont_fixx(&|$)"],
+  "S12.17": ["toHaveClass(/text-muted-foreground/);", "toHaveClass(/text-warning/);"]
 }

@@ -1,7 +1,7 @@
 """SQLAlchemy models. Every table lives in schema `app` (spec v3, "Data model")."""
 
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
@@ -74,11 +74,21 @@ def _now() -> Mapped[datetime]:
     return mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+_last_stamp = datetime.min.replace(tzinfo=UTC)
+
+
+def stamp() -> datetime:
+    """Now, but always after the last stamp this process gave. Windows' clock can return the same
+    time for every row written together, and history must keep their order (D77)."""
+    global _last_stamp
+    now = datetime.now(UTC)
+    _last_stamp = now if now > _last_stamp else _last_stamp + timedelta(microseconds=1)
+    return _last_stamp
+
+
 def _stamped() -> Mapped[datetime]:
     """Set in Python per row, so rows written in one transaction keep their order."""
-    return mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(UTC), server_default=func.now(), nullable=False
-    )
+    return mapped_column(DateTime(timezone=True), default=stamp, server_default=func.now(), nullable=False)
 
 
 def _tags() -> Mapped[list[str]]:
@@ -204,7 +214,6 @@ class Feedback(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     assignee_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     submitter_replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    assignee_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     project: Mapped[Project | None] = relationship(lazy="raise")
     assignee: Mapped[DigitalStaff | None] = relationship(foreign_keys=[assignee_id], lazy="raise")
@@ -239,7 +248,20 @@ class FeedbackMessage(Base):
     body: Mapped[str] = mapped_column(Text)
     is_internal: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     expected_by: Mapped[date | None] = mapped_column(Date)
+    # An update or Resolve note that asks the person who raised it to try it (D80).
+    asks_check: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     created_at: Mapped[datetime] = _stamped()
+
+
+class ItemRead(Base):
+    """When each Digital Staff member last opened an item, so what came after shows as New (D82)."""
+
+    __tablename__ = "item_reads"
+    __table_args__ = (PrimaryKeyConstraint("email", "feedback_id"),)
+
+    email: Mapped[str] = mapped_column(String(320))
+    feedback_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("feedback.id"))
+    read_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class Attachment(Base):
@@ -306,7 +328,9 @@ class Notification(Base):
     # Set once anyone acts on what the notification asked for; outcome says what happened (D54).
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     outcome: Mapped[str | None] = mapped_column(String(300))
-    created_at: Mapped[datetime] = _now()
+    # The stage in a word or two ("Approved", "Fixed"), for the item's trail in the bell (D78).
+    step: Mapped[str | None] = mapped_column(String(40))
+    created_at: Mapped[datetime] = _stamped()
     updated_at: Mapped[datetime] = _now()
 
     # Read with the notification, so the bell shows the item's stage as it is now (D54).

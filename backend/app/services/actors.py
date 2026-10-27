@@ -38,4 +38,4 @@ class Actor:
 
 
 SYSTEM = Actor("system", None, "Feedback")
-AGENT = Actor("agent", None, "Feedback agent")
+AGENT = Actor("agent", None, "Assistant")

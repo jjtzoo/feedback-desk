@@ -4,7 +4,8 @@
     python -m app.worker --once   # one pass (the Cloud Run job Cloud Scheduler runs every minute)
 
 - Sends the email for each queued notification: up to 3 tries, waiting 1 then 5 minutes,
-  then marks it failed.
+  then marks it failed. Notifications for one person about one item that are due together
+  (written in the same step, such as assigned and needs approval) go as one email (D78).
 - Runs the daily digest and the Friday release drafter when their local slot comes round.
   Cloud Scheduler may call the same jobs; job_runs makes each slot run once.
 - Embeds open items whose embedding is missing or from another model, a batch at a time,
@@ -48,27 +49,40 @@ async def send_batch(limit: int = 20) -> int:
                 .with_for_update(skip_locked=True)
             )
         )
+        groups: dict[tuple[str, object], list[Notification]] = {}
         for n in rows:
-            n.email_attempts += 1
+            groups.setdefault((n.recipient_email, n.feedback_id or n.id), []).append(n)
+        for group in groups.values():
+            first = group[0]
+            for n in group:
+                n.email_attempts += 1
             try:
-                subject, body = email_service.render(n, settings.app_base_url)
-                await asyncio.to_thread(email_service.send, settings, n.recipient_email, subject, body)
+                subject, body = email_service.render_many(group, settings.app_base_url)
+                await asyncio.to_thread(email_service.send, settings, first.recipient_email, subject, body)
             except Exception as exc:
-                if n.email_attempts >= MAX_ATTEMPTS:
-                    n.email_status = "failed"
-                else:
-                    n.email_after = datetime.now(UTC) + timedelta(minutes=BACKOFF_MINUTES[n.email_attempts - 1])
+                for n in group:
+                    if n.email_attempts >= MAX_ATTEMPTS:
+                        n.email_status = "failed"
+                    else:
+                        n.email_after = datetime.now(UTC) + timedelta(minutes=BACKOFF_MINUTES[n.email_attempts - 1])
                 log.warning(
                     "email failed id=%s to=%s attempt=%s error=%s",
-                    n.id,
-                    email_service.redact(n.recipient_email),
-                    n.email_attempts,
+                    first.id,
+                    email_service.redact(first.recipient_email),
+                    first.email_attempts,
                     type(exc).__name__,
                 )
             else:
-                n.email_status = "sent"
-                n.emailed_at = datetime.now(UTC)
-                log.info("email sent id=%s type=%s to=%s", n.id, n.type, email_service.redact(n.recipient_email))
+                for n in group:
+                    n.email_status = "sent"
+                    n.emailed_at = datetime.now(UTC)
+                log.info(
+                    "email sent id=%s type=%s count=%s to=%s",
+                    first.id,
+                    first.type,
+                    len(group),
+                    email_service.redact(first.recipient_email),
+                )
         return len(rows)
 
 

@@ -44,8 +44,27 @@ async function openPanel(page: Page, ref: string) {
   return panel;
 }
 
-/** A button in the panel's header (Start work, Post update, Resolve, Close). */
+/** A button in the panel's header (Start work, Update <name>, Resolve, Close). */
 const headerButton = (panel: Locator, name: string) => panel.locator("header").getByRole("button", { name, exact: true });
+
+/** The panel's update button and its dialog are named for the person who raised it (D79): "Update Aisha". */
+const updateButton = (panel: Locator) => panel.locator("header").getByRole("button", { name: /^Update [A-Z][a-z]+$/ });
+const updateDialog = (page: Page) => page.getByRole("dialog", { name: /^Update [A-Z][a-z]+ on progress$/ });
+
+/** Pick a day on the Expected by calendar (D79), moving month by month to the one it is in. */
+async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
+  await dialog.locator("#expected-by").click();
+  const d = new Date(`${iso}T00:00:00`);
+  const month = d.toLocaleDateString("en-AU", { month: "long" });
+  const grid = page.getByRole("grid", { name: `${month} ${d.getFullYear()}` });
+  const back = d < new Date();
+  for (let i = 0; i < 24 && !(await grid.isVisible()); i++) {
+    await page.getByRole("button", { name: back ? /previous month/i : /next month/i }).click();
+  }
+  // Day buttons are labelled "Monday, 26 October 2026" (with "Today, " in front for today).
+  await grid.getByRole("button", { name: new RegExp(`, ${d.getDate()} ${month} ${d.getFullYear()}$`) }).click();
+  await expect(grid).toHaveCount(0);
+}
 
 /** The dialog an action opens over the panel; the panel itself is hidden from the page while it is open. */
 const actionDialog = (page: Page, name: string) => page.getByRole("dialog", { name, exact: true });
@@ -93,10 +112,10 @@ test("S14.02 Post update with text and Expected by shows both on the tracker and
 
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
-  await headerButton(panel, "Post update").click();
-  const dialog = actionDialog(darlene, "Post a progress update");
+  await updateButton(panel).click();
+  const dialog = updateDialog(darlene);
   await dialog.getByLabel("Update", { exact: true }).fill(update);
-  await dialog.getByLabel("Expected by (optional)").fill(expectedBy);
+  await pickExpectedBy(darlene, dialog, expectedBy);
   await submit(dialog).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
   await expect(dialog).toHaveCount(0);
@@ -105,7 +124,7 @@ test("S14.02 Post update with text and Expected by shows both on the tracker and
   await expect(band(page)).toContainText(dayText(expectedBy));
   await expect(band(page)).toContainText("Expected by");
   await expect(page.getByRole("region", { name: "Latest update" })).toContainText(update);
-  await expect(history(page)).toContainText(`Update: ${update}`);
+  await expect(history(page).getByRole("listitem").filter({ hasText: "Update from Darlene" })).toContainText(update);
   await expect(history(page)).toContainText(new RegExp(`Expected by ${dayText(expectedBy).source}`));
 
   await bell(page).click();
@@ -121,16 +140,16 @@ test("S14.03 An update with only a date is accepted; one with neither says 'Writ
   const panel = await openPanel(darlene, ref);
 
   // A date and no words.
-  await headerButton(panel, "Post update").click();
-  const dateOnly = actionDialog(darlene, "Post a progress update");
-  await dateOnly.getByLabel("Expected by (optional)").fill(expectedBy);
+  await updateButton(panel).click();
+  const dateOnly = updateDialog(darlene);
+  await pickExpectedBy(darlene, dateOnly, expectedBy);
   await submit(dateOnly).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
   await expect(dateOnly).toHaveCount(0);
 
   // Neither: refused on the screen, and by the server for anyone who skips the screen.
-  await headerButton(panel, "Post update").click();
-  const neither = actionDialog(darlene, "Post a progress update");
+  await updateButton(panel).click();
+  const neither = updateDialog(darlene);
   await submit(neither).click();
   await expect(neither.getByRole("alert")).toHaveText("Write an update or set an Expected by date.");
   await expect(neither).toBeVisible();
@@ -143,7 +162,7 @@ test("S14.03 An update with only a date is accepted; one with neither says 'Writ
   await openTracker(page, ref);
   await expect(band(page)).toContainText(dayText(expectedBy));
   await expect(history(page)).toContainText("Expected by");
-  await expect(history(page)).not.toContainText("Update:");
+  await expect(history(page)).not.toContainText("Update from");
   await expect(page.getByRole("region", { name: "Latest update" })).toHaveCount(0);
 });
 
@@ -154,9 +173,9 @@ test("S14.04 Expected by yesterday: the card says Overdue in red, the column hea
 
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
-  await headerButton(panel, "Post update").click();
-  const dialog = actionDialog(darlene, "Post a progress update");
-  await dialog.getByLabel("Expected by (optional)").fill(yesterday);
+  await updateButton(panel).click();
+  const dialog = updateDialog(darlene);
+  await pickExpectedBy(darlene, dialog, yesterday);
   await submit(dialog).click();
   await expect(dialog).toHaveCount(0);
 
@@ -176,7 +195,7 @@ test("S14.04 Expected by yesterday: the card says Overdue in red, the column hea
   await expect(darlene.locator("button", { hasText: ref })).toBeVisible();
 });
 
-test("S14.05 Resolve needs a note; with a note it becomes the tracker's last entry 'Resolved: ...'", async ({ page, signIn, team }) => {
+test("S14.05 Resolve needs a note; with a note it becomes the tracker's last entry, 'Resolved by Darlene' with the note", async ({ page, signIn, team }) => {
   await signIn("Rafael");
   const ref = await inProgress(page, team, "fire-safety-blog-agent", "Fire Safety Blog Agent draft preview");
   const note = "Fixed the preview and released it to production";
@@ -202,9 +221,9 @@ test("S14.05 Resolve needs a note; with a note it becomes the tracker's last ent
 
   await openTracker(page, ref);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
-  await expect(history(page)).toContainText(`Resolved: ${note}`);
+  await expect(history(page)).toContainText("Resolved by Darlene");
 
-  await expect(history(page).getByRole("listitem").first()).toContainText(`Resolved: ${note}`);
+  await expect(history(page).getByRole("listitem").first()).toContainText(`Resolved by Darlene${note}`);
 });
 
 test("S14.06 Close asks how it ends and shows the reason on the tracker; Won't fix without a reason is refused", async ({ page, signIn, team }) => {
@@ -293,4 +312,25 @@ test("S14.07 The dashboard's Avg time to first response changes after the first 
   await postJson(darlene, `/console/items/${ref}/update`, { body: "Looking into the invoice download now" });
   await darlene.reload();
   await expect(average).toHaveText(/^\d+(\.\d+)? h$/);
+});
+
+test("S14.09 Update Liam says when to use it and picks Expected by on a calendar in the app's date style; Resolve shows an example", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const ref = await inProgress(await team.as("Liam"), team, "rake-agent", "RAKE Agent training calendar");
+  const panel = await openPanel(page, ref);
+  await headerButton(panel, "Update Liam").click();
+  const update = actionDialog(page, "Update Liam on progress");
+  await expect(update).toContainText("a fix ready to try");
+  await expect(update.locator("#expected-by")).toHaveText("Pick a date");
+  await update.locator("#expected-by").click();
+  await page.getByRole("grid").locator("button:not([disabled])").last().click();
+  const picked = update.locator("#expected-by");
+  await expect(picked).toHaveText(/^[A-Z][a-z]{2},? \d{1,2} [A-Z][a-z]{2}$/);
+  await expect(picked).not.toHaveText(/\d+\/\d+\/\d{4}/);
+  await expect(update.getByRole("checkbox", { name: /Ask them to check it/ })).toBeVisible();
+  await update.getByRole("button", { name: "Cancel" }).click();
+
+  await headerButton(panel, "Resolve").click();
+  const resolve = actionDialog(page, "Resolve");
+  await expect(resolve.getByRole("textbox")).toHaveAttribute("placeholder", /Please try it and tell us if it still happens/);
 });

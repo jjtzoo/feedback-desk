@@ -103,7 +103,7 @@ test("S05.05 The owner sees 'Also following: Mike', impact raised to a team, and
   const darlene = await team.as("Darlene");
   await darlene.goto(`/console?inbox=open&item=${ref}`);
   const panel = darlene.getByRole("dialog");
-  await expect(panel).toContainText(/Impact: one person/);
+  await expect(panel).toContainText(/Affects one person/);
   await expect(panel).not.toContainText("Also following");
 
   const mike = await team.as("Mike");
@@ -113,7 +113,7 @@ test("S05.05 The owner sees 'Also following: Mike', impact raised to a team, and
 
   await darlene.goto(`/console?inbox=open&item=${ref}`);
   await expect(panel).toContainText(/Also following: Mike/);
-  await expect(panel).toContainText(/Impact: team/);
+  await expect(panel).toContainText(/Affects a team/);
 
   await page.goto(`/track/${ref}`);
   await expect(page.getByText("Another staff member reported the same thing")).toBeVisible();

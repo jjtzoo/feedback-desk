@@ -170,7 +170,8 @@ export interface Tracker {
   stage: Stage;
   stages: StageStep[];
   expected_by: string | null;
-  assignee: { name: string; role: string; email: string } | null;
+  /** Name and role only: staff follow up through the item, not by email (D75). */
+  assignee: { name: string; role: string } | null;
   latest_update: { body: string; author: string | null; at: string } | null;
   history: TimelineEntry[];
   close_reason: string | null;
@@ -178,6 +179,8 @@ export interface Tracker {
   attachments: Attachment[];
   can_reply: boolean;
   muted: boolean;
+  /** An update or Resolve note that asked them to try it, not answered yet (D80). */
+  check: { by: string | null; body: string; at: string } | null;
 }
 
 export interface Card {
@@ -198,7 +201,8 @@ export interface Card {
   expected_by: string | null;
   overdue: boolean;
   has_files: boolean;
-  unread_reply: boolean;
+  /** A reply, note or update from someone else since you last opened it (D82). */
+  unread: boolean;
   flagged: boolean;
   channel: "chat" | "fallback";
   /** The submitter plus each distinct colleague who added a +1. */
@@ -240,10 +244,13 @@ export interface Message {
   body: string;
   is_internal: boolean;
   expected_by: string | null;
+  /** An update that asked the person who raised it to try it (D80). */
+  asks_check: boolean;
   created_at: string;
 }
 
 export interface FeedbackEvent {
+  id: string;
   actor_type: string;
   actor_name: string | null;
   event_type: string;
@@ -290,6 +297,8 @@ export interface Detail extends Card {
   /** For the Take over dialog (D53): whether the holder is away, and their latest step on the item. */
   assignee_away: boolean;
   holder_activity: { text: string; at: string } | null;
+  /** When you last opened it before now: later messages show as New (D82). */
+  last_read_at: string | null;
 }
 
 export interface Notification {
@@ -305,6 +314,10 @@ export interface Notification {
   item_status: Status | null;
   item_stage: Stage | null;
   item_ending: Ending | null;
+  /** The item and this step of it, so the bell shows one row per item with a trail (D78). */
+  feedback_id: string | null;
+  reference: string | null;
+  step: string | null;
 }
 
 export interface ChannelMessage {

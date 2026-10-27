@@ -25,6 +25,17 @@ def render(n: Notification, base_url: str) -> tuple[str, str]:
     return n.title, f"{body}Open it: {base_url}{n.link}{FOOTER}"
 
 
+def render_many(rows: list[Notification], base_url: str) -> tuple[str, str]:
+    """Several notifications about one item for one person, due together: one email under the
+    newest title, listing each step, oldest first (D78)."""
+    if len(rows) == 1:
+        return render(rows[0], base_url)
+    latest = rows[-1]
+    steps = "\n".join(f"- {n.title}" for n in rows)
+    body = f"{latest.body}\n\n" if latest.body else ""
+    return latest.title, f"{steps}\n\n{body}Open it: {base_url}{latest.link}{FOOTER}"
+
+
 def build(settings: Settings, to: str, subject: str, body: str) -> EmailMessage:
     msg = EmailMessage()
     msg["From"] = settings.mail_from

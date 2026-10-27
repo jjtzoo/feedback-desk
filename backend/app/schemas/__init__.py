@@ -241,6 +241,8 @@ class TrackerOut(Out):
     attachments: list[AttachmentOut]
     can_reply: bool
     muted: bool
+    # An update or Resolve note that asked them to try it, not yet answered (D80).
+    check: dict[str, Any] | None
 
 
 class ReplyIn(BaseModel):
@@ -249,6 +251,11 @@ class ReplyIn(BaseModel):
 
 class MuteIn(BaseModel):
     muted: bool
+
+
+class CheckIn(BaseModel):
+    fixed: bool
+    comment: str = Field(default="", max_length=4000)
 
 
 # --- console ------------------------------------------------------------------------------
@@ -272,7 +279,8 @@ class CardOut(Out):
     expected_by: date | None
     overdue: bool
     has_files: bool
-    unread_reply: bool
+    # A reply, note or update from someone else since this person last opened it (D82).
+    unread: bool
     flagged: bool
     channel: str
     reporters: int
@@ -320,10 +328,12 @@ class MessageOut(Out):
     body: str
     is_internal: bool
     expected_by: date | None
+    asks_check: bool
     created_at: datetime
 
 
 class EventOut(Out):
+    id: uuid.UUID
     actor_type: str
     actor_name: str | None
     event_type: str
@@ -370,6 +380,8 @@ class DetailOut(CardOut):
     # For the Take over dialog: whether the holder is away, and their latest step on the item (D53).
     assignee_away: bool
     holder_activity: ActivityOut | None
+    # When this person last opened it before now; later messages show as New (D82).
+    last_read_at: datetime | None
 
 
 class TakeOverIn(BaseModel):
@@ -386,6 +398,7 @@ class HandOverIn(BaseModel):
 class UpdateIn(BaseModel):
     body: str = Field(default="", max_length=4000)
     expected_by: date | None = None
+    asks_check: bool = False
 
 
 class NoteIn(BaseModel):
@@ -446,11 +459,15 @@ class NotificationOut(Out):
     link: str
     read_at: datetime | None
     created_at: datetime
+    # The item it is about and its step, so the bell shows one row per item with a trail (D78).
+    feedback_id: uuid.UUID | None
+    step: str | None
     # What happened once anyone acted on it, and the item's stage as it is now (D54).
     outcome: str | None
     item_status: Status | None = None
     item_stage: str | None = None  # the staff stage, for a staff member's bell
     item_ending: Ending | None = None
+    reference: str | None = None
 
 
 class NotificationsOut(Out):

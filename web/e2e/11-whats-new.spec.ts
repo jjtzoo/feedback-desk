@@ -152,7 +152,8 @@ test.describe("once releases are published", () => {
     await expect(page.getByRole("listitem").filter({ hasText: FIXED_ITEM })).not.toContainText("From your feedback");
 
     await page.getByRole("button", { name: /^Notifications/ }).click();
-    await expect(page.getByText("Your feedback made it into this week's RAKE Agent fixes and updates")).toBeVisible();
+    // The bell row (D78) also lists the step in its trail, so find the row, not the text.
+    await expect(page.getByRole("link", { name: /Your feedback made it into this week's RAKE Agent fixes and updates/ })).toBeVisible();
   });
 
   test("S11.05 Published items leave out unticked items, staff names and internal notes", async ({ page, signIn, team }) => {

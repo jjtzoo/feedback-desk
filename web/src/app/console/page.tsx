@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { PriorityBadge, StatusBadge } from "@/components/badges";
+import { NewMark, PriorityBadge, StatusBadge } from "@/components/badges";
 import { ActionDialog, type ActionResult } from "@/components/console/action-dialogs";
 import { BoardView } from "@/components/console/board-view";
 import { useCounts } from "@/components/console/counts";
@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, errorText, type Board, type Card, type ConsoleView, type Ending, type ItemList, type Project, type Staff } from "@/lib/api";
-import { CATEGORIES, CATEGORY_LABEL, ENDING_LABEL, PRIORITIES, WORK_TYPES, WORK_TYPE_LABEL, age, day } from "@/lib/format";
+import { CATEGORIES, CATEGORY_LABEL, ENDING_LABEL, PRIORITIES, WORK_TYPES, WORK_TYPE_LABEL, age, day, isSettled } from "@/lib/format";
 import { defaultInbox } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
 
@@ -376,11 +376,14 @@ function Work() {
                               {c.reference}
                             </button>
                           </TableCell>
-                          <TableCell className="max-w-60 truncate font-medium">{c.title}</TableCell>
+                          <TableCell className="max-w-60 truncate font-medium">
+                            {c.unread && <NewMark label="New reply" className="mr-2" />}
+                            {c.title}
+                          </TableCell>
                           <TableCell>{c.project?.name ?? "–"}</TableCell>
                           <TableCell>{c.work_type ? WORK_TYPE_LABEL[c.work_type] : "–"}</TableCell>
                           <TableCell>
-                            <PriorityBadge showCode priority={c.priority} />
+                            <PriorityBadge showCode quiet={isSettled(c.status)} priority={c.priority} />
                           </TableCell>
                           <TableCell>
                             <StatusBadge status={c.status} ending={c.ending} />
@@ -420,14 +423,16 @@ function Work() {
       )}
 
       <ItemPanel
-        key={item ?? "none"}
+        key={`${item ?? "none"}-${params.get("msg") ?? params.get("tab") ?? ""}`}
         reference={item}
+        focusTab={params.get("tab")}
+        focusMessage={params.get("msg")}
         projects={projects}
         staff={staff}
         previous={position > 0 ? order[position - 1] : null}
         next={position >= 0 && position < order.length - 1 ? order[position + 1] : null}
-        onStep={(ref) => setParam("item", ref)}
-        onClose={() => setParam("item", null)}
+        onStep={(ref) => setParams({ item: ref, tab: null, msg: null })}
+        onClose={() => setParams({ item: null, tab: null, msg: null })}
         onChanged={reload}
       />
       <ActionDialog key={`${pending?.ref}-${pending?.kind}`} kind={pending ? pending.kind : null} onClose={() => setPending(null)} onSubmit={finishPending} />
