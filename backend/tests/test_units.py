@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 from sqlalchemy import select, update
 
-from agent import callbacks, model, tools
+from agent import agent, callbacks, model, tools
 from app import agent_runtime
 from app.config import get_settings
 from app.db import session_scope
@@ -262,6 +262,13 @@ async def test_submit_tool_refuses_without_confirm_even_if_the_guard_is_skipped(
         state={"draft": dict(COMPLETE), "draft_confirmed": False, "user": {"email": "a@redadair.example", "name": "A"}}
     )
     assert (await tools.submit_feedback(ctx))["error"] == "not_confirmed"  # type: ignore[arg-type]
+
+
+def test_instruction_names_the_signed_in_person_and_role_but_not_their_email() -> None:
+    user = {"email": "liam.carter@redadair.example", "name": "Liam Carter", "role": "admin"}
+    text = agent.instruction(FakeContext(state={"user": user}))  # type: ignore[arg-type]
+    assert "talking to Liam, signed in with the admin role" in text
+    assert "Carter" not in text and "liam.carter" not in text
 
 
 # --- model credentials ---------------------------------------------------------------------

@@ -19,7 +19,11 @@ def instruction(ctx: ReadonlyContext) -> str:
     draft = ctx.state.get("draft") or {}
     hint = ctx.state.get("project_hint")
     context = ctx.state.get("context") or {}
+    user = ctx.state.get("user") or {}
     lines = ["", "## This conversation"]
+    if user.get("name"):
+        first_name = str(user["name"]).split()[0]
+        lines.append(f"You're talking to {first_name}, signed in with the {user.get('role', 'staff')} role.")
     if hint:
         lines.append(f"The page was opened for project {hint!r}; it is already in the draft.")
     if context.get("source"):
