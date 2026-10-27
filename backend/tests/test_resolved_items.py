@@ -56,7 +56,9 @@ async def test_resolve_asks_the_person_who_raised_it_and_the_email_carries_both_
 ) -> None:
     ref = await resolved(staff, marc, darlene)
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
-    assert t["is_it_fixed"] == {"state": "resolved", "reopen_until": None} and t["check"] is None
+    assert t["is_it_fixed"]["state"] == "resolved" and t["is_it_fixed"]["reopen_until"] is None and t["check"] is None
+    closes = datetime.fromisoformat(t["is_it_fixed"]["closes_at"])
+    assert timedelta(days=6, hours=23) < closes - datetime.now(UTC) <= timedelta(days=7)
     asked = (await rows(STAFF, "is_it_fixed"))[-1]
     assert asked.title == f"{ref} is resolved. Is it fixed?" and asked.link == f"/track/{ref}#is-it-fixed"
     _, body = email_service.render(asked, "https://feedback.test")

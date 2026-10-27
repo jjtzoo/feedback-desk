@@ -471,8 +471,11 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
     question = None
     if fb.submitter_email == user.email:
         until = reopen_until(fb, status_events)
-        if fb.status == "resolved" or until is not None:
-            question = {"state": fb.status, "reopen_until": until.isoformat() if until else None}
+        if fb.status == "resolved" and fb.resolved_at is not None:
+            closes = fb.resolved_at + timedelta(days=get_settings().resolved_auto_close_days)
+            question = {"state": "resolved", "closes_at": closes.isoformat(), "reopen_until": None}
+        elif until is not None:
+            question = {"state": "closed", "closes_at": None, "reopen_until": until.isoformat()}
 
     latest = next((m for m in reversed(messages) if m.message_type in ("progress", "reply")), None)
     assignee = None

@@ -243,8 +243,8 @@ class TrackerOut(Out):
     muted: bool
     # An update that asked them to try an in-progress fix, not yet answered (D80).
     check: dict[str, Any] | None
-    # For the person who raised it: Is it fixed? while Resolved, then I still have an issue until
-    # reopen_until (D92). state is resolved or closed.
+    # For the person who raised it: Is it fixed? while Resolved (it closes by itself at closes_at), then
+    # I still have an issue until reopen_until (D92). state is resolved or closed.
     is_it_fixed: dict[str, Any] | None
 
 

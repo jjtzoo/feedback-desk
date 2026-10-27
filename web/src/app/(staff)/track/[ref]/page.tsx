@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
 import { PriorityBadge } from "@/components/badges";
+import { IsItFixed } from "@/components/is-it-fixed";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,9 +20,9 @@ import { cn } from "@/lib/utils";
 const PREVIEW_ENTRIES = 4;
 
 /** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, who has it,
- *  the latest update, and the full history newest first. When the owner asks them to try it,
- *  that comes first with It's fixed and Still happening (D80). A notification about news opens
- *  it at #latest (D81). */
+ *  the latest update, and the full history newest first. A resolved item asks the person who
+ *  raised it Is it fixed? (D92); an update asking them to try a fix in progress comes first with
+ *  It's fixed and Still happening (D80). A notification about news opens it at #latest (D81). */
 export default function TrackerPage() {
   const { ref } = useParams<{ ref: string }>();
   const [t, setT] = useState<Tracker | null>(null);
@@ -262,6 +263,7 @@ export default function TrackerPage() {
           </div>
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
+            <IsItFixed tracker={t} onChange={setT} />
             {t.check && (
               <section id="latest" className={cn("rounded-3xl border-2 border-foreground bg-card p-5 shadow-card transition-shadow", pointed && "ring-2 ring-ring")} aria-labelledby="check">
                 <h2 id="check" className="font-semibold">
@@ -336,7 +338,7 @@ export default function TrackerPage() {
                   Reply or add details
                 </label>
                 <p className="text-sm text-muted-foreground">
-                  {t.stage === "resolved" ? "Still not right? Replying reopens it." : "The owner is notified straight away."}
+                  The owner is notified straight away.
                 </p>
                 <Textarea id="reply" rows={3} value={reply} maxLength={4000} onChange={(e) => setReply(e.target.value)} className="mt-3 rounded-xl text-base" />
                 {sendError && (
