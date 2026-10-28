@@ -5,11 +5,23 @@
 A chat-style agent where any REDADAIR staff member gives feedback on the intranet's platforms and agents, plus a console where the Digital team approves, works and closes it. Staff track every item like a parcel.
 
 - **Project documents:** [Project Hub draft](docs/project-hub.md), [requirements reference](docs/requirements.md)
-- **Spec (source of truth):** [docs/feedback-build-spec-v3.md](docs/feedback-build-spec-v3.md) (decisions D1 to D35, sprints, gates)
+- **Spec (source of truth):** [docs/feedback-build-spec-v3.md](docs/feedback-build-spec-v3.md) (decisions D1 to D99, sprints, gates, build status)
 - **How it fits together:** [docs/architecture.md](docs/architecture.md)
 - **Deploying:** [docs/deployment.md](docs/deployment.md) (checklists, rollback)
 - **Company standards it follows:** [docs/standards/](docs/standards/)
-- **Brand:** the app shows as Smoke Signal with Sig, its assistant, on the `ui/smoke-signal-brand` branch while D37 is open (the intranet tile stays Feedback). Assets: `web/public/brand/`; plan: [docs/design/smoke-signal-integration.md](docs/design/smoke-signal-integration.md)
+- **Brand:** the app shows as Smoke Signal with Sig, its assistant, while D37 is open (the intranet tile stays Feedback). Assets: `web/public/brand/`; plan: [docs/design/smoke-signal-integration.md](docs/design/smoke-signal-integration.md)
+
+## Status
+
+Built and tested locally on the stub model, and checked against Gemini; **nothing is deployed**. Not done yet:
+
+- **Google Cloud:** there is no project yet, so the deploy scripts, Cloud Run YAML, worker job and scheduler are written but have never run, and there is no staging or production (asks 1 and 9 in the spec).
+- **Google sign-in** needs the OAuth client (ask 2); the local sign-in picker stands in.
+- **Email** goes to Mailpit locally; the provider is still open (D32).
+- **People** are placeholders until the real Digital Staff list arrives (ask 6).
+- **Pilot and launch** (Sprint 4) have not started.
+
+What is built, area by area: the spec's Build status.
 
 ## Main technologies
 
@@ -65,7 +77,7 @@ A Resolved item asks the person who raised it Is it fixed? (D92). If they don't 
 
 ## Switching on the real agent
 
-The stub model keeps everything working without a key. To use Gemini, load the AI Studio key from Secret Manager into the shell (never into a file) and restart the API:
+The stub model keeps everything working without a key. To use Gemini, load the AI Studio key from Secret Manager into the shell (never into a file) and restart the API (the secret exists once the Google Cloud project does):
 
 ```bash
 export GOOGLE_API_KEY="$(gcloud secrets versions access latest --secret=feedback-staging-google-api-key)"
@@ -80,7 +92,7 @@ The chat's duplicate check looks at open items and at items fixed in the last `D
 ```bash
 cd backend && uv run ruff check . && uv run mypy && uv run pytest
 cd backend && uv run python -m evals.run_routing      # 40-item routing set in its own fresh local database; the gate is judged on Gemini
-cd backend && uv run python -m evals.run_conversations  # 89 conversation cases judged turn by turn, in their own fresh local database (Gemini)
+cd backend && uv run python -m evals.run_conversations  # 98 conversation cases judged turn by turn, in their own fresh local database (Gemini)
 cd web && npm run lint && npm run build
 cd web && npm run test:e2e                            # browser tests (Playwright) of the manual checklist
 cd web && npm run test:e2e:coverage                   # which checklist items have a test -> web/e2e/COVERAGE.md, docs/testing/feature-evidence.md
@@ -93,7 +105,7 @@ Browser tests start their own API (port 8002, `backend/scripts/e2e_server.py`, w
 
 ## Build and deploy
 
-Images are built from `backend/` and `web/`, pushed to Artifact Registry and deployed to Cloud Run by `./deploy.sh staging|production` (or `.\deploy.ps1`). `staging` deploys from the `staging` branch, production from `main` through a no-traffic candidate revision. Follow [docs/deployment.md](docs/deployment.md) every time. CI (`.github/workflows/ci.yml`) runs the checks on every pull request.
+Images are built from `backend/` and `web/`, pushed to Artifact Registry and deployed to Cloud Run by `./deploy.sh staging|production` (or `.\deploy.ps1`). `staging` deploys from the `staging` branch, production from `main` through a no-traffic candidate revision. Follow [docs/deployment.md](docs/deployment.md) every time. None of this has run yet: it waits for the Google Cloud project. CI (`.github/workflows/ci.yml`) runs the checks on every pull request and push; its deploy jobs stay off until the repository variable `GCP_PROJECT_ID` is set.
 
 ## Important rules and limitations
 
@@ -101,5 +113,5 @@ Images are built from `backend/` and `web/`, pushed to Artifact Registry and dep
 - Never commit to `main`; one branch per change; Marc reviews every pull request.
 - No secrets in code, `.env.example`, YAML or images; they live in Secret Manager.
 - Local development uses staging-like configuration, never production resources.
-- Still waiting on IT (spec "Asks to Chris"): Google Cloud projects, the Google OAuth client, the AI Studio key, the email provider, the GitHub repository, and the real Digital Staff list. Until then the local stand-ins in D23 are used.
+- Still waiting on IT (spec "Asks to Chris"): Google Cloud projects, the Google OAuth client, the AI Studio key, the email provider, branch protection on the GitHub repository, and the real Digital Staff list. Until then the local stand-ins in D23 are used.
 - Open decisions: D31 (PostgreSQL 16 or 17) and D32 (Gmail API or ZeptoMail).
