@@ -4,7 +4,7 @@ import type { Allowance } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 /** The person's share of today's assistant allowance (D36). Quiet until half is used, and hidden
- *  when there is no per-person limit. */
+ *  when there is no per-person limit. From 80 % Sig explains in the chat what happens next. */
 export function UsageMeter({ allowance }: { allowance: Allowance }) {
   if (!allowance.limit_tokens || allowance.percent < 50) return null;
   const high = allowance.percent >= 80;
@@ -13,7 +13,6 @@ export function UsageMeter({ allowance }: { allowance: Allowance }) {
       <p className={cn("flex items-center gap-1.5 text-xs", high ? "font-semibold text-warning" : "text-muted-foreground")}>
         {high && <TriangleAlert className="size-3.5" aria-hidden="true" />}
         Today&apos;s assistant allowance: {allowance.percent}% used
-        {high && allowance.percent < 100 && ". The form still works if it runs out."}
       </p>
       <div
         role="meter"
