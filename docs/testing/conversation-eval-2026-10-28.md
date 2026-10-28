@@ -45,3 +45,22 @@ Newly failing: five got no reply at all, the turns that timed out (no-tool-syste
 - Still failing, the two faults of 27 Oct: an empty reply, a silent turn (lol-in-a-serious-report, question), which D85 and D88 address on a branch not in this base; and the card arriving later than the case allows (answers-question-with-question, assign-to-person, swearing-lost-work), which D63 and D87 address.
 
 So the conversation checks don't pass yet, as on 27 Oct, and the gaps are the ones already known; the app cards add none. They should be run again once this branch and the D69 to D88 work are merged together.
+
+## After merging D69 to D90 (same day)
+
+The branch then took in the work its base lacked, so it could be merged as one: 5A's merge of `fix/console-tracker-27oct` (D75 to D84, commit dfa1da5), `fix/sig-27oct-review` (D69 to D74, D85 to D88), `feat/sig-knows-role` (D89) and `feat/chat-persistence` (D90). Sig's instruction is the review's, with 5C's two changes (the app-card line and a screenshot counting as what it shows). A refreshed chat (D90) comes back with its app cards and thumbnails. The two runs below went one after the other, not at the same time.
+
+| Run | Model | Result | Cost |
+| --- | --- | --- | --- |
+| Conversation checks (98 cases) | gemini-3.8-flash | **93 of 98**; all 7 D99 cases pass; no turn timed out | about A$4.83 (259 calls) |
+| Routing gate | gemini-3.8-flash | **Pass**: 92.5 % project, 95.0 % work type, 95.0 % assignee, every brief complete | not logged by the runner |
+
+The 5 misses all failed in the Sig branch's own runs of 27 Oct, and none picks a card or opens with `?project=`:
+- answers-impact-when-asked-tool, answers-steps-when-asked-tool: the cases expect the tool asked twice; Sig asks it once (product owner, 27 Oct), the recorded conflict.
+- no-tool-page-slow: the tool asked again in other words after "It's blocking my work".
+- typo-go-forms-extention: the impact question instead of the card.
+- vent-then-useful: tool chips under a vent.
+
+Routing misses: the Flipbook tile item went to `intranet` (as on 26, 27 and 28 Oct); two items saved nothing, one of them a timed-out turn.
+
+Also on the merged code: 156 backend tests, Ruff and mypy; the web build; the browser suite 261 passed, 1 skipped by design (S10.09), and 2 that D90 changed (S03.16: the chat now survives F5; S05.02: a new report starts a new chat), fixed and passing; mutation records for sections 3 and 5, all caught.
