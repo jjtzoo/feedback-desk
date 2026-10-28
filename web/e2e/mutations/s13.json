@@ -10,7 +10,7 @@
   "S13.09": [".toBe(file.buffer.length)", ".toBe(file.buffer.length + 1)"],
   "S13.10": ["toHaveCount(events.length)", "toHaveCount(events.length + 1)"],
   "S13.11": ["Waiting for an Admin to approve.", "Waiting for an Adminx to approve."],
-  "S13.12": ["for (const name of [\"Start work\"", "for (const name of [\"Take over\""],
+  "S13.12": ["toEqual([\"Close…\"]);", "toEqual([\"Start work\", \"Close…\"]);"],
   "S13.13": ["Mario took over ${ref}", "Mario took overx ${ref}"],
   "S13.14": ["\"Mario has just taken this over.\"", "\"Mario has just taken this overx.\""],
   "S13.15": ["Mario · Mario took this on", "Mario · Mario took this onx"],
