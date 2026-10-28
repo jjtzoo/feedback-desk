@@ -126,7 +126,7 @@ test.describe("8. Staff: tracker", () => {
     for (const i of [3, 4]) await expect(stages.nth(i)).not.toContainText(SHORT_DATE);
   });
 
-  test("S08.03 Who has it names the assignee and role, with an email button that uses the FB number as the subject", async ({
+  test("S08.03 Who has it names the assignee and role, with no email button or other way to contact them directly", async ({
     page,
     signIn,
     team,
@@ -138,9 +138,10 @@ test.describe("8. Staff: tracker", () => {
     const who = page.getByRole("region", { name: "Who has it" });
     await expect(who).toContainText("Darlene");
     await expect(who).toContainText("Digital Staff · RAKE Agent owner");
-    const email = who.getByRole("link", { name: "Email Darlene" });
-    await expect(email).toHaveAttribute("href", /^mailto:[^?]+\?subject=/);
-    await expect(email).toHaveAttribute("href", new RegExp(`subject=${ref}$`));
+    // No way to contact her directly: follow-ups go through the item (D75).
+    await expect(who.getByRole("link")).toHaveCount(0);
+    await expect(who.getByRole("button")).toHaveCount(0);
+    await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
   });
 
   test("S08.04 a Needs review item says the Digital team is checking who it belongs to", async ({ page, signIn }) => {
@@ -201,21 +202,22 @@ test.describe("8. Staff: tracker", () => {
       return i;
     };
 
-    // Newest first. Resolving writes two entries (the note and the stage) in one moment, so they share the top.
-    expect(at("Resolved: Fix deployed")).toBeLessThan(2);
-    expect(at("Update: Fix deployed")).toBeLessThan(2);
+    // Newest first. Resolving's note and its stage show as one entry, with the note once (D80).
+    expect(at("Resolved by Darlene")).toBe(0);
+    expect(texts[0]).toContain("Fix deployed");
+    expect(texts.filter((t) => t.includes("Fix deployed"))).toHaveLength(1);
     const order = [
       at("You added details"),
-      at("Update: Found the cause"),
+      at("Update from Darlene"),
       at("Expected by"),
       at("Darlene started work"),
       at("Darlene opened your feedback"),
       at("Planned (Marc accepted it)"),
     ];
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(order[0]).toBeGreaterThan(1);
+    expect(order[0]).toBeGreaterThan(0);
     // The three entries written when it was raised come last.
-    for (const first of ["Received via chat, 1 file", "Classified: Bug, P1, RAKE Agent", "Assigned to Darlene"]) {
+    for (const first of ["Received via chat, 1 file", "Classified: Bug, Blocking, RAKE Agent", "Assigned to Darlene"]) {
       expect(at(first)).toBeGreaterThan(order[order.length - 1]);
     }
 
@@ -351,4 +353,44 @@ test.describe("8. Staff: tracker", () => {
     await expect(page.getByRole("link", { name: "Go to My feedback" })).toBeVisible();
     await expect(page.getByText("RAKE Agent crashes for Mario only")).toHaveCount(0);
   });
+});
+
+test("S08.13 When Darlene asks them to check, the tracker leads with It's fixed and Still happening", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await approvedBug(page, team, "RAKE Agent crashes when I open my roster");
+  const darlene = await team.as("Darlene");
+  await postJson(darlene, `/console/items/${ref}/start`);
+  await postJson(darlene, `/console/items/${ref}/update`, { body: "Fix is live, please try your roster again.", asks_check: true });
+  await openTracker(page, ref);
+
+  const check = page.getByRole("region", { name: "Darlene asked you to check this" });
+  await expect(check).toContainText("Fix is live, please try your roster again.");
+  await check.getByLabel("Comment (optional)").fill("Opens fine now");
+  await check.getByRole("button", { name: "It's fixed" }).click();
+  await expect(check).toHaveCount(0);
+  const history = page.getByRole("region", { name: "Tracking history" });
+  await expect(history).toContainText("Liam Carter said it's fixed");
+
+  // Resolved asks them to check too; Still happening sends it back to In progress.
+  await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fixed: the roster opens again. Please try it." });
+  await page.reload();
+  await page.getByRole("region", { name: "Darlene asked you to check this" }).getByRole("button", { name: "Still happening" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
+  await expect(history).toContainText("Reopened: still happening");
+});
+
+test("S08.14 On a Resolved item the priority under What you sent is grey, with its icon and word", async ({ page, signIn, team }) => {
+  await signIn("Liam");
+  const ref = await approvedBug(page, team, "RAKE Agent crashes when I print my roster");
+  await openTracker(page, ref);
+  const badge = page.getByRole("region", { name: "What you sent" }).getByText("Major", { exact: true });
+  await expect(badge).toHaveClass(/text-warning/);
+
+  const darlene = await team.as("Darlene");
+  await postJson(darlene, `/console/items/${ref}/start`);
+  await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fixed: printing works again." });
+  await page.reload();
+  await expect(badge).toHaveClass(/text-muted-foreground/);
+  await expect(badge).not.toHaveClass(/text-warning/);
+  await expect(badge.locator("svg")).toHaveCount(1);
 });

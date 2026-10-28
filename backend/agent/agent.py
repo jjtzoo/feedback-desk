@@ -19,8 +19,14 @@ def instruction(ctx: ReadonlyContext) -> str:
     draft = ctx.state.get("draft") or {}
     hint = ctx.state.get("project_hint")
     context = ctx.state.get("context") or {}
+    user = ctx.state.get("user") or {}
     lines = ["", "## This conversation"]
-    if hint:
+    if user.get("name"):
+        first_name = str(user["name"]).split()[0]
+        lines.append(f"You're talking to {first_name}, signed in with the {user.get('role', 'staff')} role.")
+    if ctx.state.get("picked"):
+        lines.append(f"They picked {ctx.state['picked']!r} from the app cards; it is already in the draft.")
+    elif hint:
         lines.append(f"The page was opened for project {hint!r}; it is already in the draft.")
     if context.get("source"):
         lines.append(f"They came from: {context['source']}.")
@@ -31,10 +37,10 @@ def instruction(ctx: ReadonlyContext) -> str:
 
 def build_agent(choice: ModelChoice) -> LlmAgent:
     s = get_settings()
-    # Every call stays small (D36): replies are a sentence or two plus tool calls.
+    # Replies are a sentence or two plus tool calls; the cap leaves room for Gemini 3's thinking (D88).
     config = types.GenerateContentConfig(
         max_output_tokens=s.model_max_output_tokens,
-        thinking_config=types.ThinkingConfig(thinking_budget=s.model_thinking_budget),
+        thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel(s.model_thinking_level.upper())),
     )
     return LlmAgent(
         name="feedback_agent",

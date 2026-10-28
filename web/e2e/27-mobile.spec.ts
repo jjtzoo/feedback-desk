@@ -82,3 +82,26 @@ test("S27.07 The staff Guide at phone width highlights every control it asks you
   }
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test.describe("on a touch phone", () => {
+  test.use({ hasTouch: true, isMobile: true });
+
+  test("S27.08 The chat's app cards sit two to a row with no sideways scroll, and the paperclip, Take a photo, box and Send share one line", async ({ page, signIn }) => {
+    await signIn("Liam");
+    await page.goto("/chat");
+    const cards = page.getByRole("region", { name: /Which tool is it about/ }).getByRole("button");
+    await expect(cards.first()).toBeVisible();
+    const [a, b, c] = await Promise.all([0, 1, 2].map(async (i) => (await cards.nth(i).boundingBox())!));
+    expect(Math.abs(a.y - b.y)).toBeLessThan(2);
+    expect(c.y).toBeGreaterThan(a.y + a.height - 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+
+    const row = [page.getByRole("button", { name: /Attach a file/ }), page.getByRole("button", { name: "Take a photo" }), page.getByLabel("Your message"), page.getByRole("button", { name: "Send" })];
+    const boxes = await Promise.all(row.map(async (control) => (await control.boundingBox())!));
+    for (let i = 1; i < boxes.length; i++) {
+      expect(boxes[i].x).toBeGreaterThanOrEqual(boxes[i - 1].x + boxes[i - 1].width - 1);
+      expect(boxes[i].y).toBeLessThan(boxes[0].y + boxes[0].height);
+    }
+    expect(boxes[3].x + boxes[3].width).toBeLessThanOrEqual(375);
+  });
+});

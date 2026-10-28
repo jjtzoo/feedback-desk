@@ -1,7 +1,7 @@
 """The per-turn rubric of evals/run_conversations.py (D68), on the chats of 26 Oct. The rubric is judged
 on Gemini; here it must fail those chats and pass a good one."""
 
-from evals.run_conversations import Turn, judge_turns, question_kinds
+from evals.run_conversations import Turn, asked_about_the_problem, judge_turns, question_kinds
 
 IMPACT = ["Blocking my work", "Slowing me down", "Nice-to-have"]
 TOOLS = ["AFSS Portal", "RAKE Agent", "Not sure"]
@@ -65,3 +65,15 @@ def test_a_good_chat_passes() -> None:
     ) == ["turn 3: expected the card"]
     turns[2].card = {"title": "AFSS Portal: statement list slow"}
     assert judge_turns(CASE | {"chips": ["tools", "no_impact", "card"]}, turns) == []
+
+
+def test_item_23_the_card_after_only_the_tool_question_has_asked_nothing_about_the_problem() -> None:
+    """The 27 Oct GoFormz chat: tool, impact, then the card. Neither is a question about the problem."""
+    turns = [
+        Turn("I'm having trouble with my app it's so slow", ["Which app or site?"], [("project", TOOLS)]),
+        Turn("GoFormz Extension Portal", ["Is it blocking your work, or a minor annoyance?"], [("impact", IMPACT)]),
+        Turn("when I pressed submit it failed and reset my forms", ["Here's what I'll send."], card={"title": "x"}),
+    ]
+    assert not asked_about_the_problem(turns)
+    turns[1].replies = ["Got it. Which form, and does it happen every time?"]
+    assert asked_about_the_problem(turns)

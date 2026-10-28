@@ -1,9 +1,10 @@
 """Feedback items from the staff side: submitting, "+1 and comment", My feedback, the parcel
 tracker and follow-ups (brief §4.1, §4.2)."""
 
+import re
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, or_, select, update
@@ -12,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.errors import Conflict, Forbidden, NotFound
 from app.models import Attachment, DigitalStaff, Feedback, FeedbackEvent, FeedbackFollower, FeedbackMessage, Project
+from app.models.entities import stamp
 from app.models.enums import CLOSED_STATUSES, OPEN_STATUSES, STAGE_OF, STAGES
 from app.services import embeddings, events, notifications
 from app.services.actors import AGENT, SYSTEM, User
@@ -49,6 +51,8 @@ ENDING_TEXT = {
 }
 # Endings that carry a reason staff see; Fixed needs none and a duplicate links to the original.
 ENDINGS_WITH_REASON = ("wont_fix", "declined", "no_longer_needed")
+# Priorities in words, as every page shows them (D76): never a bare "P1".
+PRIORITY_WORD = {"P1": "Blocking", "P2": "Major", "P3": "Minor", "P4": "Nice-to-have"}
 
 
 def status_text(fb: Feedback, merged_into: str | None = None) -> str:
@@ -107,6 +111,8 @@ class Submission:
     session_id: str | None = None
     chat_turns: list[tuple[str, str, datetime]] = field(default_factory=list)
     original_text: str = ""
+    # A fixed item the duplicate check matched in the chat: linked as a possible regression (D73).
+    regression_of: dict[str, str] | None = None
 
 
 @dataclass
@@ -173,7 +179,7 @@ async def submit(db: AsyncSession, sub: Submission) -> Created:
                 feedback_id=fb.id,
                 author_type="staff" if role == "user" else "agent",
                 author_email=sub.user.email if role == "user" else None,
-                author_name=sub.user.name if role == "user" else "Feedback agent",
+                author_name=sub.user.name if role == "user" else "Assistant",
                 message_type="chat",
                 body=mask(text),
                 created_at=at,
@@ -188,8 +194,8 @@ async def submit(db: AsyncSession, sub: Submission) -> Created:
     if sub.channel == "chat":
         labels = [
             CATEGORY_LABEL.get(fb.category or "", ""),
-            fb.priority or "",
-            project.name if project else "project to confirm",
+            PRIORITY_WORD.get(fb.priority or "", ""),
+            project.name if project else "tool to confirm",
         ]
         events.log(
             db,
@@ -221,6 +227,9 @@ async def submit(db: AsyncSession, sub: Submission) -> Created:
         )
     if fb.status == "acknowledged":
         events.log(db, fb.id, SYSTEM, "acknowledged", public_text="Acknowledged: passed on to the team as thanks")
+    if sub.regression_of:
+        # For the owner only: staff were told in the chat that it was fixed before.
+        events.log(db, fb.id, AGENT, "linked", after={"regression_of": sub.regression_of})
 
     await embeddings.store(db, fb.id, f"{fb.title}. {fb.summary}")
     await _notify_new(db, fb, routing)
@@ -273,9 +282,11 @@ async def plus_one(db: AsyncSession, user: User, ref_no: str, comment: str) -> F
         exists = await db.get(FeedbackFollower, (fb.id, user.email))
         if exists is None:
             db.add(FeedbackFollower(feedback_id=fb.id, email=user.email, name=user.name))
+    message_id = uuid.uuid4() if comment.strip() else None
     if comment.strip():
         db.add(
             FeedbackMessage(
+                id=message_id,
                 feedback_id=fb.id,
                 author_type="staff",
                 author_email=user.email,
@@ -304,7 +315,13 @@ async def plus_one(db: AsyncSession, user: User, ref_no: str, comment: str) -> F
     fb.updated_at = _now()
     fb.submitter_replied_at = _now()
     await notifications.notify_assignee(
-        db, fb, type="plus_one", title=f"+1 on {fb.ref_no}: {fb.title}", body=comment, actor_email=user.email
+        db,
+        fb,
+        type="plus_one",
+        title=f"+1 on {fb.ref_no}: {fb.title}",
+        body=comment,
+        actor_email=user.email,
+        message_id=message_id,
     )
     return await load(db, feedback_id=fb.id)
 
@@ -345,13 +362,31 @@ class TrackerView:
     attachments: list[Attachment]
     can_reply: bool
     muted: bool
+    check: dict[str, Any] | None = None
 
 
 def _public_text(e: FeedbackEvent) -> str:
     # Approvals logged before D43 read "Approved by Chris"; staff see "Planned (Chris accepted it)".
     if e.event_type == "status" and e.after.get("status") == "approved" and e.actor_name:
         return f"Planned ({e.actor_name} accepted it)"
+    # Items classified before D76 read "Classified: Bug, P1, ..."; staff see the word.
+    if e.event_type == "classified" and e.public_text:
+        return re.sub(r"\bP[1-4]\b", lambda m: PRIORITY_WORD[m.group()], e.public_text)
     return e.public_text or ""
+
+
+CHECK_STAGES = ("in_progress", "resolved")
+
+
+def open_check(fb: Feedback, messages: list[FeedbackMessage], evs: list[FeedbackEvent]) -> FeedbackMessage | None:
+    """The latest update or Resolve note that asked the person to try it, while they haven't said
+    whether it's fixed (D80). Messages and events oldest first."""
+    if fb.status not in CHECK_STAGES:
+        return None
+    ask = next((m for m in reversed(messages) if m.asks_check), None)
+    if ask is None or any(e.event_type == "checked" and e.created_at > ask.created_at for e in evs):
+        return None
+    return ask
 
 
 async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
@@ -381,7 +416,7 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
                 FeedbackMessage.is_internal.is_(False),
                 FeedbackMessage.message_type.in_(("reply", "progress", "follow_up")),
             )
-            .order_by(FeedbackMessage.created_at)
+            .order_by(FeedbackMessage.created_at, FeedbackMessage.id)
         )
     )
 
@@ -405,29 +440,50 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         for i, s in enumerate(STAGES)
     ]
 
+    # A Resolve note is written just before its status event, whose text quotes it; the two show as one
+    # entry, "Resolved by" with the note under it, so the words appear once (D80).
+    resolved = [e for e in public_events if e.event_type == "status" and (e.public_text or "").startswith("Resolved: ")]
+    notes: dict[datetime, FeedbackMessage] = {}
     # Messages first, so an update wins a tie with the event logged in the same moment.
     history: list[TimelineEntry] = []
     for m in messages:
-        if m.message_type == "progress":
-            history.append(TimelineEntry(m.created_at, f"Update: {first_sentence(m.body, 140)}", m.body))
+        note_of = next(
+            (
+                e.created_at
+                for e in resolved
+                if e.public_text == f"Resolved: {m.body.strip()[:140]}"
+                and timedelta(0) <= e.created_at - m.created_at < timedelta(seconds=1)
+            ),
+            None,
+        )
+        if m.message_type == "progress" and note_of is not None:
+            notes[note_of] = m
+        elif m.message_type == "progress":
+            history.append(TimelineEntry(m.created_at, f"Update from {m.author_name}", m.body))
         elif m.message_type == "reply":
             history.append(TimelineEntry(m.created_at, f"Reply from {m.author_name}", m.body))
         elif m.author_email == user.email:
             history.append(TimelineEntry(m.created_at, "You added details", m.body))
         else:
             history.append(TimelineEntry(m.created_at, "Another staff member added details"))
-    history += [TimelineEntry(e.created_at, _public_text(e)) for e in public_events]
+    for e in public_events:
+        note = notes.get(e.created_at)
+        if note is not None and e.event_type == "status":
+            history.append(TimelineEntry(e.created_at, f"Resolved by {note.author_name}", note.body))
+        else:
+            history.append(TimelineEntry(e.created_at, _public_text(e)))
     history.sort(key=lambda h: h.at, reverse=True)
+    ask = open_check(fb, messages, public_events)
 
     latest = next((m for m in reversed(messages) if m.message_type in ("progress", "reply")), None)
     assignee = None
     if fb.assignee is not None:
         owns = fb.project is not None and fb.project.owner_id == fb.assignee.id
         role = "Admin" if fb.assignee.role == "admin" else "Digital Staff"
+        # Name and role only: follow-ups go through the item, so they stay on the record (D75).
         assignee = {
             "name": fb.assignee.name,
             "role": f"{role} · {fb.project.name} owner" if owns and fb.project else role,
-            "email": fb.assignee.google_email,
         }
     merged = None
     if fb.duplicate_of:
@@ -450,20 +506,17 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         attachments=files,
         can_reply=fb.status not in CLOSED_STATUSES,
         muted=await notifications.is_muted(db, user.email, fb.id),
+        check={"by": ask.author_name, "body": ask.body, "at": ask.created_at.isoformat()} if ask else None,
     )
 
 
 async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedback:
     """Reply or add details from the tracker. A reply on a Resolved item reopens it (brief §4.2.7)."""
-    fb = await load(db, ref_no=ref_no)
-    if not await can_view(db, user, fb):
-        raise NotFound("We can't find that feedback.")
-    if user.is_digital and fb.submitter_email != user.email:
-        raise Forbidden("Reply from the console instead.")
-    if fb.status in CLOSED_STATUSES:
-        raise Conflict("closed", "This item is closed. Send a new piece of feedback instead.")
+    fb = await _load_for_reporter(db, user, ref_no)
+    message_id = uuid.uuid4()
     db.add(
         FeedbackMessage(
+            id=message_id,
             feedback_id=fb.id,
             author_type="staff",
             author_email=user.email,
@@ -494,6 +547,86 @@ async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) 
         title=f"{fb.ref_no}: {user.name} added details",
         body=body.strip(),
         actor_email=user.email,
+        message_id=message_id,
+    )
+    await db.flush()
+    return await load(db, feedback_id=fb.id)
+
+
+async def _load_for_reporter(db: AsyncSession, user: User, ref_no: str) -> Feedback:
+    """The item, for someone who raised it or followed it, while it is still open."""
+    fb = await load(db, ref_no=ref_no)
+    if not await can_view(db, user, fb):
+        raise NotFound("We can't find that feedback.")
+    if user.is_digital and fb.submitter_email != user.email:
+        raise Forbidden("Reply from the console instead.")
+    if fb.status in CLOSED_STATUSES:
+        raise Conflict("closed", "This item is closed. Send a new piece of feedback instead.")
+    return fb
+
+
+async def answer_check(db: AsyncSession, user: User, ref_no: str, fixed: bool, comment: str = "") -> Feedback:
+    """The person asked to try it says whether it's fixed (D80). Still happening reopens a Resolved
+    item to In progress. It's fixed is recorded and told to the owner, who closes it; whether it
+    closes by itself is an open decision."""
+    fb = await _load_for_reporter(db, user, ref_no)
+    messages = list(
+        await db.scalars(
+            select(FeedbackMessage)
+            .where(FeedbackMessage.feedback_id == fb.id)
+            .order_by(FeedbackMessage.created_at, FeedbackMessage.id)
+        )
+    )
+    evs = list(
+        await db.scalars(
+            select(FeedbackEvent).where(FeedbackEvent.feedback_id == fb.id, FeedbackEvent.event_type == "checked")
+        )
+    )
+    if open_check(fb, messages, evs) is None:
+        raise Conflict("no_check", "Nobody has asked you to check this. Reply instead.")
+    message_id = None
+    if comment.strip():
+        message_id = uuid.uuid4()
+        db.add(
+            FeedbackMessage(
+                id=message_id,
+                feedback_id=fb.id,
+                author_type="staff",
+                author_email=user.email,
+                author_name=user.name,
+                message_type="follow_up",
+                body=mask(comment.strip())[:4000],
+                # Stamped now, so their comment sits just before "said it's fixed" in the history.
+                created_at=stamp(),
+            )
+        )
+    said = "it's fixed" if fixed else "it's still happening"
+    events.log(db, fb.id, user.actor, "checked", after={"fixed": fixed}, public_text=f"{user.name} said {said}")
+    if not fixed and fb.status == "resolved":
+        events.log(
+            db,
+            fb.id,
+            user.actor,
+            "status",
+            before={"status": "resolved"},
+            after={"status": "in_progress"},
+            public_text="Reopened: still happening",
+        )
+        fb.status = "in_progress"
+        fb.resolved_at = None
+    fb.submitter_replied_at = _now()
+    fb.updated_at = _now()
+    await notifications.settle(db, fb.id, notifications.ANSWER, f"{fb.ref_no}: you replied", recipient=user.email)
+    await notifications.notify_assignee(
+        db,
+        fb,
+        type="check",
+        title=f"{fb.ref_no}: {user.name} says {said}",
+        body=comment.strip(),
+        actor_email=user.email,
+        message_id=message_id,
+        tab=None if message_id else "activity",
+        step="Confirmed fixed" if fixed else "Still happening",
     )
     await db.flush()
     return await load(db, feedback_id=fb.id)

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 
+import { PROJECT_GROUPS } from "@/components/chat/app-cards";
 import { STARTERS } from "@/components/chat/starters";
 import { useMe } from "@/components/me";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,12 +21,6 @@ const STEPS = [
   { title: "Tell Sig in your own words", body: "Up to three quick questions. You can attach a screenshot." },
   { title: "Check the summary", body: "Nothing is sent until you select Confirm." },
   { title: "Follow it like a parcel", body: "A reference such as FB-0137 and a tracker that shows who has it." },
-];
-
-const GROUPS: { key: Project["project_group"]; label: string }[] = [
-  { key: "platforms", label: "Platforms" },
-  { key: "agents", label: "Agents" },
-  { key: "other", label: "Other" },
 ];
 
 /**
@@ -107,7 +102,7 @@ function Landing() {
                   <SelectValue placeholder="Choose a tool" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GROUPS.map((g) => {
+                  {PROJECT_GROUPS.map((g) => {
                     const list = projects.filter((p) => p.project_group === g.key);
                     if (list.length === 0) return null;
                     return (

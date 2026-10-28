@@ -10,7 +10,7 @@ from typing import Any
 
 from google.adk.events import Event, EventActions
 from google.adk.runners import Runner
-from google.adk.sessions import BaseSessionService, DatabaseSessionService
+from google.adk.sessions import BaseSessionService, DatabaseSessionService, Session
 from google.genai import types
 
 from agent.agent import build_agent
@@ -18,6 +18,7 @@ from agent.model import ModelChoice, export_credentials, resolve
 from app.config import get_settings
 from app.services import usage
 from app.services.actors import User
+from app.services.drafts import with_tool
 
 log = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ async def create_session(user: User, project_hint: str | None, context: dict[str
     state: dict[str, Any] = {
         "user": {"email": user.email, "name": user.name, "role": user.role},
         "context": context,
-        "draft": {"project_slug": project_hint, "project_confidence": 1.0} if project_hint else {},
+        "draft": with_tool({}, project_hint) if project_hint else {},
         "draft_confirmed": False,
         "user_turns": 0,
         "messages": 0,
@@ -89,8 +90,13 @@ async def create_session(user: User, project_hint: str | None, context: dict[str
     return session.id
 
 
+async def get_session(user: User, session_id: str) -> Session | None:
+    """The user's own session, with its events; another person's session is never found."""
+    return await _session_service().get_session(app_name=APP_NAME, user_id=user.email, session_id=session_id)
+
+
 async def get_state(user: User, session_id: str) -> dict[str, Any] | None:
-    session = await _session_service().get_session(app_name=APP_NAME, user_id=user.email, session_id=session_id)
+    session = await get_session(user, session_id)
     return dict(session.state) if session else None
 
 
@@ -98,7 +104,8 @@ async def run_turn(
     user: User, session_id: str, parts: list[types.Part], state_delta: dict[str, Any]
 ) -> AsyncIterator[str]:
     """Send one user message (text and file parts); yield each piece of text the agent says.
-    The tokens each model call reports are recorded once the turn ends, even if it is cut short (D36)."""
+    The tokens each model call reports, thinking included, are recorded once the turn ends, even if it
+    is cut short (D36, D88)."""
     message = types.Content(role="user", parts=parts)
     calls = input_tokens = output_tokens = 0
     try:
@@ -109,6 +116,11 @@ async def run_turn(
                 calls += 1
                 input_tokens += int(event.usage_metadata.prompt_token_count or 0)
                 output_tokens += int(event.usage_metadata.candidates_token_count or 0)
+                output_tokens += int(event.usage_metadata.thoughts_token_count or 0)
+            if event.error_code and not event.partial:
+                # A model call that ended without a reply (MAX_TOKENS, MODEL_RETURNED_NO_CONTENT, ...): ADK
+                # ends the turn quietly, so say why. Codes only, never what was said.
+                log.warning("model call ended without a reply session=%s reason=%s", session_id, event.error_code)
             if event.partial or not event.content or event.author == "user":
                 continue
             for part in event.content.parts or []:

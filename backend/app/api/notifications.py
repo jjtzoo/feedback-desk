@@ -29,6 +29,7 @@ async def list_notifications(db: Db, user: CurrentUser) -> NotificationsOut:
                 "item_status": n.feedback.status,
                 "item_stage": STAGE_OF[n.feedback.status],
                 "item_ending": n.feedback.ending,
+                "reference": n.feedback.ref_no,
             }
             if n.feedback
             else {}

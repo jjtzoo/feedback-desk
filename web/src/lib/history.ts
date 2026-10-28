@@ -1,5 +1,5 @@
 import type { Category, FeedbackEvent, Priority, Project, Status, WorkType } from "@/lib/api";
-import { CATEGORY_LABEL, PRIORITY_LABEL, STATUS_LABEL, WORK_TYPE_LABEL, day } from "@/lib/format";
+import { CATEGORY_LABEL, IMPACT_LABEL, PRIORITY_LABEL, STATUS_LABEL, WORK_TYPE_LABEL, day } from "@/lib/format";
 
 /** Why routing chose the person, in words for the console (D56). The router's reasons are in app/services/router.py. */
 export function routingReason(reason: string, project: string | null): string {
@@ -67,14 +67,24 @@ export function historyLine(e: FeedbackEvent, projects: Project[]): string {
     }
     case "expected_by":
       return after.expected_by ? `Set Expected by to ${day(String(after.expected_by))}` : "Cleared Expected by";
+    case "classified": {
+      // From what was saved, so an item classified before D76 doesn't show "P1" or a tool's slug.
+      const parts = [CATEGORY_LABEL[after.category as Category], PRIORITY_LABEL[after.priority as Priority], projectName(after.project)];
+      return `Classified: ${parts.filter(Boolean).join(", ")}`;
+    }
     case "opened":
       return `${actorName(e)} opened it`;
     case "asked_for_info":
       return after.ask === "owner" ? "Asked the owner a question" : "Asked the person who raised it for more information";
     case "impact":
-      return `Impact raised to ${String(after.impact ?? "").replace(/_/g, " ")} after another report`;
-    case "linked":
-      return after.merged ? `${String(after.merged)} was merged into this` : "Linked another item";
+      return `Now affects ${IMPACT_LABEL[String(after.impact)] ?? "more people"} after another report`;
+    case "linked": {
+      if (after.merged) return `${String(after.merged)} was merged into this`;
+      // The chat matched an item fixed before (D73): the owner checks whether it has come back.
+      const fixed = after.regression_of as { reference?: string; fixed_on?: string } | undefined;
+      if (fixed?.reference) return `Possible regression of ${fixed.reference}, fixed ${fixed.fixed_on ? day(fixed.fixed_on) : "before"}`;
+      return "Linked another item";
+    }
     default:
       return e.public_text ?? "Updated it";
   }

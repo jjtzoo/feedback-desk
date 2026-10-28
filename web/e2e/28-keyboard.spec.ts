@@ -108,7 +108,7 @@ async function reachCard(page: Page, description: string) {
 test("S28.01 Tab through the landing page, chat, tracker and console: a visible focus ring on every control, in a sensible order", async ({ page, signIn, team }) => {
   test.setTimeout(120_000);
   await signIn("Liam");
-  // An approved item, so the landing page lists it, the tracker has an owner to email and the board has a card.
+  // An approved item, so the landing page lists it, the tracker has an owner and the board has a card.
   const ref = await raiseBug(page, "rake-agent", "RAKE Agent shows an error when I tab through it");
   await postJson(await team.as("Chris"), `/console/items/${ref}/approve`);
 
@@ -143,7 +143,6 @@ test("S28.01 Tab through the landing page, chat, tracker and console: a visible 
     ...HEADER,
     "Account: Liam Carter",
     "My feedback",
-    /^Email Darlene/,
     /^Mute notifications for this item/,
     "Reply or add details",
   ]);
@@ -354,5 +353,5 @@ test("S28.05 Status never relies on colour: badges carry a word, the stepper and
   const onBoard = darlene.locator("button", { hasText: ref });
   await expect(onBoard).toBeVisible();
   await expect(onBoard.getByText("P2 · Major", { exact: true })).toBeVisible();
-  await expect(onBoard.getByLabel("Unread reply from the submitter")).toBeVisible();
+  await expect(onBoard.getByText("New reply")).toBeVisible();
 });

@@ -4,6 +4,7 @@ card, "+1 and comment", and the backup form when the model is down (F10).
 Messages stream back as server-sent events:
   message    {"text"}                               something the agent says
   chips      {"kind", "options"}                    quick picks (project, impact, reply)
+  tool       {"slug"}                               the tool is known, so the app cards go (D99)
   duplicates {"candidates"}                         likely duplicates, for "+1 and comment"
   draft      {"card", "hash"}                       the confirm card, when Sig is at that step
   done       {"reference", "assigned_to", "status"} saved
@@ -14,11 +15,13 @@ Messages stream back as server-sent events:
 import asyncio
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import APIRouter, File, UploadFile
+from google.adk.sessions import Session
 from google.genai import types
 from sqlalchemy import select
 from sse_starlette.sse import EventSourceResponse
@@ -31,26 +34,35 @@ from app.errors import Conflict, NotFound, ServiceError
 from app.models import Attachment
 from app.schemas import (
     AttachmentOut,
+    ChatResumeOut,
     ChatStartIn,
     ChatStartOut,
+    ChatTurnOut,
     ConfirmIn,
     FallbackIn,
     MessageIn,
     PlusOneIn,
     ProjectOut,
     SavedOut,
+    ToolIn,
 )
 from app.services import catalog, files, usage
 from app.services import feedback as feedback_service
 from app.services.actors import User
 from app.services.drafts import (
     CHECK_SEND_CHIPS,
+    CONTINUE,
     GENERAL,
+    TOOL_QUESTION,
     card,
     draft_hash,
     first_sentence,
+    has_report,
     impact_chips,
     is_complete,
+    project_known,
+    step_line,
+    with_tool,
 )
 from app.services.privacy import mask
 from app.services.ratelimit import RateLimiter
@@ -61,6 +73,12 @@ session_limiter = RateLimiter(get_settings().chat_sessions_per_user_per_hour, 36
 
 SHOW_SUMMARY_LEAD = "Here's what I'll send"
 SHOW_SUMMARY = "Here's what I'll send. Check it and press Confirm, or tell me what to change."
+NO_WORDS = "Sorry, I lost my train of thought there. Could you say that again?"
+# Words that point at the card ("Hit the Confirm button on the card"), said without the card step (D87).
+CARD_LINE = re.compile(
+    rf"{re.escape(SHOW_SUMMARY_LEAD)}|\bconfirm\b[^.?!\n]*\bcard\b|\bcard\b[^.?!\n]*\bconfirm\b", re.IGNORECASE
+)
+ATTACHED = "[Attached: "
 
 
 @router.post("/chat/sessions", response_model=ChatStartOut)
@@ -84,8 +102,47 @@ async def start_session(body: ChatStartIn, user: CurrentUser, db: Db) -> ChatSta
     except Exception:
         log.exception("could not start an agent session")
         return ChatStartOut(mode="fallback", project=project_out, projects=project_list)
+    # The app cards put the person's usual tools first (D99); a page opened for a tool shows none.
+    usual = [] if project else await catalog.likely_projects(db, user.email, body.context.source, projects)
     return ChatStartOut(
-        mode="chat", session_id=sid, greeting=runtime.GREETING, project=project_out, projects=project_list
+        mode="chat",
+        session_id=sid,
+        greeting=runtime.GREETING,
+        project=project_out,
+        projects=project_list,
+        usual=[p.slug for p in usual],
+    )
+
+
+@router.get("/chat/sessions/{session_id}", response_model=ChatResumeOut)
+async def resume_session(session_id: str, user: CurrentUser, db: Db) -> ChatResumeOut:
+    """The chat so far, so a refresh picks it up again. A sent or ended chat is not resumed."""
+    session = await _session(user, session_id)
+    state = dict(session.state)
+    projects = await catalog.list_projects(db)
+    hint = state.get("project_hint")
+    project = next((p for p in projects if p.slug == hint), None) if hint else None
+    draft = state.get("draft") or {}
+    shown = draft_hash(draft) if is_complete(draft) else None
+    showing = shown is not None and state.get("card_hash") == shown
+    source = str((state.get("context") or {}).get("source") or "")
+    usual = [] if project else await catalog.likely_projects(db, user.email, source, projects)
+    files = await db.scalars(
+        select(Attachment).where(Attachment.session_id == session_id, Attachment.uploaded_by == user.email)
+    )
+    return ChatResumeOut(
+        mode="chat",
+        session_id=session_id,
+        project=ProjectOut.model_validate(project) if project else None,
+        projects=[ProjectOut.model_validate(p) for p in projects],
+        turns=_turns(session),
+        card=await _card(draft) if showing else None,
+        card_hash=shown if showing else None,
+        duplicates=state.get("duplicates") or [],
+        # The app cards and the thumbnails come back as they were (D99, D95).
+        usual=[p.slug for p in usual],
+        tool=draft["project_slug"] if project_known(draft) else None,
+        attachments=[AttachmentOut.model_validate(a) for a in files],
     )
 
 
@@ -100,22 +157,30 @@ async def upload(session_id: str, user: CurrentUser, db: Db, file: UploadFile = 
 @router.post("/chat/sessions/{session_id}/messages")
 async def send_message(session_id: str, body: MessageIn, user: StreamUser) -> EventSourceResponse:
     state = await _state(user, session_id)
-    settings = get_settings()
-    messages = int(state.get("messages") or 0)
-    if messages >= settings.max_messages_per_session:
-        raise ServiceError("rate_limited", "This chat has reached its message limit. Use the form instead.", 429)
     text = mask(body.text)
+    delta = _turn(state, text)
     parts = await _message_parts(user, session_id, text, body.attachment_ids)
-    delta = {
-        "messages": messages + 1,
-        "user_turns": int(state.get("user_turns") or 0) + 1,
-        # The person's own words (masked), so update_draft can tell whether they named the tool.
-        "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
-        # Suggested answers and the step belong to one turn: update_draft sets them again for the next.
-        "replies": [],
-        "step": None,
-    }
     return EventSourceResponse(_stream(user, session_id, parts, delta), headers=STREAM_HEADERS)
+
+
+@router.post("/chat/sessions/{session_id}/tool")
+async def pick_tool(session_id: str, body: ToolIn, user: StreamUser) -> EventSourceResponse:
+    """An app card (D99). Code sets the tool, the way `?project=` does, so the model never has to
+    guess or ask it; the tool's name is the person's turn, and Sig answers it like any message."""
+    state = await _state(user, session_id)
+    async with session_scope() as db:
+        project = await catalog.project_by_slug(db, body.project_slug)
+    if project is None:
+        raise NotFound("That tool isn't in the list any more. Please pick another or type it.")
+    delta = _turn(state, project.name) | {
+        "draft": with_tool(state.get("draft") or {}, project.slug),
+        "draft_confirmed": False,
+        "project_hint": project.slug,
+        "picked": project.name,
+    }
+    return EventSourceResponse(
+        _stream(user, session_id, [types.Part(text=project.name)], delta), headers=STREAM_HEADERS
+    )
 
 
 @router.post("/chat/sessions/{session_id}/confirm")
@@ -186,17 +251,61 @@ async def save_fallback(body: FallbackIn, user: CurrentUser, db: Db) -> SavedOut
 # --- helpers ------------------------------------------------------------------------------
 
 
-async def _state(user: User, session_id: str) -> dict[str, Any]:
+async def _session(user: User, session_id: str) -> Session:
     try:
-        state = await runtime.get_state(user, session_id)
+        session = await runtime.get_session(user, session_id)
     except Exception as exc:
         log.exception("could not read session %s", session_id)
         raise ServiceError("unavailable", "The chat isn't available right now.", 503) from exc
-    if state is None:
+    if session is None:
         raise NotFound("That chat has ended. Please start again.")
-    if state.get("saved"):
+    if session.state.get("saved"):
         raise Conflict("already_saved", "This chat's feedback is already sent.")
-    return state
+    return session
+
+
+async def _state(user: User, session_id: str) -> dict[str, Any]:
+    return dict((await _session(user, session_id)).state)
+
+
+def _turns(session: Session) -> list[ChatTurnOut]:
+    """What each side said, as the page showed it: no Confirm press, no file text, no tool calls."""
+    turns: list[ChatTurnOut] = []
+    for event in session.events:
+        parts = [p.text for p in (event.content.parts or []) if p.text and not p.thought] if event.content else []
+        if not parts:
+            continue
+        if event.author == "user":
+            if parts[0] == "Confirmed":
+                continue
+            files = [p.split("\n", 1)[0][len(ATTACHED) : -1] for p in parts[1:] if p.startswith(ATTACHED)]
+            turns.append(ChatTurnOut(role="user", text=parts[0], files=files))
+        else:
+            turns.extend(ChatTurnOut(role="agent", text=_without_card_fields(p)) for p in parts)
+    return turns
+
+
+async def _card(draft: dict[str, Any]) -> dict[str, Any]:
+    async with session_scope() as db:
+        slug = draft.get("project_slug")
+        project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
+    return card(draft, project.name if project else None)
+
+
+def _turn(state: dict[str, Any], text: str) -> dict[str, Any]:
+    """The state a new turn starts with, once the chat's message limit allows it."""
+    messages = int(state.get("messages") or 0)
+    if messages >= get_settings().max_messages_per_session:
+        raise ServiceError("rate_limited", "This chat has reached its message limit. Use the form instead.", 429)
+    return {
+        "messages": messages + 1,
+        "user_turns": int(state.get("user_turns") or 0) + 1,
+        # The person's own words (masked), so update_draft can tell whether they named the tool.
+        "user_text": f"{state.get('user_text') or ''}\n{text}"[-4000:],
+        # Suggested answers and the step belong to one turn: update_draft sets them again for the next.
+        "replies": [],
+        "step": None,
+    }
 
 
 def _user_words(state: dict[str, Any]) -> str:
@@ -220,7 +329,7 @@ async def _message_parts(user: User, session_id: str, text: str, ids: list[uuid.
             )
         )
         for att in rows:
-            note = f"[Attached: {att.file_name}]"
+            note = f"{ATTACHED}{att.file_name}]"
             if att.extracted_text:
                 note += f"\nText from the file:\n{mask(att.extracted_text)[:6000]}"
             parts.append(types.Part(text=note))
@@ -250,6 +359,11 @@ async def _project_chips(user: User, state: dict[str, Any]) -> list[dict[str, An
     ]
 
 
+def _asks_tool(text: str) -> bool:
+    """A question in the reply that asks which tool (D86)."""
+    return any(s.rstrip().endswith("?") and TOOL_QUESTION.search(s) for s in re.split(r"(?<=[.!?])\s+|\n", text))
+
+
 def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
     return {"event": event, "data": json.dumps(data, ensure_ascii=False, default=str)}
 
@@ -257,10 +371,18 @@ def _sse(event: str, data: dict[str, Any]) -> dict[str, str]:
 async def _stream(
     user: User, session_id: str, parts: list[types.Part], delta: dict[str, Any]
 ) -> AsyncIterator[dict[str, str]]:
+    said = False
+    words = ""
     try:
-        async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
-            async for raw in runtime.run_turn(user, session_id, parts, delta):
-                yield _sse("message", {"text": _without_card_fields(raw)})
+        # Gemini 3.8 Flash sometimes ends a turn after a tool call with no words: ask it once to go on.
+        for attempt in (parts, [types.Part(text=CONTINUE)]):
+            async with asyncio.timeout(get_settings().agent_turn_timeout_seconds):
+                async for raw in runtime.run_turn(user, session_id, attempt, delta if attempt is parts else {}):
+                    said = said or bool(raw.strip())
+                    words += raw
+                    yield _sse("message", {"text": _without_card_fields(raw)})
+            if said or (await runtime.get_state(user, session_id) or {}).get("saved"):
+                break
     except TimeoutError:
         log.warning("agent turn timed out session=%s", session_id)
         yield _sse("fallback", {"reason": "timeout"})
@@ -291,14 +413,29 @@ async def _stream(
     replies = state.get("replies") or []
     shown = draft_hash(draft) if is_complete(draft) else None
     keep = step == "show_card" or (step is None and shown is not None and state.get("card_hash") == shown)
+    if shown and not keep and step is None:
+        # Sig said the card line without the card step (D87), or said nothing after editing a card that
+        # was up or after its question about the problem (D85): the card it means shows.
+        after_question = bool(state.get("card_hash") or state.get("details_asked"))
+        keep = CARD_LINE.search(words) is not None if said else after_question
+    if not said and step is None and not keep and has_report(draft) and not project_known(draft):
+        # A silent turn with a report under way and no tool yet asks for the tool (D88).
+        step = "ask_tool"
+    asked_tool = step is None and not keep and not project_known(draft) and _asks_tool(words)
+    if project_known(draft):
+        yield _sse("tool", {"slug": draft["project_slug"]})
     if state.get("duplicates"):
         yield _sse("duplicates", {"candidates": state["duplicates"]})
+    if not said:
+        # The model can end a turn with tool calls and no words (seen on Gemini 3.8 Flash): never an empty
+        # reply. The step it signalled still says what comes next (D85).
+        # A silent turn after an app card still asks about that tool (D99).
+        picked = f"What's happening with {delta['picked']}?" if delta.get("picked") else None
+        line = SHOW_SUMMARY if keep and shown else step_line(step, draft) or picked or NO_WORDS
+        yield _sse("message", {"text": line})
     if keep and shown:
-        async with session_scope() as db:
-            slug = draft.get("project_slug")
-            project = await catalog.project_by_slug(db, slug) if slug and slug != GENERAL else None
-        yield _sse("draft", {"card": card(draft, project.name if project else None), "hash": shown})
-    elif step == "ask_tool":
+        yield _sse("draft", {"card": await _card(draft), "hash": shown})
+    elif step == "ask_tool" or asked_tool:
         yield _sse("chips", {"kind": "project", "options": await _project_chips(user, state)})
     elif step == "ask_impact" and not draft.get("priority"):
         yield _sse("chips", {"kind": "impact", "options": impact_chips(draft)})
@@ -307,8 +444,11 @@ async def _stream(
     elif step and replies:
         yield _sse("chips", {"kind": "reply", "options": [{"label": r, "value": r} for r in replies]})
     after: dict[str, Any] = {"card_hash": shown if keep else None}
-    if step and step.startswith("ask_"):
+    if (step and step.startswith("ask_")) or asked_tool:
         # Only intake questions count towards the 3 (brief §4.1.3); chat about Sig does not.
         after["questions"] = int(state.get("questions") or 0) + 1
+    if step == "ask_details":
+        # Its one question about the problem (D69): update_draft turns a second one into the card (D87).
+        after["details_asked"] = True
     await runtime.update_state(user, session_id, after)
     yield _sse("end", {})

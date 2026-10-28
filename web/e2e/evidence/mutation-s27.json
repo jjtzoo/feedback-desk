@@ -1,11 +1,12 @@
 {
-  "ran": "2026-10-26T04:19:33.959Z",
-  "commit": "a85dbb1",
-  "uncommitted": false,
+  "ran": "2026-10-27T22:34:17.911Z",
+  "commit": "a20c51e",
+  "uncommitted": true,
   "spec": "27-mobile.spec.ts",
-  "fingerprint": "ca24f9f5ca87c753",
+  "fingerprint": "76354618518f0c52",
   "caught": {
     "S27.06": true,
-    "S27.07": true
+    "S27.07": true,
+    "S27.08": true
   }
 }

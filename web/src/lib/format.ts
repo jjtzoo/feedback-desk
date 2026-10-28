@@ -62,6 +62,46 @@ export const STAGE_LABEL: Record<Stage, string> = {
   closed: "Closed",
 };
 
+/** The assistant's recommendation, effort and reach, in words (D76): never "needs_info" or "one_person". */
+export const RECOMMENDATION_LABEL: Record<string, string> = {
+  implement: "Implement",
+  decline: "Decline",
+  needs_info: "Needs more information",
+};
+
+export const IMPACT_LABEL: Record<string, string> = {
+  one_person: "one person",
+  team: "a team",
+  company: "the whole company",
+};
+
+export const EFFORT_LABEL: Record<string, string> = { S: "small", M: "medium", L: "large" };
+
+/** The recommendation line on the item panel and the approvals card. */
+export function recommendationText(r: { decision?: string; reason?: string }, effort: string | null, impact: string | null): { head: string; rest: string } {
+  const parts = [r.reason?.trim(), effort && `Effort: ${EFFORT_LABEL[effort] ?? effort}.`, impact && `Affects ${IMPACT_LABEL[impact] ?? impact}.`];
+  return { head: RECOMMENDATION_LABEL[r.decision ?? ""] ?? "No recommendation", rest: parts.filter(Boolean).join(" ") };
+}
+
+/** Where it was sent from, in the app's words: the browser's raw date string becomes "Tue 27 Oct, 5:25 am" (D76). */
+export function contextText(context: Record<string, unknown>): string {
+  return ["device", "browser", "screen", "source", "time"]
+    .map((k) => {
+      const value = context[k];
+      if (!value) return null;
+      if (k !== "time") return String(value);
+      const at = new Date(String(value));
+      return Number.isNaN(at.getTime()) ? String(value) : when(at.toISOString());
+    })
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/** Resolved or ended: the status leads and the priority goes quiet (D83). */
+export function isSettled(status: Status): boolean {
+  return ["resolved", "acknowledged", "declined", "closed"].includes(status);
+}
+
 export const WORK_TYPES = Object.keys(WORK_TYPE_LABEL) as WorkType[];
 export const CATEGORIES = Object.keys(CATEGORY_LABEL) as Category[];
 export const PRIORITIES: Priority[] = ["P1", "P2", "P3", "P4"];

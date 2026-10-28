@@ -1,15 +1,20 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { CalendarDays, Loader2 } from "lucide-react";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { enAU } from "react-day-picker/locale";
 
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Staff } from "@/lib/api";
+import { day } from "@/lib/format";
 
 export type ActionKind = "update" | "resolve" | "fix" | "close" | "decline" | "ask" | "merge" | "take_over" | "hand_over";
 
@@ -21,20 +26,24 @@ const CLOSE_ENDINGS: [CloseEnding, string, string][] = [
   ["no_longer_needed", "No longer needed", "It stopped mattering, or it's covered by something else."],
 ];
 
-const COPY: Record<ActionKind, { title: string; description: string; field: string; button: string; required: boolean }> = {
+const COPY: Record<ActionKind, { title: string; description: string; field: string; button: string; required: boolean; placeholder?: string }> = {
+  // Says when to use it, not only where it goes (D79); the panel names the person in the title.
   update: {
-    title: "Post a progress update",
-    description: "Staff see it on their tracker and get it in the app and by email.",
+    title: "Update the person who raised it",
+    description:
+      "For news they'd want: you've reproduced it, there's a workaround, a new date, or a fix ready to try. They see it on their tracker, in the app and by email. Work notes for the team go in an internal note.",
     field: "Update",
-    button: "Post update",
+    button: "Send update",
     required: false,
+    placeholder: "Reproduced it: the form clears when a submission fails. Working on a fix.",
   },
   resolve: {
     title: "Resolve",
-    description: "It becomes the last entry on the staff tracker.",
+    description: "Write it for the person who raised it: they see it on their tracker and by email, with It's fixed and Still happening to answer. Close as fixed once it's confirmed.",
     field: "What was done",
     button: "Resolve",
     required: true,
+    placeholder: "Fixed: a failed submission no longer clears your form. Please try it and tell us if it still happens.",
   },
   fix: {
     title: "Close as fixed",
@@ -91,6 +100,8 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
 export interface ActionResult {
   text: string;
   expectedBy?: string;
+  /** Update: ask them to try it, so their tracker asks whether it's fixed (D80). */
+  asksCheck?: boolean;
   ending?: CloseEnding;
   ask?: "submitter" | "owner";
   /** Hand over: who takes it. */
@@ -120,6 +131,8 @@ export function ActionDialog({
 }) {
   const [text, setText] = useState(initialText);
   const [expectedBy, setExpectedBy] = useState("");
+  const [asksCheck, setAsksCheck] = useState(false);
+  const [picking, setPicking] = useState(false);
   const [ending, setEnding] = useState<CloseEnding | null>(null);
   const [ask, setAsk] = useState<"submitter" | "owner">("submitter");
   const [to, setTo] = useState("");
@@ -150,12 +163,17 @@ export function ActionDialog({
       setError("Write an update or set an Expected by date.");
       return;
     }
+    if (kind === "update" && asksCheck && !text.trim()) {
+      setError("Say what to check.");
+      return;
+    }
     setBusy(true);
-    const ok = await onSubmit(kind, { text: text.trim(), expectedBy: expectedBy || undefined, ending: ending ?? undefined, ask, to: to || undefined });
+    const ok = await onSubmit(kind, { text: text.trim(), expectedBy: expectedBy || undefined, asksCheck, ending: ending ?? undefined, ask, to: to || undefined });
     setBusy(false);
     if (ok) {
       setText("");
       setExpectedBy("");
+      setAsksCheck(false);
       setEnding(null);
       setError(null);
       onClose();
@@ -164,10 +182,43 @@ export function ActionDialog({
 
   let extra: ReactNode = null;
   if (kind === "update") {
+    // A calendar in the app's own date style: the browser's date field shows US order in an en-US browser (D79).
     extra = (
       <div className="grid gap-2">
         <Label htmlFor="expected-by">Expected by (optional)</Label>
-        <Input id="expected-by" type="date" value={expectedBy} onChange={(e) => setExpectedBy(e.target.value)} className="h-11 rounded-xl" />
+        <div className="flex flex-wrap items-center gap-2">
+          <Popover open={picking} onOpenChange={setPicking}>
+            <PopoverTrigger asChild>
+              <Button id="expected-by" type="button" variant="outline" className="h-11 justify-start rounded-xl font-normal">
+                <CalendarDays aria-hidden="true" />
+                {expectedBy ? day(expectedBy) : "Pick a date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto p-0">
+              <Calendar
+                mode="single"
+                locale={enAU}
+                selected={expectedBy ? new Date(`${expectedBy}T00:00:00`) : undefined}
+                onSelect={(d) => {
+                  setExpectedBy(d ? isoDay(d) : "");
+                  setPicking(false);
+                }}
+              />
+            </PopoverContent>
+          </Popover>
+          {expectedBy && (
+            <Button type="button" variant="ghost" className="h-11 rounded-xl" onClick={() => setExpectedBy("")}>
+              Clear date
+            </Button>
+          )}
+        </div>
+        <Label className="mt-2 flex items-start gap-2 font-normal">
+          <Checkbox checked={asksCheck} onCheckedChange={(v) => setAsksCheck(v === true)} className="mt-0.5" />
+          <span>
+            Ask them to check it
+            <span className="block text-muted-foreground">Their tracker asks whether it&apos;s fixed, with It&apos;s fixed and Still happening.</span>
+          </span>
+        </Label>
       </div>
     );
   } else if (kind === "close") {
@@ -244,7 +295,7 @@ export function ActionDialog({
               {kind === "merge" ? (
                 <Input id="action-text" placeholder="FB-0138" value={text} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
               ) : (
-                <Textarea id="action-text" rows={4} value={text} maxLength={4000} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
+                <Textarea id="action-text" rows={4} value={text} maxLength={4000} placeholder={copy.placeholder} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
               )}
               {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
             </div>
@@ -261,4 +312,9 @@ export function ActionDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/** A picked calendar day as "2026-10-27", in local time (toISOString would shift it to UTC). */
+function isoDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

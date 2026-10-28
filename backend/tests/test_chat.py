@@ -1,5 +1,6 @@
 """Sprint 2: the staff chat on the stub model (S2-1 to S2-8)."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -18,13 +19,13 @@ from agent.stub import (
     SHOW_SUMMARY,
 )
 from app import agent_runtime
-from app.api.chat import _without_card_fields
+from app.api.chat import NO_WORDS, _without_card_fields
 from app.config import get_settings
 from app.db import session_scope
 from app.models import Attachment, Feedback, FeedbackEvent, FeedbackMessage, Notification
 from app.services import auth
 from app.services import feedback as feedback_service
-from app.services.drafts import is_complete
+from app.services.drafts import CONTINUE, is_complete
 from tests.conftest import STAFF, STAFF2, first, parse_sse, say, signed_in, start_chat, submit_via_chat, texts
 from tests.test_units import PNG, _docx
 
@@ -82,7 +83,7 @@ async def test_bug_conversation_routes_to_the_owner_and_waits_for_approval(staff
                 )
             )
         )
-        assert public == ["Received via chat", "Classified: Bug, P1, RAKE Agent", "Assigned to Darlene"]
+        assert public == ["Received via chat", "Classified: Bug, Blocking, RAKE Agent", "Assigned to Darlene"]
         turns = list(await db.scalars(select(FeedbackMessage).where(FeedbackMessage.feedback_id == fb.id)))
         assert turns[0].author_type == "agent" and any("blank answer" in t.body for t in turns)
         kinds = {n.type for n in await db.scalars(select(Notification))}
@@ -199,6 +200,27 @@ async def test_chat_belongs_to_the_person_who_started_it(staff: httpx.AsyncClien
     await other.aclose()
 
 
+async def test_a_refresh_picks_the_chat_up_again_until_it_is_sent(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff, project="flipbook")
+    events = await say(staff, sid, "Flipbook pages are blank, it's annoying, I expected pages but got white screens")
+    shown = first(events, "draft")
+    r = await staff.get(f"/api/chat/sessions/{sid}")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["project"]["slug"] == "flipbook"
+    assert [t["role"] for t in body["turns"]][:2] == ["agent", "user"]
+    assert body["turns"][1]["text"].startswith("Flipbook pages are blank")
+    assert [t["text"] for t in body["turns"] if t["role"] == "agent"][1:] == texts(events)
+    assert shown and body["card_hash"] == shown["hash"] and body["card"] == shown["card"]
+
+    other = await signed_in(STAFF2)
+    assert (await other.get(f"/api/chat/sessions/{sid}")).status_code == 404
+    await other.aclose()
+
+    await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": shown["hash"]})
+    assert (await staff.get(f"/api/chat/sessions/{sid}")).status_code == 409
+
+
 async def test_passwords_are_masked_before_storage(staff: httpx.AsyncClient) -> None:
     await submit_via_chat(
         staff, "Rake rejects my password: Hunter2 every time, it's annoying", ["I expected to get in but got an error"]
@@ -278,6 +300,72 @@ async def test_duplicate_is_offered_and_plus_one_adds_the_comment(staff: httpx.A
     await other.aclose()
 
 
+async def test_a_match_fixed_before_is_linked_as_a_possible_regression_not_offered_for_plus_one(
+    marc: httpx.AsyncClient, staff: httpx.AsyncClient
+) -> None:
+    """Review item 37: the duplicate check also looks at items fixed in the last months (D73)."""
+    old = (
+        await submit_via_chat(
+            staff,
+            "Flipbook pages are blank on the safety brochure, it's annoying",
+            ["I expected pages but got white screens"],
+            project="flipbook",
+        )
+    )["reference"]
+    async with session_scope() as db:
+        fb = await db.scalar(select(Feedback).where(Feedback.ref_no == old))
+        assert fb is not None
+        fb.status, fb.ending, fb.resolved_at = "closed", "fixed", datetime.now(UTC) - timedelta(days=30)
+    other = await signed_in(STAFF2)
+    sid = await start_chat(other, project="flipbook")
+    events = await say(
+        other, sid, "Flipbook pages are blank on the brochure, it's annoying, I expected pages but got white"
+    )
+    assert first(events, "duplicates") is None  # nothing to "+1": that one is closed
+    assert f"({old})" in texts(events)[-1] and "fixed on" in texts(events)[-1]
+    assert (await other.post(f"/api/chat/sessions/{sid}/plus-one", json={"reference": old})).status_code == 409
+    card = first(events, "draft")
+    assert card is not None
+    r = await other.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    new = first(parse_sse(r.text), "done")
+    assert new is not None and new["reference"] != old
+    item = (await marc.get(f"/api/console/items/{new['reference']}")).json()
+    linked = [e for e in item["events"] if e["event_type"] == "linked"]
+    assert linked and linked[0]["after"]["regression_of"]["reference"] == old
+    assert linked[0]["public_text"] is None  # for the owner, not the tracker
+    await other.aclose()
+
+
+async def test_a_fix_older_than_the_window_is_not_matched(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old = (
+        await submit_via_chat(
+            staff,
+            "Flipbook pages are blank on the safety brochure, it's annoying",
+            ["I expected pages but got white screens"],
+            project="flipbook",
+        )
+    )["reference"]
+    async with session_scope() as db:
+        fb = await db.scalar(select(Feedback).where(Feedback.ref_no == old))
+        assert fb is not None
+        fb.status, fb.ending, fb.resolved_at = "closed", "fixed", datetime.now(UTC) - timedelta(days=200)
+    other = await signed_in(STAFF2)
+    sid = await start_chat(other, project="flipbook")
+    events = await say(
+        other, sid, "Flipbook pages are blank on the brochure, it's annoying, I expected pages but got white"
+    )
+    assert old not in texts(events)[-1]
+    monkeypatch.setattr(get_settings(), "duplicate_fixed_days", 365)
+    sid = await start_chat(other, project="flipbook")
+    events = await say(
+        other, sid, "Flipbook pages are blank on the brochure, it's annoying, I expected pages but got white"
+    )
+    assert f"({old})" in texts(events)[-1]
+    await other.aclose()
+
+
 async def test_the_console_tallies_reporters_and_suggests_a_priority_review_without_changing_it(
     staff: httpx.AsyncClient, marc: httpx.AsyncClient
 ) -> None:
@@ -351,6 +439,36 @@ async def test_model_error_switches_to_the_backup_form(
     assert first(await say(staff, sid, "RAKE is broken"), "fallback") == {"reason": "error"}
 
 
+async def test_a_turn_with_no_words_never_shows_an_empty_reply(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Gemini once ended a turn with tool calls and no text (access-new-starter, 27 Oct)."""
+    sid = await start_chat(staff)
+
+    async def silent(*args: Any, **kwargs: Any) -> Any:
+        return
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(agent_runtime, "run_turn", silent)
+    assert texts(await say(staff, sid, "I need access to the Financial Platform")) == [NO_WORDS]
+
+
+async def test_a_silent_turn_is_asked_once_to_go_on_and_the_nudge_is_not_the_persons(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sid = await start_chat(staff)
+    sent: list[str] = []
+
+    async def silent_then_words(user: Any, session_id: str, parts: Any, delta: Any) -> Any:
+        sent.append(parts[0].text)
+        if len(sent) == 2:
+            yield "Got it. Which screen was it on?"
+
+    monkeypatch.setattr(agent_runtime, "run_turn", silent_then_words)
+    assert texts(await say(staff, sid, "The CPD Tracker lost my points")) == ["Got it. Which screen was it on?"]
+    assert sent == ["The CPD Tracker lost my points", CONTINUE]
+
+
 async def test_sessions_survive_an_api_restart(staff: httpx.AsyncClient) -> None:
     sid = await start_chat(staff, project="flipbook")
     await say(staff, sid, "Flipbook crashes when I open the brochure")
@@ -377,6 +495,28 @@ async def test_the_tool_chips_put_the_persons_usual_tools_first(staff: httpx.Asy
     assert not any(o.get("usual") for o in chips["options"][1:])
 
 
+async def test_the_27_oct_goformz_opening_offers_the_persons_goformz_first_and_no_impact_question(
+    staff: httpx.AsyncClient,
+) -> None:
+    """Review items 21 and 24 (D60): "my app, so slow" names no tool; their usual tool leads the chips."""
+    await submit_via_chat(
+        staff,
+        "GoFormz inspection form won't sync, it's annoying",
+        ["I expected it to sync"],
+        project="goformz-extension-portal",
+    )
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "I'm having trouble with my app it's so slow")
+    chips = first(events, "chips")
+    assert chips is not None and chips["kind"] == "project"
+    assert chips["options"][0] == {
+        "label": "GoFormz Extension Portal",
+        "value": "GoFormz Extension Portal",
+        "usual": True,
+    }
+    assert ASK_IMPACT not in texts(events)
+
+
 async def test_impact_chips_only_follow_an_impact_question(staff: httpx.AsyncClient) -> None:
     sid = await start_chat(staff)
     events = await say(staff, sid, "RAKE gives a blank answer when I ask about leave.")
@@ -386,7 +526,10 @@ async def test_impact_chips_only_follow_an_impact_question(staff: httpx.AsyncCli
         "Can't work at all",
         "Slower, but I get there",
         "Minor, I can live with it",
+        "Something else",
     ]
+    # Review item 22: the last chip only puts the cursor in the message box; the page sends nothing.
+    assert [o.get("own_words", False) for o in chips["options"]] == [False, False, False, True]
     events = await say(staff, sid, "I can't work at all")
     assert texts(events)[-1] == ASK_EXPECTED and first(events, "chips") is None  # an open question: no chips
 
@@ -466,6 +609,89 @@ COMPLETE = {
 }
 
 
+FAULT = COMPLETE | {"work_type": "fix", "category": "bug", "summary": "RAKE gives a blank answer"}
+
+
+def _model_leaves(state: dict[str, Any]) -> Any:
+    """A model turn that says nothing, even when asked to go on, and leaves `state` (27 Oct run)."""
+
+    async def turn(user: Any, session_id: str, parts: Any, delta: dict[str, Any]) -> Any:
+        await agent_runtime.update_state(user, session_id, delta | state)
+        return
+        yield  # pragma: no cover
+
+    return turn
+
+
+async def test_a_silent_turn_still_asks_the_question_its_step_signalled(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D85: answers-steps-when-asked-tool showed "lost my train of thought" with no tool chips."""
+    sid = await start_chat(staff)
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({"step": "ask_tool"}))
+    events = await say(staff, sid, "it keeps giving me grief")
+    assert texts(events) == ["Which tool is this about?"]
+    assert (first(events, "chips") or {}).get("kind") == "project"
+
+
+async def test_a_silent_turn_with_a_report_and_no_tool_asks_for_the_tool(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D88: answers-steps-when-asked-tool went silent with no step after the person gave their steps."""
+    sid = await start_chat(staff)
+    report = {"summary": "Certificate upload does nothing", "steps": ["Click upload", "Pick the PDF"]}
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({"draft": report}))
+    events = await say(staff, sid, "I click upload, pick the pdf, then nothing happens")
+    assert texts(events) == ["Which tool is this about?"]
+    assert (first(events, "chips") or {}).get("kind") == "project"
+
+
+async def test_a_silent_turn_shows_the_card_it_edited_or_the_one_its_question_led_to(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D85: after-card-wrong-tool swapped the tool in silence; two-problems-same-tool went silent after
+    its question about the problem."""
+    sid = await start_chat(staff)
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(SHOW_SUMMARY, {"draft": FAULT, "step": "show_card"}))
+    assert first(await say(staff, sid, "RAKE gives a blank answer, every time"), "draft") is not None
+    swapped = FAULT | {"project_slug": "training-portal"}
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({"draft": swapped}))
+    events = await say(staff, sid, "sorry I meant the training portal")
+    assert texts(events) == [SHOW_SUMMARY]
+    assert (first(events, "draft") or {})["card"]["project"] == "Training Portal"
+
+    sid = await start_chat(staff)
+    question = "Which screen was it on, and does it happen every time?"
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(question, {"draft": FAULT, "step": "ask_details"}))
+    assert first(await say(staff, sid, "RAKE gives a blank answer"), "draft") is None
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_leaves({}))
+    events = await say(staff, sid, "the leave page, every time since this morning")
+    assert texts(events) == [SHOW_SUMMARY] and first(events, "draft") is not None
+
+
+async def test_the_tool_asked_in_words_without_its_step_still_gets_the_tool_chips(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D86: the page offered no chips under "Which tool is this about?" when the step was left out."""
+    sid = await start_chat(staff)
+    question = "Sorry to hear that. Which tool is this about?"
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(question, {"draft": {"category": "bug"}}))
+    assert (first(await say(staff, sid, "something keeps crashing"), "chips") or {}).get("kind") == "project"
+    # Once the tool is known, the same words offer nothing.
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(question, {"draft": FAULT}))
+    assert first(await say(staff, sid, "RAKE, I said"), "chips") is None
+
+
+async def test_words_about_the_card_show_the_card_without_its_step(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D87: one-word-bug-staff-admin said "Hit the Confirm button on the card" with no card up."""
+    sid = await start_chat(staff)
+    line = "Hit the Confirm button on the card to send it off, or let me know what to change."
+    monkeypatch.setattr(agent_runtime, "run_turn", _model_says(line, {"draft": FAULT}))
+    assert first(await say(staff, sid, "leave balance wrong"), "draft") is not None
+
+
 async def test_an_answer_with_a_complete_draft_shows_no_card_without_the_card_step(
     staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -522,3 +748,129 @@ async def test_the_card_stays_up_for_a_yes_and_goes_when_they_change_their_mind(
     events = await say(staff, sid, "never mind")
     assert texts(events) == [NOT_SENT] and first(events, "draft") is None
     assert await count() == 0
+
+
+# --- D99: the chat opens with the app cards; D95: screenshots ------------------------------
+
+
+async def pick(client: httpx.AsyncClient, sid: str, slug: str) -> list[tuple[str, dict[str, Any]]]:
+    r = await client.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": slug})
+    assert r.status_code == 200, r.text
+    return parse_sse(r.text)
+
+
+async def test_a_new_chat_lists_the_persons_usual_tools_for_the_cards(staff: httpx.AsyncClient) -> None:
+    await submit_via_chat(
+        staff, "RAKE gives a blank answer when I ask about leave.", ["It's blocking my work", "I expected an answer"]
+    )
+    r = await staff.post("/api/chat/sessions", json={"context": {"source": "https://tools.example/it-asset"}})
+    assert r.json()["usual"] == ["it-asset", "rake-agent"]
+    assert {p["slug"] for p in r.json()["projects"]} >= {"it-asset", "rake-agent", "intranet"}
+    # A page opened for a tool skips the cards.
+    r = await staff.post("/api/chat/sessions", json={"project_slug": "flipbook"})
+    assert r.json()["usual"] == []
+
+
+async def test_a_card_sets_the_tool_so_sig_asks_what_happened_never_which_tool(
+    staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    submitted: list[feedback_service.Submission] = []
+    real_submit = feedback_service.submit
+
+    async def spy(db: Any, sub: feedback_service.Submission) -> Any:
+        submitted.append(sub)
+        return await real_submit(db, sub)
+
+    monkeypatch.setattr(feedback_service, "submit", spy)
+    sid = await start_chat(staff)
+    events = await pick(staff, sid, "it-asset")
+    assert texts(events) == ["What's happening with IT Asset?"]
+    assert first(events, "tool") == {"slug": "it-asset"} and first(events, "chips") is None
+    events = await say(staff, sid, "Asset search takes about a minute and it's slowing me down")
+    said = texts(events)
+    for answer in ["I expected results in a second or two"]:
+        if first(events, "draft"):
+            break
+        events = await say(staff, sid, answer)
+        said += texts(events)
+    assert ASK_PROJECT not in said
+    card = first(events, "draft")
+    assert card is not None and card["card"]["project"] == "IT Asset"
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    done = first(parse_sse(r.text), "done")
+    # Code routed it to the tool's owner; the model named nobody (D2).
+    assert done is not None and done["assigned_to"] == "Darlene"
+    async with session_scope() as db:
+        fb = await feedback_service.load(db, ref_no=done["reference"])
+        assert fb.project is not None and fb.project.slug == "it-asset"
+        assert fb.ai_confidence["project"] == 1.0
+    # What they wrote, not the card's tool name, is their own words (the quote and the abuse check).
+    assert submitted[0].original_text.startswith("Asset search takes about a minute")
+
+
+async def test_a_card_answers_the_tool_question_after_typing_first(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "The export button throws an error every single time")
+    assert texts(events)[-1] == ASK_PROJECT and first(events, "tool") is None
+    events = await pick(staff, sid, "financial-platform")
+    assert first(events, "tool") == {"slug": "financial-platform"}
+    assert ASK_PROJECT not in texts(events)
+
+
+async def test_a_card_never_confirms_and_refuses_an_unknown_tool(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff, project="flipbook")
+    events = await say(staff, sid, "Flipbook crashes when I open the brochure, it's blocking my work")
+    while first(events, "draft") is None:
+        events = await say(staff, sid, "I expected the brochure to open")
+    hash_before = first(events, "draft")["hash"]  # type: ignore[index]
+    # A card picked with the summary up changes the draft: the old summary can't be confirmed (D12).
+    await pick(staff, sid, "training-portal")
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": hash_before})
+    assert r.status_code == 409 and await count() == 0
+    r = await staff.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": "not-a-tool"})
+    assert r.status_code == 404
+    other = await signed_in(STAFF2)
+    r = await other.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": "flipbook"})
+    assert r.status_code == 404
+    await other.aclose()
+
+
+async def test_the_page_hears_the_tool_once_it_is_named_not_guessed(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff)
+    assert first(await say(staff, sid, "the page is slow to load"), "tool") is None
+    sid = await start_chat(staff)
+    events = await say(staff, sid, "Flipbook crashes when I open the brochure")
+    assert first(events, "tool") == {"slug": "flipbook"}
+
+
+async def test_the_tracker_shows_the_teams_images_apart_and_gives_the_upload_limits(
+    staff: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    sid = await start_chat(staff, project="staff-admin-portal")
+    up = await staff.post(f"/api/chat/sessions/{sid}/attachments", files={"file": ("Screenshot.png", PNG, "image/png")})
+    events = await say(
+        staff,
+        sid,
+        "Login loops on my phone, it's blocking, I expected the dashboard but got the sign-in page",
+        [up.json()["id"]],
+    )
+    card = first(events, "draft")
+    assert card is not None
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    ref = first(parse_sse(r.text), "done")["reference"]  # type: ignore[index]
+    # The person adds a pasted screenshot on the tracker; the owner replies with one showing the fix.
+    mine = await staff.post(f"/api/feedback/{ref}/attachments", files={"file": ("Screenshot 2.png", PNG, "image/png")})
+    fix = await darlene.post(f"/api/feedback/{ref}/attachments", files={"file": ("fixed.png", PNG, "image/png")})
+    assert mine.status_code == 201 and fix.status_code == 201
+    fake = await darlene.post(
+        f"/api/feedback/{ref}/attachments", files={"file": ("x.png", b"not an image", "image/png")}
+    )
+    assert fake.status_code == 415
+    tracker = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    assert [(a["file_name"], a["from_team"]) for a in tracker["attachments"]] == [
+        ("Screenshot.png", False),
+        ("Screenshot 2.png", False),
+        ("fixed.png", True),
+    ]
+    assert tracker["max_files"] == get_settings().max_files_per_item
+    assert tracker["max_file_mb"] == get_settings().max_file_mb

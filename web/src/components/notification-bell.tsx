@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell } from "lucide-react";
+import { ArrowRight, Bell } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -21,6 +21,8 @@ const RETRY_MAX_MS = 60_000;
  * timeout); once the stream is back, polling stops. Clicking a notification opens its item.
  * A request someone has already acted on shows what happened instead ("FB-0003 approved by Chris"),
  * and each item's badge is its stage now, so an old message never contradicts the item (D54).
+ * One row per item: its latest step on top, the steps so far as a trail, the summary once; the row
+ * is unread while any step in it is, and opening it reads them all (D78).
  */
 export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }) {
   const [items, setItems] = useState<Notification[]>([]);
@@ -79,9 +81,10 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
     load();
   }
 
-  async function readOne(n: Notification) {
+  async function readGroup(group: Notification[]) {
     setOpen(false);
-    if (!n.read_at) await api.post("/notifications/read", { ids: [n.id] }).catch(() => undefined);
+    const ids = group.filter((n) => !n.read_at).map((n) => n.id);
+    if (ids.length) await api.post("/notifications/read", { ids }).catch(() => undefined);
     load();
   }
 
@@ -113,28 +116,61 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
         </div>
         <ul className="max-h-[60vh] divide-y overflow-y-auto" aria-live="polite">
           {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted-foreground">No updates yet. Progress on your feedback appears here.</li>}
-          {items.map((n) => (
-            <li key={n.id}>
-              <Link href={n.link} onClick={() => readOne(n)} className="flex gap-3 px-4 py-3 hover:bg-muted">
-                <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", n.read_at ? "bg-transparent" : "bg-foreground")} aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className={cn("block text-sm", !n.read_at && "font-semibold")}>{n.outcome ?? n.title}</span>
-                  {n.body && !n.outcome && <span className="line-clamp-2 block text-sm text-muted-foreground">{n.body}</span>}
-                  <span className="mt-1 flex flex-wrap items-center gap-2">
-                    <ItemBadge n={n} />
-                    <time dateTime={n.created_at} title={when(n.created_at)} className="font-mono text-xs text-muted-foreground tabular">
-                      {age(n.created_at)}
-                    </time>
+          {byItem(items).map((group) => {
+            const n = group[group.length - 1];
+            const unreadRow = group.some((g) => !g.read_at);
+            const trail = steps(group);
+            const summary = [...group].reverse().find((g) => g.body && !g.outcome)?.body;
+            return (
+              <li key={n.id}>
+                <Link href={n.link} onClick={() => readGroup(group)} className="flex gap-3 px-4 py-3 hover:bg-muted">
+                  <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", unreadRow ? "bg-foreground" : "bg-transparent")} aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className={cn("block text-sm", unreadRow && "font-semibold")}>{n.outcome ?? n.title}</span>
+                    {trail.length > 1 && (
+                      <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <span className="sr-only">Steps so far: {trail.join(", then ")}</span>
+                        {trail.map((step, i) => (
+                          <span key={`${step}-${i}`} className="inline-flex items-center gap-1" aria-hidden="true">
+                            {i > 0 && <ArrowRight className="size-3" />}
+                            {step}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                    {summary && <span className="line-clamp-2 block text-sm text-muted-foreground">{summary}</span>}
+                    <span className="mt-1 flex flex-wrap items-center gap-2">
+                      <ItemBadge n={n} />
+                      <time dateTime={n.created_at} title={when(n.created_at)} className="font-mono text-xs text-muted-foreground tabular">
+                        {age(n.created_at)}
+                      </time>
+                    </span>
                   </span>
-                </span>
-                {!n.read_at && <span className="sr-only">Unread</span>}
-              </Link>
-            </li>
-          ))}
+                  {unreadRow && <span className="sr-only">Unread</span>}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </PopoverContent>
     </Popover>
   );
+}
+
+/** One group per item, newest group first; each group oldest step first. Rows with no item (the standing
+ *  approvals count, digests) stay on their own (D55). The API lists newest first. */
+function byItem(items: Notification[]): Notification[][] {
+  const groups = new Map<string, Notification[]>();
+  for (const n of items) {
+    const key = n.feedback_id ?? n.id;
+    groups.set(key, [n, ...(groups.get(key) ?? [])]);
+  }
+  return [...groups.values()];
+}
+
+/** The steps in order, a repeat in a row shown once ("Update → Reply", not "Update → Update → Reply"). */
+function steps(group: Notification[]): string[] {
+  return group.map((n) => n.step ?? n.title).filter((step, i, all) => step !== all[i - 1]);
 }
 
 /** The item's stage now: console words for the Digital team, the staff stage on a staff tracker link; an ended item shows its ending. */

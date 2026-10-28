@@ -76,14 +76,15 @@ function events(body: string): { name: string; data: Record<string, unknown> }[]
 
 /**
  * Raise feedback as the signed-in person without the screen, to set up what a test then looks at.
+ * `context` is what the page would send with the chat (device, browser, time).
  * Answers any question the stub asks until the card shows (a yes to "Want me to send that to the team?"
  * for praise and questions, D64), then confirms. Returns the reference.
  */
-export async function raise(page: Page, message: string, answers: string[] = [], project: string | null = null) {
+export async function raise(page: Page, message: string, answers: string[] = [], project: string | null = null, context: Record<string, string> = {}) {
   const api = page.request;
   // Every response is kept, so a failed setup says what the API actually sent back.
   const seen: string[] = [];
-  const opened = await api.post("/api/chat/sessions", { data: { project_slug: project, context: {} }, timeout: TIMEOUT });
+  const opened = await api.post("/api/chat/sessions", { data: { project_slug: project, context }, timeout: TIMEOUT });
   const startBody = await opened.text();
   seen.push(`start ${opened.status()} ${startBody.slice(0, 300)}`);
   const start = opened.ok() ? (JSON.parse(startBody) as { session_id?: string; mode?: string }) : {};
@@ -126,6 +127,22 @@ export async function raiseBug(page: Page, project: string, title = "The page sh
 export function pdf(name: string, bytes = 400) {
   const head = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n");
   return { name, mimeType: "application/pdf", buffer: Buffer.concat([head, Buffer.alloc(Math.max(0, bytes - head.length), 32)]) };
+}
+
+/** A real one-pixel PNG, so the upload's content check passes. */
+export const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg==", "base64");
+
+/** Paste into a box the way Ctrl+V of a screenshot does: a clipboard holding a picture called image.png and no text. */
+export async function pasteImage(box: Locator, text = "") {
+  await box.evaluate(
+    (el, { bytes, text }) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(bytes)], "image.png", { type: "image/png" }));
+      if (text) dt.setData("text/plain", text);
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    },
+    { bytes: Array.from(PNG), text },
+  );
 }
 
 type Dropped = { name: string; mimeType: string; buffer: Buffer };

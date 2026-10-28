@@ -73,7 +73,9 @@ async def test_full_lifecycle_end_to_end(
     assert t["assignee"]["name"] == "Darlene" and t["assignee"]["role"] == "Digital Staff · RAKE Agent owner"
     assert t["latest_update"]["body"] == "Found the cause; the fix is in testing."
     history = [h["text"] for h in t["history"]]
-    assert history[0].startswith("Update: Found the cause")
+    # An update shows once: who it's from, then its words (D80).
+    assert history[0] == "Update from Darlene"
+    assert t["history"][0]["detail"] == "Found the cause; the fix is in testing."
     for line in (
         "Expected by Fri 23 Oct",
         "Darlene started work",
@@ -96,7 +98,9 @@ async def test_full_lifecycle_end_to_end(
     assert (await darlene.get("/api/console/items", params=overdue)).json()["items"] == []
     assert (await darlene.get("/api/console/counts")).json()["overdue"] == 0
     resolved = (await staff.get(f"/api/feedback/{ref}/tracker")).json()["history"]
-    assert resolved[0]["text"] == "Resolved: Fix deployed" and resolved[1]["text"] == "Update: Fix deployed"
+    # The Resolve note and the status change are one entry, so the words show once (D80).
+    assert resolved[0] == {"at": resolved[0]["at"], "text": "Resolved by Darlene", "detail": "Fix deployed"}
+    assert resolved[1]["text"] != "Update from Darlene" or resolved[1]["detail"] != "Fix deployed"
     # The Windows clock ticks every ~16 ms; the reply must land after the assignee last read it.
     await asyncio.sleep(0.05)
     t = (await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Still blank on my phone"})).json()
@@ -107,7 +111,7 @@ async def test_full_lifecycle_end_to_end(
         for c in col["items"]
         if c["reference"] == ref
     )
-    assert card["unread_reply"] is True
+    assert card["unread"] is True
 
     await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fixed for mobile too"})
     # A resolved item closes as fixed, never as won't fix (D45).

@@ -21,6 +21,8 @@ from app.models.enums import (
 )
 
 GENERAL = "general"
+# Sent to the model when a turn ended with tool calls and no words; never part of the saved transcript.
+CONTINUE = "(Your last turn showed the person nothing. Reply to them now, in words.)"
 REQUIRED = ("project_slug", "work_type", "category", "priority", "summary", "title")
 ENUMS: dict[str, tuple[str, ...]] = {
     "target_type": TARGET_TYPES,
@@ -41,6 +43,8 @@ TEXT_LIMITS = {
 BRIEF_TEXT = ("problem", "expected", "actual", "who_needs_it", "asking_for", "submitter_quote")
 BRIEF_LISTS = ("steps", "done_when", "open_gaps")
 CONFIDENCE = ("project", "work_type", "category", "priority")
+# A number, letter or bullet the model put in front of a list item: "1.", "2)", "Step 3:", "a.", "-", "•".
+LIST_MARKER = re.compile(r"^\s*(?:(?:step\s*)?\d{1,2}\s*[.):](?=\s)|[a-z][.)](?=\s)|[-*•](?=\s))\s*", re.IGNORECASE)
 
 WORK_TYPE_LABEL = {"fix": "Fix", "improvement": "Improvement", "new_feature": "New feature", "no_change": "No change"}
 CATEGORY_LABEL = {
@@ -93,7 +97,9 @@ def apply_update(draft: Draft, updates: dict[str, Any], valid_slugs: set[str]) -
             new["brief"][field] = str(value).strip()[:2000]
         elif field in BRIEF_LISTS:
             items = value if isinstance(value, list) else [value]
-            new["brief"][field] = [str(i).strip()[:500] for i in items if str(i).strip()][:10]
+            # Every page and email numbers or bullets these lists itself, so the model's own "1." goes.
+            cleaned = (LIST_MARKER.sub("", str(i)).strip() for i in items)
+            new["brief"][field] = [i[:500] for i in cleaned if i][:10]
         elif field.endswith("_confidence") and field.removesuffix("_confidence") in CONFIDENCE:
             try:
                 new["confidence"][field.removesuffix("_confidence")] = max(0.0, min(1.0, float(value)))
@@ -108,6 +114,15 @@ def apply_update(draft: Draft, updates: dict[str, Any], valid_slugs: set[str]) -
     if new.get("category") == "praise" and not new.get("priority"):
         new["priority"] = "P4"
     return new, errors
+
+
+def with_tool(draft: Draft, slug: str) -> Draft:
+    """The draft with a tool the person chose on the page (`?project=` or an app card, D99): certain,
+    so Sig never asks which tool."""
+    new: Draft = json.loads(json.dumps(draft or {}))
+    new["project_slug"] = slug
+    new.setdefault("confidence", {})["project"] = 1.0
+    return new
 
 
 def missing(draft: Draft) -> list[str]:
@@ -156,6 +171,9 @@ IMPACT_IDEA = [
     {"label": "Would save me time daily", "value": "It would save me time every day"},
     {"label": "Nice to have", "value": "It's a nice-to-have"},
 ]
+# After the impact answers, for a case they don't cover (review item 22): the page puts the cursor in
+# the message box and sends nothing.
+OWN_WORDS_CHIP = {"label": "Something else", "value": "Something else", "own_words": True}
 
 # What Sig's next message does, signalled through update_draft's next_step (review item 20): the page
 # shows the card and the chips for that step only, never because the draft happens to be complete.
@@ -169,9 +187,45 @@ CHECK_SEND_CHIPS = [
 ]
 
 
-def impact_chips(draft: Draft) -> list[dict[str, str]]:
-    idea = draft.get("work_type") in ("improvement", "new_feature") or draft.get("category") == "feature_request"
-    return IMPACT_IDEA if idea else IMPACT_FAULT
+def _is_idea(draft: Draft) -> bool:
+    return draft.get("work_type") in ("improvement", "new_feature") or draft.get("category") == "feature_request"
+
+
+def impact_chips(draft: Draft) -> list[dict[str, Any]]:
+    return [*(IMPACT_IDEA if _is_idea(draft) else IMPACT_FAULT), OWN_WORDS_CHIP]
+
+
+# The question for a step, said for Sig when a turn signalled it but had no words even after the
+# retry (D85): the chips then sit under the question they belong to.
+def step_line(step: str | None, draft: Draft) -> str | None:
+    idea = _is_idea(draft)
+    lines = {
+        "ask_tool": "Which tool is this about?",
+        "ask_details": "What would you like it to do?" if idea else "Can you tell me a bit more about what happened?",
+        "ask_work_type": "Does this exist today but isn't working, or is it something new?",
+        "check_send": "Want me to send that to the team?",
+    }
+    if step == "ask_impact" and not draft.get("priority"):
+        return (
+            "Would it save you time every day, or is it more of a nice-to-have?"
+            if idea
+            else "Can you still work, or is it stopping you?"
+        )
+    return lines.get(step or "")
+
+
+def has_report(draft: Draft) -> bool:
+    """Something of the report is saved besides the tool: a silent turn has something to go on (D88)."""
+    return any(draft.get(k) for k in ("summary", "title", *BRIEF_TEXT, *BRIEF_LISTS))
+
+
+# Sig asking which tool in words without the ask_tool step (D86): the page still offers the tool chips.
+TOOL_QUESTION = re.compile(r"\bwhich (tool|app|system|platform)\b|\bis (this|it) about\b|\bwhat (tool|app)\b", re.I)
+
+
+def project_known(draft: Draft) -> bool:
+    slug = draft.get("project_slug")
+    return bool(slug) and slug != GENERAL and float((draft.get("confidence") or {}).get("project", 1.0)) >= 0.7
 
 
 REPLIES_MAX = 3

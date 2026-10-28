@@ -61,7 +61,7 @@ def after_model(callback_context: CallbackContext, llm_response: LlmResponse) ->
     totals = dict(state.get("usage") or {"calls": 0, "input_tokens": 0, "output_tokens": 0})
     totals["calls"] += 1
     totals["input_tokens"] += int(usage.prompt_token_count or 0)
-    totals["output_tokens"] += int(usage.candidates_token_count or 0)
+    totals["output_tokens"] += int(usage.candidates_token_count or 0) + int(usage.thoughts_token_count or 0)
     state["usage"] = totals
     return None
 

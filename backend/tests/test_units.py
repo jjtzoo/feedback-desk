@@ -7,9 +7,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from google.adk.models.llm_response import LlmResponse
+from google.genai import types
 from sqlalchemy import select, update
 
-from agent import callbacks, model, tools
+from agent import agent, callbacks, model, tools
 from app import agent_runtime
 from app.config import get_settings
 from app.db import session_scope
@@ -195,6 +197,10 @@ def test_a_tool_only_counts_as_named_when_the_person_said_it() -> None:
     assert mentions("the Flipbook tile on the home page goes to a 404", intranet)
     rake = SimpleNamespace(name="RAKE Agent", slug="rake-agent", aliases=["rake"], keywords=["policy answer"])
     assert mentions("RAKE gives a blank answer", rake) and not mentions("the drake is broken", rake)
+    # Review item 19's typos name the tool too (D69); short names need the exact word.
+    portal = SimpleNamespace(name="Training Portal", slug="training-portal", aliases=[], keywords=[])
+    assert mentions("trainign protal wont load my certifcate pg", portal)
+    assert mentions("rake rgent keeps saying it doesnt know", rake) and not mentions("my app is slow", portal)
 
 
 def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
@@ -205,6 +211,23 @@ def test_praise_gets_the_lowest_priority_so_its_card_can_show() -> None:
     assert "priority" in missing(bug)  # anything else still waits for the impact question
     kept, _ = apply_update({}, {**praise, "priority": "P2"}, {"rake-agent"})
     assert kept["priority"] == "P2"  # a priority the model did set is left alone
+
+
+def test_brief_lists_lose_the_models_own_numbers_and_bullets() -> None:
+    """Review item 26: the pages number the steps, so "1. 1. Fill out a form" never shows again."""
+    draft, errors = apply_update(
+        {},
+        {
+            "steps": ["1. Fill out a form", "2) Press Submit", "Step 3: it resets", "- watch the spinner"],
+            "open_gaps": ["• Which form", "a. Any error message"],
+            "done_when": ["1.5 seconds is fine", "10:30 runs work"],
+        },
+        {"rake-agent"},
+    )
+    assert not errors
+    assert draft["brief"]["steps"] == ["Fill out a form", "Press Submit", "it resets", "watch the spinner"]
+    assert draft["brief"]["open_gaps"] == ["Which form", "Any error message"]
+    assert draft["brief"]["done_when"] == ["1.5 seconds is fine", "10:30 runs work"]  # numbers in the text stay
 
 
 def test_praise_card_shows_praise_alone_without_a_priority() -> None:
@@ -257,11 +280,30 @@ async def test_editing_the_draft_clears_the_confirmation() -> None:
     assert ctx.state["draft_confirmed"] is False
 
 
+async def test_a_second_question_about_the_problem_becomes_the_card() -> None:
+    """D87: typo-go-forms-extention (27 Oct) asked what it does when it breaks twice."""
+    ctx = FakeContext(state={"draft": dict(COMPLETE), "user_text": "RAKE gives a blank answer"})
+    assert (await tools.update_draft(ctx, next_step="ask_details"))["next_step"] == "ask_details"  # type: ignore[arg-type]
+    ctx.state["details_asked"] = True
+    result = await tools.update_draft(ctx, next_step="ask_details")  # type: ignore[arg-type]
+    assert result["next_step"] == "show_card" and "card line" in result["note"]
+    # Still missing something: the question stays.
+    ctx.state["draft"] = {k: v for k, v in COMPLETE.items() if k != "priority"}
+    assert (await tools.update_draft(ctx, next_step="ask_details"))["next_step"] == "ask_details"  # type: ignore[arg-type]
+
+
 async def test_submit_tool_refuses_without_confirm_even_if_the_guard_is_skipped() -> None:
     ctx = FakeContext(
         state={"draft": dict(COMPLETE), "draft_confirmed": False, "user": {"email": "a@redadair.example", "name": "A"}}
     )
     assert (await tools.submit_feedback(ctx))["error"] == "not_confirmed"  # type: ignore[arg-type]
+
+
+def test_instruction_names_the_signed_in_person_and_role_but_not_their_email() -> None:
+    user = {"email": "liam.carter@redadair.example", "name": "Liam Carter", "role": "admin"}
+    text = agent.instruction(FakeContext(state={"user": user}))  # type: ignore[arg-type]
+    assert "talking to Liam, signed in with the admin role" in text
+    assert "Carter" not in text and "liam.carter" not in text
 
 
 # --- model credentials ---------------------------------------------------------------------
@@ -280,6 +322,25 @@ def test_choosing_gemini_exports_the_key_before_the_agent_is_built(monkeypatch: 
         assert os.environ["GOOGLE_GENAI_USE_ENTERPRISE"] == "false"
     finally:
         agent_runtime.reset()
+
+
+def test_the_model_thinks_by_level_with_room_to_reply() -> None:
+    """D88: thinking_budget 0 doesn't stop 3.8 Flash thinking, and thinking filled a 1,024 cap (MAX_TOKENS)."""
+    config = agent.build_agent(model.ModelChoice("stub", "stub", True, "")).generate_content_config
+    assert config is not None and config.thinking_config is not None
+    assert config.thinking_config.thinking_level == types.ThinkingLevel.LOW
+    assert config.thinking_config.thinking_budget is None
+    assert (config.max_output_tokens or 0) >= 8192
+
+
+def test_thinking_tokens_count_as_output() -> None:
+    """Thinking is billed as output (D88), so the per-chat cost log counts it."""
+    ctx = FakeContext()
+    usage = types.GenerateContentResponseUsageMetadata(
+        prompt_token_count=1000, candidates_token_count=40, thoughts_token_count=900
+    )
+    callbacks.after_model(ctx, LlmResponse(usage_metadata=usage))  # type: ignore[arg-type]
+    assert ctx.state["usage"] == {"calls": 1, "input_tokens": 1000, "output_tokens": 940}
 
 
 def test_a_summary_about_the_user_is_refused() -> None:

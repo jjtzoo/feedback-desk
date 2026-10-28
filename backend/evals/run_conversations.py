@@ -11,7 +11,9 @@ staff really chat, to break Sig: D68). Every reply of every case is judged by co
   4. no dashes as punctuation
   5. no card unless something was reported (the case's expect)
   6. no impact question when the person already said it ("slow", "can't work")
-plus each case's own keys (chips per message, never_ask, card; never_repeat is rule 1, for every case).
+plus each case's own keys (chips per message, never_ask, card, asks_details, keeps; never_repeat is
+rule 1, for every case). A message written {pick: <slug>} picks that app card instead of typing (D99);
+a case's project opens the chat for that tool, as /chat?project= does.
 
 Runs each case through the real chat API on whichever model the settings choose, in a throwaway local
 database (pgserver, database "feedback_conversations", recreated each run), and reports the model
@@ -20,6 +22,7 @@ cost from the usage ledger. Scored on Gemini; the stub only shows the scripted b
     uv run python -m evals.run_conversations                # both sets
     uv run python -m evals.run_conversations --set real     # only conversation_cases_real.yaml
     uv run python -m evals.run_conversations --only real-15
+    uv run python -m evals.run_conversations --parallel 4   # four chats at once
 """
 
 import argparse
@@ -41,8 +44,13 @@ MAX_CHARS = 300  # about two lines in the chat on a laptop
 
 # The kinds of question Sig asks, to spot one asked twice in other words and to match chips to it.
 QUESTION_KINDS = {
-    "tool": re.compile(r"which (tool|app|system|platform)|is (this|it) about|what (tool|app) |which one", re.I),
-    "impact": re.compile(r"affect\w*|impact|stopping you|nuisance|how much|how bad|blocking|getting your work", re.I),
+    # "Which one first?" between two problems they named is not the tool question.
+    "tool": re.compile(
+        r"which (tool|app|system|platform)|is (this|it) about|what (tool|app) |which one(?![^?]*\bfirst\b)", re.I
+    ),
+    "impact": re.compile(
+        r"affect\w*|impact|stopping you|nuisance|how much|how bad|how urgent\w*|blocking|getting your work", re.I
+    ),
     "send": re.compile(r"send (that|this|it) to|pass (that|this|it) on", re.I),
     "work_type": re.compile(r"exist\w* today|something new|new feature", re.I),
     "details": re.compile(
@@ -86,6 +94,14 @@ def judge_turns(case: dict[str, Any], turns: list[Turn]) -> list[str]:
     problems: list[str] = []
     asked_before: dict[str, int] = {}
     expected_chips = case.get("chips") or []
+    # A case that expects the tool chips twice wants the tool asked again when the first answer was about
+    # something else ("it's really annoying" to "Which tool?"), unless it lists the tool question in never_repeat.
+    repeat_ok = (
+        {"tool"}
+        if expected_chips.count("tools") > 1
+        and "tool" not in {k for phrase in case.get("never_repeat") or [] for k in question_kinds(f"{phrase}?")}
+        else set()
+    )
     never_ask = {k for phrase in case.get("never_ask") or [] for k in question_kinds(f"{phrase}?")}
     person_so_far = ""
     for n, turn in enumerate(turns, 1):
@@ -93,7 +109,7 @@ def judge_turns(case: dict[str, Any], turns: list[Turn]) -> list[str]:
         reply = "\n".join(turn.replies)
         kinds = question_kinds(turn.replies[-1]) if turn.replies else set()
         at = f"turn {n}"
-        for kind in kinds:
+        for kind in kinds - repeat_ok:
             if kind in asked_before:
                 problems.append(f"{at}: asked the {kind} question again (first at turn {asked_before[kind]})")
             asked_before.setdefault(kind, n)
@@ -117,6 +133,18 @@ def judge_turns(case: dict[str, Any], turns: list[Turn]) -> list[str]:
         if n <= len(expected_chips):
             problems += _expected_chips(at, str(expected_chips[n - 1]), turn)
     return problems
+
+
+def asked_about_the_problem(turns: list[Turn]) -> bool:
+    """A question before the card that isn't about the tool, the impact, sending or the work type (D63)."""
+    other = {"tool", "impact", "send", "work_type"}
+    for turn in turns:
+        if turn.card is not None:
+            return False
+        last = turn.replies[-1] if turn.replies else ""
+        if last.rstrip().endswith("?") and not question_kinds(last) & other:
+            return True
+    return False
 
 
 def _expected_chips(at: str, expected: str, turn: Turn) -> list[str]:
@@ -162,12 +190,16 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
     card = None
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://eval") as client:
         (await client.post("/api/auth/dev/sign-in", json={"email": email})).raise_for_status()
-        sid = (await client.post("/api/chat/sessions", json={"context": {"source": "conversation eval"}})).json()[
-            "session_id"
-        ]
-        for text in case["messages"][:MAX_TURNS]:
-            turn = Turn(said=text)
-            body = (await client.post(f"/api/chat/sessions/{sid}/messages", json={"text": text})).text
+        start = {"project_slug": case.get("project"), "context": {"source": "conversation eval"}}
+        sid = (await client.post("/api/chat/sessions", json=start)).json()["session_id"]
+        for message in case["messages"][:MAX_TURNS]:
+            if isinstance(message, dict):  # {pick: slug}: an app card at the start of the chat (D99)
+                turn = Turn(said=f"[card] {message['pick']}")
+                sent = await client.post(f"/api/chat/sessions/{sid}/tool", json={"project_slug": message["pick"]})
+            else:
+                turn = Turn(said=message)
+                sent = await client.post(f"/api/chat/sessions/{sid}/messages", json={"text": message})
+            body = sent.text
             for name, data in _events(body):
                 if name == "message":
                     turn.replies.append(str(data.get("text", "")))
@@ -201,6 +233,8 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
     problems += [f"offered the chip {c!r}" for c in case.get("forbid_chip_labels") or [] if c.lower() in labels]
     if case.get("asks_last") and not (replies and replies[-1].rstrip().endswith("?")):
         problems.append("the last reply is not a question")
+    if case.get("asks_details") and not asked_about_the_problem(turns):
+        problems.append("no question about the problem itself before the card")
     if card is not None:
         # Written in the person's terms (review item 11), never about "the user".
         for f in ("title", "summary"):
@@ -214,6 +248,9 @@ async def run_case(n: int, case: dict[str, Any]) -> Result:
             problems.append(f"project {card.get('project')!r}, not {want['project']}")
         if case.get("gaps") and not card.get("gaps"):
             problems.append("the card shows no open gaps")
+        shown = " ".join(str(card.get(f, "")) for f in ("title", "summary", "what_happened")).lower()
+        if case.get("keeps") and not any(k.lower() in shown for k in case["keeps"]):
+            problems.append(f"the card dropped what they said first (none of {case['keeps']})")
     if problems:
         problems.append("replies: " + " | ".join(r.replace("\n", " ")[:160] for r in replies))
     return Result(case["name"], not problems, problems)
@@ -230,8 +267,14 @@ async def cost() -> tuple[int, float]:
         return int(row[0]), float(row[1])
 
 
-async def run(cases: list[dict[str, Any]]) -> list[Result]:
-    return [await run_case(n, case) for n, case in enumerate(cases, 1)]
+async def run(cases: list[dict[str, Any]], parallel: int = 1) -> list[Result]:
+    gate = asyncio.Semaphore(parallel)
+
+    async def one(n: int, case: dict[str, Any]) -> Result:
+        async with gate:
+            return await run_case(n, case)
+
+    return list(await asyncio.gather(*(one(n, case) for n, case in enumerate(cases, 1))))
 
 
 def load(which: str) -> list[dict[str, Any]]:
@@ -243,6 +286,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--set", choices=["all", *SETS], default="all", help="which case file to run")
     parser.add_argument("--only", help="run only cases whose name starts with this")
+    parser.add_argument("--parallel", type=int, default=1, help="chats at the same time (rate limits can add timeouts)")
     args = parser.parse_args()
 
     from scripts.local_db import start
@@ -269,7 +313,7 @@ def main() -> None:
     choice = model_choice()
 
     async def go() -> tuple[list[Result], tuple[int, float]]:
-        results = await run(cases)
+        results = await run(cases, args.parallel)
         return results, await cost()
 
     results, (calls, aud) = asyncio.run(go())

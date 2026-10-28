@@ -3,6 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
+import { FileThumbs, type Shown } from "@/components/attach";
 import { PriorityBadge } from "@/components/badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +11,18 @@ import { Label } from "@/components/ui/label";
 import type { ChatCard, Priority } from "@/lib/api";
 
 /** "Here's what I'll send" (brief §4.1.6): project, type, summary, priority (none for praise, D50),
- *  what happened for a fix, and what is still unknown with a box to add it (D63); Confirm or Change. */
+ *  what happened for a fix, the files sent with it (screenshots as thumbnails, D95), and what is
+ *  still unknown with a box to add it (D63); Confirm or Change. */
 export function ConfirmCard({
   card,
+  files,
   busy,
   onConfirm,
   onChange,
   onAdd,
 }: {
   card: ChatCard;
+  files: Shown[];
   busy: boolean;
   onConfirm: () => void;
   onChange: () => void;
@@ -57,6 +61,14 @@ export function ConfirmCard({
             <dt className="font-medium text-muted-foreground">Priority</dt>
             <dd>
               <PriorityBadge priority={card.priority as Priority} />
+            </dd>
+          </>
+        )}
+        {files.length > 0 && (
+          <>
+            <dt className="font-medium text-muted-foreground">Files</dt>
+            <dd>
+              <FileThumbs files={files} />
             </dd>
           </>
         )}

@@ -24,7 +24,12 @@ const SOMEONE = "Someone may have raised this already";
 /** Mike describes the same problem in a new chat ("slow" already says the impact, D66); returns the duplicate box. */
 async function describeAgain(mike: Page, text: string) {
   await mike.goto("/chat");
+  // A chat Mike left unsent comes back after a reload (D90): a new report starts a new chat.
+  await expect(mike.getByLabel("Your message")).toBeVisible();
+  const fresh = mike.getByRole("button", { name: "New chat" });
+  if (await fresh.isVisible()) await fresh.click();
   await expect(mike.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
+  await expect(mike.getByRole("listitem").filter({ hasText: "You:" })).toHaveCount(0);
   await chatSay(mike, text);
   const box = mike.getByText(SOMEONE, { exact: true }).locator("xpath=ancestor::li[1]");
   await expect(box).toBeVisible();
@@ -103,7 +108,7 @@ test("S05.05 The owner sees 'Also following: Mike', impact raised to a team, and
   const darlene = await team.as("Darlene");
   await darlene.goto(`/console?inbox=open&item=${ref}`);
   const panel = darlene.getByRole("dialog");
-  await expect(panel).toContainText(/Impact: one person/);
+  await expect(panel).toContainText(/Affects one person/);
   await expect(panel).not.toContainText("Also following");
 
   const mike = await team.as("Mike");
@@ -113,7 +118,7 @@ test("S05.05 The owner sees 'Also following: Mike', impact raised to a team, and
 
   await darlene.goto(`/console?inbox=open&item=${ref}`);
   await expect(panel).toContainText(/Also following: Mike/);
-  await expect(panel).toContainText(/Impact: team/);
+  await expect(panel).toContainText(/Affects a team/);
 
   await page.goto(`/track/${ref}`);
   await expect(page.getByText("Another staff member reported the same thing")).toBeVisible();

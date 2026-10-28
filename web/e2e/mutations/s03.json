@@ -7,7 +7,7 @@
   "S03.06": ["toHaveCount(2)", "toHaveCount(3)"],
   "S03.07": ["length + 1", "length + 2"],
   "S03.08": ["line one\\nline two", "line one line two"],
-  "S03.09": ["toHaveCount(0)", "toHaveCount(1)"],
+  "S03.09": ["message.getByRole(\"img\", { name: \"screenshot.png\" })", "message.getByRole(\"img\", { name: \"screenshotx.png\" })"],
   "S03.10": ["uploaded.", "uploadedx."],
   "S03.11": ["toHaveCount(0)", "toHaveCount(1)"],
   "S03.12": ["don't match", "don't matchx"],
@@ -19,5 +19,13 @@
   "S03.18": ["contentinfo\")).toHaveCount(0)", "contentinfo\")).toHaveCount(1)"],
   "S03.19": ["toHaveText([\"RAKE Agent\"])", "toHaveText([\"Flipbook\"])"],
   "S03.20": ["toHaveCount(0)", "toHaveCount(1)"],
-  "S03.21": ["\"Your feedback\" })).toHaveCount(0)", "\"Your feedback\" })).toHaveCount(1)"]
+  "S03.21": ["\"Your feedback\" })).toHaveCount(0)", "\"Your feedback\" })).toHaveCount(1)"],
+  "S03.22": ["toBeFocused()", "not.toBeFocused()"],
+  "S03.23": ["toHaveText([\"Flipbook\"])", "toHaveText([\"IT Asset\"])"],
+  "S03.24": ["\"Which tool is this about?\")).toHaveCount(0)", "\"Which tool is this about?\")).toHaveCount(1)"],
+  "S03.25": ["cards(page)).toHaveCount(0)", "cards(page)).toBeVisible()"],
+  "S03.26": ["cards(page)).toHaveCount(0)", "cards(page)).toBeVisible()"],
+  "S03.27": ["toBeFocused()", "not.toBeFocused()"],
+  "S03.28": ["\"Check it doesn't show passwords or card numbers.\")).toBeVisible()", "\"Check it doesn't show passwords or card numbers!\")).toBeVisible()"],
+  "S03.29": ["toHaveAttribute(\"capture\", \"environment\")", "toHaveAttribute(\"capture\", \"user\")"]
 }

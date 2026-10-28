@@ -17,7 +17,7 @@ from app.db import session_scope
 from app.services import catalog, embeddings
 from app.services import feedback as feedback_service
 from app.services.actors import User
-from app.services.drafts import GENERAL, NEXT_STEPS, apply_update, missing, quick_replies
+from app.services.drafts import CONTINUE, GENERAL, NEXT_STEPS, apply_update, missing, quick_replies
 
 log = logging.getLogger(__name__)
 UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
@@ -102,13 +102,14 @@ async def update_draft(
         priority_confidence: 0 to 1.
         impact: one_person, team or company.
         effort: S, M or L.
-        recommendation: implement, decline or needs_info.
-        recommendation_reason: one sentence for the approver.
+        recommendation: implement, decline or needs_info. Set it again with show_card, from
+            everything known by then.
+        recommendation_reason: one sentence for the approver, rewritten with the recommendation.
         summary: one plain-English sentence.
         title: under 80 characters.
         sentiment: positive, neutral or negative.
         problem: developer brief, one plain sentence.
-        steps: developer brief, numbered steps to reproduce (fixes).
+        steps: developer brief, steps to reproduce, one per item, without numbers (fixes).
         expected: developer brief, what should happen (fixes).
         actual: developer brief, what happened instead (fixes).
         who_needs_it: developer brief, the job, how often, how many people (improvements, new features).
@@ -142,7 +143,10 @@ async def update_draft(
     slug = draft.get("project_slug")
     chosen = next((p for p in projects if p.slug == slug), None)
     said = str(tool_context.state.get("user_text") or "")
-    if chosen and slug != tool_context.state.get("project_hint") and not catalog.mentions(said, chosen):
+    if chosen and slug == tool_context.state.get("project_hint"):
+        # Chosen on the page (?project= or an app card, D99): certain, whatever the model guessed.
+        draft.setdefault("confidence", {})["project"] = 1.0
+    elif chosen and not catalog.mentions(said, chosen):
         if UNSURE_RE.search(said.lower()):
             # They were asked and don't know: the Digital team checks it (needs review), no more questions.
             draft["project_slug"] = GENERAL
@@ -158,6 +162,14 @@ async def update_draft(
         if next_step not in NEXT_STEPS:
             errors.append(f"next_step must be one of: {', '.join(NEXT_STEPS)}.")
         else:
+            second_ask = next_step == "ask_details" and tool_context.state.get("details_asked")
+            if second_ask and not missing(draft) and "note" not in result:
+                # One answer about the problem is enough (D69, D87): the card comes now.
+                next_step = "show_card"
+                result["note"] = (
+                    "You already asked about the problem once and the draft is complete: no second "
+                    "question. Say the card line now; put whatever is still missing in open_gaps."
+                )
             # The page reads it after this turn; the API clears it before the next one.
             tool_context.state["step"] = next_step
             if next_step == "show_card" and missing(draft):
@@ -170,10 +182,12 @@ async def update_draft(
 
 
 async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str, Any]:
-    """Look for open items in the same project that may be the same issue.
+    """Look for items in the same project that may be the same issue: open ones, and ones fixed in
+    the last few months.
 
     Returns:
-        candidates: reference, title and date of each likely duplicate (never who raised it).
+        candidates: reference, title and date of each likely duplicate (never who raised it), and
+        fixed_on (the day it was fixed) for one that was fixed before and may be happening again.
     """
     draft = dict(tool_context.state.get("draft") or {})
     slug = draft.get("project_slug")
@@ -182,9 +196,25 @@ async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str
         return {"candidates": [], "note": "Set the project and summary first."}
     async with session_scope() as db:
         project = await catalog.project_by_slug(db, slug)
-        found = await embeddings.find_similar(db, project.id, text, limit=max(1, min(limit, 3))) if project else []
-    candidates = [{"reference": s.ref_no, "title": s.title, "date": s.created_at_iso[:10]} for s in found]
-    tool_context.state["duplicates"] = candidates
+        found = (
+            await embeddings.find_similar(
+                db, project.id, text, limit=max(1, min(limit, 3)), fixed_days=get_settings().duplicate_fixed_days
+            )
+            if project
+            else []
+        )
+    candidates = [
+        {"reference": s.ref_no, "title": s.title, "date": s.created_at_iso[:10]}
+        | ({"fixed_on": s.fixed_at_iso[:10]} if s.fixed_at_iso else {})
+        for s in found
+    ]
+    # Open matches get "+1 and comment" on the page; a fixed one is a possible regression instead (D73):
+    # the new item goes in, linked to it for the owner.
+    tool_context.state["duplicates"] = [c for c in candidates if "fixed_on" not in c]
+    fixed = next((c for c in candidates if "fixed_on" in c), None)
+    tool_context.state["regression_of"] = (
+        {"reference": fixed["reference"], "title": fixed["title"], "fixed_on": fixed["fixed_on"]} if fixed else None
+    )
     return {"candidates": candidates}
 
 
@@ -210,10 +240,11 @@ async def submit_feedback(tool_context: ToolContext) -> dict[str, Any]:
         if not event.content:
             continue
         text = "".join(p.text or "" for p in event.content.parts or [] if not p.thought).strip()
-        if text and text != "Confirmed":
+        if text and text not in ("Confirmed", CONTINUE):
             role = "user" if event.author == "user" else "agent"
             turns.append((role, text, datetime.fromtimestamp(event.timestamp, UTC)))
-    first_user = next((t for r, t, _ in turns if r == "user"), "")
+    # An app card's tool name is not what they wrote (D99).
+    first_user = next((t for r, t, _ in turns if r == "user" and t != state.get("picked")), "")
 
     usage = dict(state.get("usage") or {})
     usage["cost_aud"] = cost_aud(usage)
@@ -228,6 +259,7 @@ async def submit_feedback(tool_context: ToolContext) -> dict[str, Any]:
                 session_id=tool_context.session.id,
                 chat_turns=turns,
                 original_text=first_user,
+                regression_of=state.get("regression_of"),
             ),
         )
         fb = created.feedback
