@@ -276,8 +276,11 @@ class TrackerOut(UploadLimits):
     attachments: list[TrackerFileOut]
     can_reply: bool
     muted: bool
-    # An update or Resolve note that asked them to try it, not yet answered (D80).
+    # An update that asked them to try an in-progress fix, not yet answered (D80).
     check: dict[str, Any] | None
+    # For the person who raised it: Is it fixed? while Resolved (it closes by itself at closes_at), then
+    # I still have an issue until reopen_until (D92). state is resolved or closed.
+    is_it_fixed: dict[str, Any] | None
 
 
 class ReplyIn(BaseModel):
@@ -291,6 +294,10 @@ class MuteIn(BaseModel):
 class CheckIn(BaseModel):
     fixed: bool
     comment: str = Field(default="", max_length=4000)
+
+
+class StillAnIssueIn(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
 
 
 # --- console ------------------------------------------------------------------------------

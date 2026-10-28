@@ -195,8 +195,10 @@ export interface Tracker {
   attachments: TrackerFile[];
   can_reply: boolean;
   muted: boolean;
-  /** An update or Resolve note that asked them to try it, not answered yet (D80). */
+  /** An update that asked them to try an in-progress fix, not answered yet (D80). */
   check: { by: string | null; body: string; at: string } | null;
+  /** For the person who raised it: Is it fixed? while Resolved (it closes by itself at closes_at), then I still have an issue until reopen_until (D92). */
+  is_it_fixed: { state: "resolved" | "closed"; closes_at: string | null; reopen_until: string | null } | null;
   max_file_mb: number;
   max_files: number;
 }

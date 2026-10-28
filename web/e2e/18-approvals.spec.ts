@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { BUG, BUG_ANSWERS, getJson, openActivity, postJson, raise, raiseBug } from "./helpers";
+import { BUG, BUG_ANSWERS, getJson, openActivity, postJson, raise, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 18: Admin approvals (/console/approvals). Staff raise feedback through the
 // API, Admins decide it on the screen, and the staff member's tracker and bell are read afterwards.
@@ -265,7 +265,7 @@ test("S18.08 As Marc, approving works from the item panel and from the board's A
   await expect(panel.getByText(panelRef, { exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(panel.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
-  await expect(panel.getByRole("button", { name: "Start work" })).toBeVisible();
+  expect(await statusMoves(page, panel)).toContain("Start work");
   await page.keyboard.press("Escape");
   await expect(panel).toHaveCount(0);
   await expect(boardCard(column(page, "Approved"), panelRef)).toBeVisible();
@@ -328,10 +328,11 @@ test("S18.11 A plain bug waits in Approvals, and its owner can't start it until 
   await marc.goto(`/console?inbox=open&item=${ref}`);
   const panel = marc.getByRole("dialog");
   await expect(panel.getByRole("button", { name: "Approve", exact: true })).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Start work" })).toHaveCount(0);
+  expect(await statusMoves(marc, panel)).not.toContain("Start work");
 
   await panel.getByRole("button", { name: "Approve", exact: true }).click();
-  await expect(panel.getByRole("button", { name: "Start work" })).toBeVisible();
+  await expect(panel.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
+  expect(await statusMoves(marc, panel)).toContain("Start work");
 });
 
 test("S18.12 The abuse phrase is not assigned to Darlene, sits in Needs review as Flagged, and every Admin is told", async ({ page, signIn, team }) => {

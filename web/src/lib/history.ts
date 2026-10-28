@@ -49,6 +49,10 @@ export function historyLine(e: FeedbackEvent, projects: Project[]): string {
       // Public moves already read plainly and carry their reason ("Declined: …", "Resolved: …"); the console
       // says Approved where staff read Planned (D43). Internal moves get the step's words.
       if (after.status === "approved") return "Approved";
+      // Who ended a resolved item, or sent it back (D92); the line already starts with who did it.
+      if (after.reopened) return "Reopened: still has an issue";
+      if (after.by === "submitter") return "Confirmed it's fixed and closed it";
+      if (after.by === "admin") return `Closed as fixed for them: ${String(after.reason ?? "")}`;
       return e.public_text ?? STATUS_STEP[after.status as Status] ?? STATUS_LABEL[after.status as Status] ?? "Changed the stage";
     case "assigned":
       if (after.reason) return `Assigned to ${name(after)} by routing (${routingReason(String(after.reason), null)})`;
@@ -72,6 +76,8 @@ export function historyLine(e: FeedbackEvent, projects: Project[]): string {
       const parts = [CATEGORY_LABEL[after.category as Category], PRIORITY_LABEL[after.priority as Priority], projectName(after.project)];
       return `Classified: ${parts.filter(Boolean).join(", ")}`;
     }
+    case "reminded":
+      return "Sent the Is it fixed? reminder";
     case "opened":
       return `${actorName(e)} opened it`;
     case "asked_for_info":

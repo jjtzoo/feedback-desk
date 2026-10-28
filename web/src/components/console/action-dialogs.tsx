@@ -45,12 +45,14 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
     required: true,
     placeholder: "Fixed: a failed submission no longer clears your form. Please try it and tell us if it still happens.",
   },
+  // An Admin closing for the person who raised it, who would otherwise confirm it or let it close by itself (D92).
   fix: {
     title: "Close as fixed",
-    description: "The work is done. The item ends as Fixed for everyone following it.",
-    field: "",
+    description: "The person who raised it usually confirms the fix, or it closes by itself if they don't answer. Say why you're closing it for them.",
+    field: "Reason (only the Digital team sees it)",
     button: "Close as fixed",
-    required: false,
+    required: true,
+    placeholder: "They confirmed on the phone that it works.",
   },
   close: {
     title: "Close",
@@ -289,17 +291,15 @@ export function ActionDialog({
             <DialogDescription>{description ?? copy.description}</DialogDescription>
           </DialogHeader>
           {extra}
-          {kind === "fix" ? null : (
-            <div className="grid gap-2">
-              <Label htmlFor="action-text">{copy.field}</Label>
-              {kind === "merge" ? (
-                <Input id="action-text" placeholder="FB-0138" value={text} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
-              ) : (
-                <Textarea id="action-text" rows={4} value={text} maxLength={4000} placeholder={copy.placeholder} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
-              )}
-              {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-            </div>
-          )}
+          <div className="grid gap-2">
+            <Label htmlFor="action-text">{copy.field}</Label>
+            {kind === "merge" ? (
+              <Input id="action-text" placeholder="FB-0138" value={text} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
+            ) : (
+              <Textarea id="action-text" rows={4} value={text} maxLength={4000} placeholder={copy.placeholder} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
+            )}
+            {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
+          </div>
           <DialogFooter>
             <Button type="button" variant="outline" className="h-11 rounded-xl" onClick={onClose}>
               Cancel

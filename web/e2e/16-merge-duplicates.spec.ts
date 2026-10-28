@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { chatSay, getJson, postJson, raise, raiseBug } from "./helpers";
+import { chatSay, getJson, postJson, raise, raiseBug, statusButton } from "./helpers";
 
 // Manual checklist section 16 (Digital Staff: merge and duplicates): merging through the item panel,
 // what the merged item's submitter and the original then show, and that nothing merges on its own.
@@ -91,7 +91,7 @@ test("S16.01 'Merge into it' closes the item, its tracker says 'Duplicate of FB-
   await expect(duplicates).toContainText(`Merged into ${original}.`);
   // Closed: nothing can be merged or closed from it any more.
   await expect(duplicates.getByRole("button", { name: "Merge into it" })).toHaveCount(0);
-  await expect(panel.locator("header").getByRole("button", { name: "Close", exact: true })).toHaveCount(0);
+  await expect(statusButton(panel)).toHaveCount(0);
 
   await merged(darlene, separate, original);
   await expectFollowsOriginal(await team.as("Aisha"), separate, original);

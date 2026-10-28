@@ -8,6 +8,7 @@ import { FileThumbs, IMAGES, ScreenshotNote, pastedImages, preview, withinLimits
 import { NewMark, PriorityBadge, StatusBadge } from "@/components/badges";
 import { ActionDialog, type ActionKind, type ActionResult } from "@/components/console/action-dialogs";
 import { RoutingLine } from "@/components/console/routing-line";
+import { StatusMenu } from "@/components/console/status-menu";
 import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -33,6 +34,7 @@ import {
   when,
 } from "@/lib/format";
 import { actorName, historyLine } from "@/lib/history";
+import { allowedMoves, type Move } from "@/lib/moves";
 import { ownership } from "@/lib/ownership";
 import { cn } from "@/lib/utils";
 
@@ -127,7 +129,7 @@ export function ItemPanel({
     const call: Record<ActionKind, [string, unknown]> = {
       update: ["update", { body: r.text, expected_by: r.expectedBy ?? null, asks_check: r.asksCheck ?? false }],
       resolve: ["resolve", { body: r.text }],
-      fix: ["close", { ending: "fixed" }],
+      fix: ["close", { ending: "fixed", reason: r.text }],
       close: ["close", { reason: r.text, ending: r.ending }],
       decline: ["decline", { reason: r.text }],
       ask: ["ask-info", { question: r.text, ask: r.ask }],
@@ -191,6 +193,12 @@ export function ItemPanel({
   const open = item && !["declined", "closed", "acknowledged"].includes(item.status);
   const changeField = (field: string, value: string | null) => void act("", { [field]: value }, "patch");
   const can = item ? ownership(item, me, staff) : null;
+  // Approving is the Admin's decision, with its own buttons; the Status menu holds the stage moves (D91).
+  const moves = item ? allowedMoves(item, me, staff).filter((m) => m.key !== "approve") : [];
+  function onMove(m: Move) {
+    if (m.key === "start" || m.key === "restart") void act("start").then((ok) => ok && toast.success(m.key === "start" ? "Started" : "Started again"));
+    else setDialog({ kind: m.key === "resolve" ? "resolve" : m.key === "close_fixed" ? "fix" : "close" });
+  }
   // Someone else's words since you last looked; on an item you never opened, only when it's yours (D82).
   const isNew = (m: Message) => m.author_name !== me.name && (lastRead ? m.created_at > lastRead : lastRead === null && Boolean(can?.holder));
   const firstName = item?.submitter_name.split(" ")[0] ?? "";
@@ -235,7 +243,8 @@ export function ItemPanel({
               <div className="flex flex-wrap items-center gap-1.5 pr-8">
                 <span className="font-mono text-sm font-semibold">{item.reference}</span>
                 <PriorityBadge showCode quiet={isSettled(item.status)} priority={item.priority} />
-                <StatusBadge status={item.status} ending={item.ending} />
+                {/* The Status menu says it when there is a move to make (D91). */}
+                {moves.length === 0 && <StatusBadge status={item.status} ending={item.ending} />}
                 {item.reporters > 1 && (
                   <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
                     <Users className="size-3.5" aria-hidden="true" /> Reported by {item.reporters} people
@@ -279,16 +288,7 @@ export function ItemPanel({
                     </Button>
                   </>
                 )}
-                {item.status === "approved" && (can?.holder || can?.canAssignToMe) && (
-                  <Button className="h-10 rounded-xl" disabled={busy} onClick={() => void act("start")}>
-                    Start work
-                  </Button>
-                )}
-                {item.status === "in_progress" && can?.holder && (
-                  <Button className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "resolve" })}>
-                    Resolve
-                  </Button>
-                )}
+                {moves.length > 0 && <StatusMenu status={item.status} moves={moves} busy={busy} onMove={onMove} />}
                 {open && !awaiting && can?.holder && (
                   <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "update" })}>
                     Update {firstName}
@@ -307,11 +307,6 @@ export function ItemPanel({
                 {open && can?.canHandOver && (
                   <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "hand_over" })}>
                     Hand over to…
-                  </Button>
-                )}
-                {open && (
-                  <Button variant="ghost" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: item.status === "resolved" ? "fix" : "close" })}>
-                    {item.status === "resolved" ? "Close as fixed" : "Close"}
                   </Button>
                 )}
               </div>

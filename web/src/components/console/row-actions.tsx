@@ -15,19 +15,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Card, Staff } from "@/lib/api";
+import type { Move } from "@/lib/moves";
 import { ownership } from "@/lib/ownership";
 
-const MOVES: { column: string; label: string; admin?: boolean }[] = [
-  { column: "approved", label: "Approved", admin: true },
-  { column: "in_progress", label: "In progress" },
-  { column: "resolved", label: "Resolved" },
-];
-
 /**
- * The list's row menu: open, post an update, take it on, hand it over, or move it to another stage.
- * Only the holder posts updates and moves it on (D53); taking over someone else's item happens in the
- * panel, where their latest step shows first. Moves and updates go through the same dialogs as the board
- * and the panel, so a reason is still asked where one is needed.
+ * The list's row menu: open, post an update, take it on, hand it over, or change its status.
+ * Only the holder posts updates (D53); taking over someone else's item happens in the panel, where their
+ * latest step shows first. The status moves are the panel's Status menu list (D91) and go through the
+ * same dialogs, so a reason is still asked where one is needed.
  */
 export function RowActions({
   card,
@@ -36,6 +31,7 @@ export function RowActions({
   onUpdate,
   onAssignToMe,
   onHandOver,
+  moves,
   onMove,
 }: {
   card: Card;
@@ -44,12 +40,12 @@ export function RowActions({
   onUpdate: () => void;
   onAssignToMe: () => void;
   onHandOver: (assigneeId: string) => void;
-  onMove: (column: string) => void;
+  moves: Move[];
+  onMove: (move: Move) => void;
 }) {
   const me = useMe();
   const open = !["declined", "closed", "acknowledged"].includes(card.status);
   const can = ownership(card, me, staff);
-  const moves = MOVES.filter((m) => (m.admin ? me.role === "admin" : can.holder));
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -82,10 +78,10 @@ export function RowActions({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Move to</DropdownMenuSubTrigger>
+                  <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     {moves.map((m) => (
-                      <DropdownMenuItem key={m.column} onSelect={() => onMove(m.column)}>
+                      <DropdownMenuItem key={m.key} onSelect={() => onMove(m)}>
                         {m.label}
                       </DropdownMenuItem>
                     ))}

@@ -1,7 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, postJson, raise, raiseBug } from "./helpers";
+import { getJson, postJson, raise, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 10: the bell, what raises a notification, and muting an item.
 // Liam stands in for Mario (the person who raised it); RAKE Agent is Darlene's, so she is assigned.
@@ -133,7 +133,8 @@ test("S10.06 Approve, start, update, reply, resolve and close each notify the pe
   await postJson(darlene, `/console/items/${ref}/update`, { body: "Found the cause, the fix is in testing" });
   await postJson(darlene, `/console/items/${ref}/reply`, { body: "Which file were you uploading?" });
   await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fix deployed to production" });
-  await postJson(darlene, `/console/items/${ref}/close`, { reason: "Confirmed working" });
+  // Digital Staff can't close a resolved item; an Admin closes it for them, so they still hear Fixed (D92).
+  await postJson(await team.as("Marc"), `/console/items/${ref}/close`, { reason: "Confirmed working on the phone", ending: "fixed" });
 
   await page.goto("/my");
   await expect(bell(page)).toHaveAccessibleName("Notifications, 6 unread");
@@ -217,10 +218,10 @@ test("S10.10 Once Chris approves a P1, Mike's 'P1 needs approval' turns read and
   await expect(settled).toContainText("Approved");
   await expect(settled).not.toContainText("Unread");
   await expect(row(page, new RegExp(`P1 needs approval: ${ref}`))).toHaveCount(0);
-  // Mike doesn't hold it, so opening it offers no Start work.
+  // Mike doesn't hold it, so its Status menu offers no Start work (D91).
   await settled.click();
   await expect(page.getByRole("dialog").getByText(ref, { exact: true })).toBeVisible();
-  await expect(page.getByRole("dialog").getByRole("button", { name: "Start work" })).toHaveCount(0);
+  expect(await statusMoves(page, page.getByRole("dialog"))).toEqual(["Close…"]);
 });
 
 test("S10.11 Each notification's badge shows the item's stage now, for the owner and for the person who raised it", async ({ page, signIn, team }) => {
@@ -339,7 +340,8 @@ test("S10.15 A fixed P1 is told to every Admin and the triage lead; a P2 is not"
     await postJson(marc, `/console/items/${ref}/approve`);
     await postJson(darlene, `/console/items/${ref}/start`);
     await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fixed: answers about rosters work again." });
-    await postJson(darlene, `/console/items/${ref}/close`, { reason: "" });
+    // Liam confirms each fix (D92).
+    await postJson(liam, `/feedback/${ref}/fixed`);
   }
 
   await page.goto("/console");

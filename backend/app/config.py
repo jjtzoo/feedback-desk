@@ -92,6 +92,11 @@ class Settings(BaseSettings):
     digest_hour: int = 8
     release_weekday: int = 4  # Friday
     release_hour: int = 9
+    # Resolved items (D92): one "Is it fixed?" reminder, then the worker closes it as Fixed by System;
+    # the person who raised it can still reopen it for reopen_days after it closes.
+    resolved_reminder_days: int = 3
+    resolved_auto_close_days: int = 7
+    reopen_days: int = 14
 
     # Limits
     max_messages_per_session: int = 30

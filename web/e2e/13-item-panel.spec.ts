@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { PNG, getJson, openActivity, pdf, postJson, raise, raiseBug } from "./helpers";
+import { PNG, getJson, openActivity, pdf, postJson, raise, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 13: Digital Staff, the item panel. Submitters raise through the API and
 // Darlene (who owns RAKE Agent) looks at the panel on screen; Chris approves where an item must be
@@ -437,14 +437,14 @@ test("S13.10 The History tab lists every event in plain words with who and when,
   for (const time of await panel.getByRole("tabpanel").locator("time").all()) await expect(time).toHaveText(/\d{1,2}:\d{2}/);
 });
 
-test("S13.11 Darlene opening an Awaiting approval item sees 'Waiting for an Admin to approve' and no Start work button", async ({ page, signIn, team }) => {
+test("S13.11 Darlene opening an Awaiting approval item sees 'Waiting for an Admin to approve' and no Start work in its Status menu", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const ref = await raiseBug(await team.as("Mei"), "rake-agent", "RAKE Agent timesheet page shows an error when I open it");
 
   const panel = await openItem(page, ref);
   await expect(panel.getByText("Awaiting approval", { exact: true })).toBeVisible();
   await expect(panel.getByText("Waiting for an Admin to approve. Work starts once it's approved.")).toBeVisible();
-  await expect(panel.getByRole("button", { name: "Start work" })).toHaveCount(0);
+  expect(await statusMoves(page, panel)).toEqual(["Close…"]);
 });
 
 test("S13.12 Mario opening an item Darlene has sees Take over, but no Start work, Update or Resolve", async ({ page, signIn, team }) => {
@@ -454,7 +454,9 @@ test("S13.12 Mario opening an item Darlene has sees Take over, but no Start work
   const panel = await openItem(page, ref);
   await expect(panel.getByRole("region", { name: "Who has it" })).toContainText("Darlene");
   await expect(panel.getByRole("button", { name: "Take over", exact: true })).toBeVisible();
-  for (const name of ["Start work", "Resolve", "Hand over to…"]) await expect(panel.getByRole("button", { name, exact: true })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Hand over to…", exact: true })).toHaveCount(0);
+  // The Status menu has only Close: no Start work or Resolve for someone who doesn't hold it (D53, D91).
+  expect(await statusMoves(page, panel)).toEqual(["Close…"]);
   await expect(panel.getByRole("button", { name: /^Update [A-Z][a-z]+$/ })).toHaveCount(0);
 });
 

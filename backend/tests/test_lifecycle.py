@@ -87,7 +87,7 @@ async def test_full_lifecycle_end_to_end(
         assert line in history, line
     assert not any("cache key" in h for h in history)  # internal notes never show
 
-    # Resolve needs a note; then the submitter replies and it reopens.
+    # Resolve needs a note; a reply leaves it Resolved, and I still have an issue reopens it (D92).
     overdue = {"inbox": "overdue"}
     assert [i["reference"] for i in (await darlene.get("/api/console/items", params=overdue)).json()["items"]] == [ref]
     assert (await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": ""})).status_code == 400
@@ -103,8 +103,10 @@ async def test_full_lifecycle_end_to_end(
     assert resolved[1]["text"] != "Update from Darlene" or resolved[1]["detail"] != "Fix deployed"
     # The Windows clock ticks every ~16 ms; the reply must land after the assignee last read it.
     await asyncio.sleep(0.05)
-    t = (await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Still blank on my phone"})).json()
-    assert t["status"] == "in_progress" and "Reopened after you added details" in [h["text"] for h in t["history"]]
+    t = (await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Is it on the app too?"})).json()
+    assert t["status"] == "resolved" and t["is_it_fixed"]["state"] == "resolved"
+    t = (await staff.post(f"/api/feedback/{ref}/still-an-issue", json={"body": "Still blank on my phone"})).json()
+    assert t["status"] == "in_progress" and "Reopened: Sam Lee still has an issue" in [h["text"] for h in t["history"]]
     card = next(
         c
         for col in (await darlene.get("/api/console/board")).json()["columns"]
@@ -117,14 +119,15 @@ async def test_full_lifecycle_end_to_end(
     # A resolved item closes as fixed, never as won't fix (D45).
     wont = await darlene.post(f"/api/console/items/{ref}/close", json={"reason": "x", "ending": "wont_fix"})
     assert wont.status_code == 409
-    r = await darlene.post(f"/api/console/items/{ref}/close", json={"reason": ""})
-    assert r.json()["status"] == "closed" and r.json()["ending"] == "fixed"
-    t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    # Only the person who raised it, the clock or an Admin closes it (D92).
+    assert (await darlene.post(f"/api/console/items/{ref}/close", json={"reason": ""})).status_code == 409
+    t = (await staff.post(f"/api/feedback/{ref}/fixed")).json()
+    assert t["status"] == "closed" and t["ending"] == "fixed"
     assert t["can_reply"] is False and t["status_text"] == "Fixed" and t["stages"][4]["label"] == "Fixed"
-    assert t["close_reason"] is None and "Fixed" in [h["text"] for h in t["history"]]
+    assert t["close_reason"] is None and "Sam Lee confirmed it's fixed" in [h["text"] for h in t["history"]]
 
     # The submitter heard about every stage, in the app and (queued) by email.
-    assert await notes_for(STAFF) == ["stage", "stage", "progress", "stage", "stage", "stage"]
+    assert await notes_for(STAFF) == ["stage", "stage", "progress", "is_it_fixed", "is_it_fixed"]
     async with session_scope() as db:
         statuses = set(await db.scalars(select(Notification.email_status)))
         assert statuses == {"queued"}
@@ -170,7 +173,11 @@ async def test_close_follows_the_state_and_endings_go_to_the_archive(
 
     await darlene.post(f"/api/console/items/{done}/start")
     await darlene.post(f"/api/console/items/{done}/resolve", json={"body": "Deployed"})
-    assert (await darlene.post(f"/api/console/items/{done}/close", json={"reason": ""})).json()["ending"] == "fixed"
+    # Digital Staff can't close a resolved item; an Admin can, with a reason (D92).
+    assert (await darlene.post(f"/api/console/items/{done}/close", json={"reason": "Works"})).status_code == 409
+    assert (await marc.post(f"/api/console/items/{done}/close", json={"reason": " "})).status_code == 400
+    r = await marc.post(f"/api/console/items/{done}/close", json={"reason": "Confirmed by phone"})
+    assert r.json()["ending"] == "fixed"
 
     # The board ends at Resolved; every ended item waits in the Archive (D47, D52).
     board = (await darlene.get("/api/console/board")).json()

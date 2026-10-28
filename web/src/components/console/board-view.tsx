@@ -1,10 +1,14 @@
 "use client";
 
-import { DndContext, PointerSensor, KeyboardSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { DndContext, PointerSensor, KeyboardSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 import { WorkCard } from "@/components/console/work-card";
 import type { Card, Column } from "@/lib/api";
+import { STATUS_LABEL } from "@/lib/format";
+import type { Move } from "@/lib/moves";
 import { cn } from "@/lib/utils";
 
 const DROPPABLE = new Set(["approved", "in_progress", "resolved"]);
@@ -31,13 +35,18 @@ function DraggableCard({ card, onOpen }: { card: Card; onOpen: () => void }) {
   );
 }
 
-function ColumnView({ column, onOpen }: { column: Column; onOpen: (ref: string) => void }) {
+/** `allowed` is set while a card is held: whether it can be dropped here, so only real moves light up (D91). */
+function ColumnView({ column, allowed, onOpen }: { column: Column; allowed: boolean | null; onOpen: (ref: string) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.key, disabled: !DROPPABLE.has(column.key) });
   return (
     <section
       ref={setNodeRef}
       aria-label={`${column.title}, ${column.count} items`}
-      className={cn("flex w-[290px] shrink-0 flex-col rounded-3xl bg-muted/60 p-2.5 transition-colors", isOver && "bg-muted ring-2 ring-foreground/20")}
+      className={cn(
+        "flex w-[290px] shrink-0 flex-col rounded-3xl bg-muted/60 p-2.5 transition-colors",
+        isOver && allowed && "bg-muted ring-2 ring-foreground/20",
+        allowed === false && "opacity-60",
+      )}
     >
       <header className="flex items-center justify-between px-2 pt-1 pb-2.5">
         <h2 className="text-sm font-bold">
@@ -59,23 +68,43 @@ function ColumnView({ column, onOpen }: { column: Column; onOpen: (ref: string) 
   );
 }
 
-/** Kanban board (brief §4.4): moving a card is the same as changing its stage. */
-export function BoardView({ columns, onOpen, onMove }: { columns: Column[]; onOpen: (ref: string) => void; onMove: (ref: string, column: string) => void }) {
+/** Kanban board (brief §4.4): moving a card is the same as changing its stage, from the same list of moves as the Status menu (D91). */
+export function BoardView({
+  columns,
+  movesFor,
+  onOpen,
+  onMove,
+}: {
+  columns: Column[];
+  movesFor: (card: Card) => Move[];
+  onOpen: (ref: string) => void;
+  onMove: (ref: string, move: Move) => void;
+}) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const [held, setHeld] = useState<{ card: Card; from: string; moves: Move[] } | null>(null);
+
+  function onDragStart(e: DragStartEvent) {
+    const from = columns.find((c) => c.items.some((i) => i.reference === e.active.id));
+    const card = from?.items.find((i) => i.reference === e.active.id);
+    setHeld(from && card ? { card, from: from.key, moves: movesFor(card) } : null);
+  }
 
   function onDragEnd(e: DragEndEvent) {
-    const target = e.over?.id;
-    if (!target || !DROPPABLE.has(String(target))) return;
-    const from = columns.find((c) => c.items.some((i) => i.reference === e.active.id));
-    if (from?.key === target) return;
-    onMove(String(e.active.id), String(target));
+    const target = e.over ? String(e.over.id) : null;
+    const was = held;
+    setHeld(null);
+    if (!was || !target || !DROPPABLE.has(target) || target === was.from) return;
+    const move = was.moves.find((m) => m.column === target);
+    const title = columns.find((c) => c.key === target)?.title ?? target;
+    if (move) onMove(was.card.reference, move);
+    else toast.error(`${was.card.reference} can't move to ${title} from ${STATUS_LABEL[was.card.status]}.`);
   }
 
   return (
-    <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setHeld(null)}>
       <div className="flex gap-3 overflow-x-auto pb-4">
         {columns.map((c) => (
-          <ColumnView key={c.key} column={c} onOpen={onOpen} />
+          <ColumnView key={c.key} column={c} allowed={held && c.key !== held.from ? held.moves.some((m) => m.column === c.key) : null} onOpen={onOpen} />
         ))}
       </div>
     </DndContext>

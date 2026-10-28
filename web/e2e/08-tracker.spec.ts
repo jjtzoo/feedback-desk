@@ -355,7 +355,7 @@ test.describe("8. Staff: tracker", () => {
   });
 });
 
-test("S08.13 When Darlene asks them to check, the tracker leads with It's fixed and Still happening", async ({ page, signIn, team }) => {
+test("S08.13 When Darlene's update asks them to check, the tracker leads with It's fixed and Still happening; a Resolved item asks Is it fixed? instead", async ({ page, signIn, team }) => {
   await signIn("Liam");
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I open my roster");
   const darlene = await team.as("Darlene");
@@ -371,12 +371,11 @@ test("S08.13 When Darlene asks them to check, the tracker leads with It's fixed 
   const history = page.getByRole("region", { name: "Tracking history" });
   await expect(history).toContainText("Liam Carter said it's fixed");
 
-  // Resolved asks them to check too; Still happening sends it back to In progress.
+  // Resolved asks the D92 question instead of a second check card.
   await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fixed: the roster opens again. Please try it." });
   await page.reload();
-  await page.getByRole("region", { name: "Darlene asked you to check this" }).getByRole("button", { name: "Still happening" }).click();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
-  await expect(history).toContainText("Reopened: still happening");
+  await expect(page.getByRole("region", { name: "Is it fixed?" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Darlene asked you to check this" })).toHaveCount(0);
 });
 
 test("S08.14 On a Resolved item the priority under What you sent is grey, with its icon and word", async ({ page, signIn, team }) => {

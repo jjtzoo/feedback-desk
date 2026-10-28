@@ -52,6 +52,26 @@ export async function postJson<T = unknown>(page: Page, path: string, data: unkn
 }
 
 /** The first name of whoever has an item: only they start work on it, post updates and resolve it (D53). */
+/** The item panel's Status button (D91), named for where the item is: "Status: In progress". */
+export const statusButton = (panel: Locator) => panel.locator("header").getByRole("button", { name: /^Status: / });
+
+/** Open the panel's Status menu and pick a move: "Start work", "Resolve…", "Close…", "Close as fixed…", "Start work again". */
+export async function moveTo(page: Page, panel: Locator, label: string) {
+  await statusButton(panel).click();
+  await page.getByRole("menu").getByRole("menuitem", { name: label, exact: true }).click();
+}
+
+/** The moves the Status menu offers, in order; the menu is closed again afterwards. */
+export async function statusMoves(page: Page, panel: Locator): Promise<string[]> {
+  await statusButton(panel).click();
+  const menu = page.getByRole("menu");
+  await expect(menu).toBeVisible();
+  const moves = await menu.getByRole("menuitem").allInnerTexts();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  return moves.map((m) => m.trim());
+}
+
 export async function holderOf(page: Page, ref: string) {
   const item = await getJson<{ assignee: { name: string } | null }>(page, `/console/items/${ref}`);
   return item.assignee!.name.split(" ")[0];

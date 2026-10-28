@@ -25,6 +25,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, errorText, type Board, type Card, type ConsoleView, type Ending, type ItemList, type Project, type Staff } from "@/lib/api";
 import { CATEGORIES, CATEGORY_LABEL, ENDING_LABEL, PRIORITIES, WORK_TYPES, WORK_TYPE_LABEL, age, day, isSettled } from "@/lib/format";
 import { defaultInbox } from "@/lib/inbox";
+import { allowedMoves, type Move, type MoveKey } from "@/lib/moves";
 import { cn } from "@/lib/utils";
 
 const INBOXES = [
@@ -70,7 +71,8 @@ const ARCHIVE_GROUPS: Group[] = [
   { title: "Praise", match: (c) => c.status === "acknowledged" },
 ];
 
-type Pending = { ref: string; kind: "resolve" | "update" };
+type Pending = { ref: string; kind: "resolve" | "update" | "close" | "fix" };
+const MOVE_DIALOG: Partial<Record<MoveKey, Pending["kind"]>> = { resolve: "resolve", close: "close", close_fixed: "fix" };
 
 function Work() {
   const router = useRouter();
@@ -153,14 +155,16 @@ function Work() {
     await api.put("/console/view", { view: v }).catch(() => undefined);
   }
 
-  async function move(ref: string, column: string) {
-    if (column === "resolved") {
-      setPending({ ref, kind: "resolve" });
+  /** A move from the board or the row menu (D91): the same list and dialogs as the panel's Status menu. */
+  async function move(ref: string, m: Move) {
+    const dialog = MOVE_DIALOG[m.key];
+    if (dialog) {
+      setPending({ ref, kind: dialog });
       return;
     }
     try {
-      await api.post(`/console/items/${ref}/move`, { column });
-      toast.success(column === "approved" ? `${ref} approved` : `${ref} moved to In progress`);
+      await api.post(`/console/items/${ref}/move`, { column: m.column });
+      toast.success(m.key === "approve" ? `${ref} approved` : `${ref} moved to In progress`);
     } catch (e) {
       toast.error(errorText(e));
     }
@@ -184,6 +188,9 @@ function Work() {
       if (pending.kind === "update") {
         await api.post(`/console/items/${pending.ref}/update`, { body: r.text, expected_by: r.expectedBy ?? null });
         toast.success("Saved");
+      } else if (pending.kind === "close" || pending.kind === "fix") {
+        await api.post(`/console/items/${pending.ref}/close`, { reason: r.text, ending: pending.kind === "fix" ? "fixed" : r.ending });
+        toast.success(`${pending.ref} closed`);
       } else {
         await api.post(`/console/items/${pending.ref}/move`, { column: "resolved", note: r.text });
         toast.success(`${pending.ref} resolved`);
@@ -230,7 +237,8 @@ function Work() {
       onUpdate={() => setPending({ ref: c.reference, kind: "update" })}
       onAssignToMe={() => void assign(c.reference, null)}
       onHandOver={(id) => void assign(c.reference, id)}
-      onMove={(column) => void move(c.reference, column)}
+      moves={allowedMoves(c, me, staff)}
+      onMove={(m) => void move(c.reference, m)}
     />
   );
 
@@ -313,7 +321,7 @@ function Work() {
 
       {effectiveView === "board" &&
         (board ? (
-          <BoardView columns={board.columns} onOpen={(r) => setParam("item", r)} onMove={(r, c) => void move(r, c)} />
+          <BoardView columns={board.columns} movesFor={(c) => allowedMoves(c, me, staff)} onOpen={(r) => setParam("item", r)} onMove={(r, m) => void move(r, m)} />
         ) : (
           <div className="flex gap-3" aria-busy="true">
             {[0, 1, 2, 3].map((i) => (

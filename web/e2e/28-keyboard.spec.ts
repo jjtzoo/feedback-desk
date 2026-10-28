@@ -298,7 +298,11 @@ test("S28.04 A select, a switch and a radio button all work with the keyboard al
   await page.goto(`/console?inbox=open&item=${ref}`);
   const header = page.locator("header", { hasText: ref });
   await expect(header).toBeVisible();
-  await header.getByRole("button", { name: "Close", exact: true }).focus();
+  // The Status menu opens with Enter and its moves are picked with the arrow keys (D91).
+  await header.getByRole("button", { name: /^Status: / }).focus();
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("menu");
+  await expect(menu.getByRole("menuitem", { name: "Close…" })).toBeFocused();
   await page.keyboard.press("Enter");
   const dialog = page.getByRole("dialog", { name: "Close", exact: true });
   await expect(dialog).toBeVisible();

@@ -12,6 +12,7 @@ from email.message import EmailMessage
 
 from app.config import Settings
 from app.models import Notification
+from app.services.notifications import IS_IT_FIXED
 
 FOOTER = (
     "\n\n--\nSmoke Signal, REDADAIR Digital team.\n"
@@ -20,9 +21,18 @@ FOOTER = (
 )
 
 
+def is_it_fixed(n: Notification, base_url: str) -> str:
+    """The two answers under a resolved item's email (D92). Each opens the tracker at that answer, where
+    one more click confirms it, so a mail scanner opening the links changes nothing."""
+    if n.type != IS_IT_FIXED:
+        return ""
+    page = f"{base_url}{n.link.split('#')[0]}"
+    return f"Is it fixed?\nYes, close it: {page}?fixed=yes\nI still have an issue: {page}?fixed=no\n\n"
+
+
 def render(n: Notification, base_url: str) -> tuple[str, str]:
     body = f"{n.body}\n\n" if n.body else ""
-    return n.title, f"{body}Open it: {base_url}{n.link}{FOOTER}"
+    return n.title, f"{body}{is_it_fixed(n, base_url)}Open it: {base_url}{n.link}{FOOTER}"
 
 
 def render_many(rows: list[Notification], base_url: str) -> tuple[str, str]:
@@ -33,7 +43,8 @@ def render_many(rows: list[Notification], base_url: str) -> tuple[str, str]:
     latest = rows[-1]
     steps = "\n".join(f"- {n.title}" for n in rows)
     body = f"{latest.body}\n\n" if latest.body else ""
-    return latest.title, f"{steps}\n\n{body}Open it: {base_url}{latest.link}{FOOTER}"
+    answers = next((a for a in (is_it_fixed(n, base_url) for n in rows) if a), "")
+    return latest.title, f"{steps}\n\n{body}{answers}Open it: {base_url}{latest.link}{FOOTER}"
 
 
 def build(settings: Settings, to: str, subject: str, body: str) -> EmailMessage:

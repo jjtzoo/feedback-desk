@@ -57,9 +57,44 @@ STEPS = {
 }
 
 
+# Asks the person who raised a resolved item whether it's fixed; its email carries the two answers (D92).
+IS_IT_FIXED = "is_it_fixed"
+
+
 def tracker_link(fb: Feedback, latest: bool = False) -> str:
     """The staff tracker; at its Latest update when that is the news."""
     return f"/track/{fb.ref_no}" + ("#latest" if latest else "")
+
+
+async def ask_is_it_fixed(
+    db: AsyncSession, fb: Feedback, *, title: str, body: str, actor_email: str | None, followers: bool = True
+) -> None:
+    """The person who raised it is asked Is it fixed?; followers hear the stage, since only the person
+    who raised it closes or reopens it (D92). The worker's reminder goes to the person who raised it only."""
+    await notify(
+        db,
+        [fb.submitter_email],
+        type=IS_IT_FIXED,
+        title=title,
+        body=body,
+        link=f"/track/{fb.ref_no}#is-it-fixed",
+        feedback_id=fb.id,
+        actor_email=actor_email,
+        step="Resolved",
+    )
+    if not followers:
+        return
+    await notify(
+        db,
+        (await submitters(db, fb))[1:],
+        type="stage",
+        title=title,
+        body=body,
+        link=tracker_link(fb, latest=True),
+        feedback_id=fb.id,
+        actor_email=actor_email,
+        step="Resolved",
+    )
 
 
 def console_link(fb: Feedback, message_id: uuid.UUID | None = None, tab: str | None = None) -> str:
