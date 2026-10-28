@@ -583,19 +583,16 @@ async def post_update(
     ref_no: str,
     body: str,
     expected_by: date | None,
-    asks_check: bool = False,
     due_reason: str = "",
 ) -> Feedback:
-    """News for the person who raised it: on their tracker, in the app and by email. asks_check marks
-    an update that asks them to try it; their tracker then asks whether it's fixed (D80). Moving the due
+    """News for the person who raised it: on their tracker, in the app and by email. It asks nothing of
+    them; a question goes in the conversation, and only Resolved asks Is it fixed? (D102). Moving the due
     date after approval needs a reason, which only the Digital team sees, and tells the approver (D94)."""
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
     require_holder(fb, user)
     if not body.strip() and expected_by is None:
         raise ServiceError("empty", "Write an update or set a due date.")
-    if asks_check and not body.strip():
-        raise ServiceError("empty", "Say what to check.")
     moved_from = fb.expected_by if fb.approved_by and expected_by not in (None, fb.expected_by) else None
     reason = due_reason.strip()[:500]
     if moved_from and not reason:
@@ -612,7 +609,6 @@ async def post_update(
                 message_type="progress",
                 body=body.strip()[:4000],
                 expected_by=expected_by,
-                asks_check=asks_check,
             )
         )
     fb.updated_at = _now()
@@ -623,11 +619,9 @@ async def post_update(
         db,
         fb,
         type="progress",
-        title=f"{user.name} asked you to check {fb.ref_no}" if asks_check else update,
-        followers_title=update,
+        title=update,
         body=body.strip(),
         actor_email=user.email,
-        step="Asked to check" if asks_check else None,
         latest=True,
     )
     if moved_from and expected_by and fb.approved_by:
@@ -637,7 +631,7 @@ async def post_update(
             type="due_moved",
             title=f"{fb.ref_no}: due date moved from {day_text(moved_from)} to {day_text(expected_by)}",
             body=f"{user.name}: {reason}",
-            link=notifications.console_link(fb, tab="activity"),
+            link=notifications.console_link(fb, tab="history"),
             feedback_id=fb.id,
             actor_email=user.email,
         )
@@ -803,12 +797,16 @@ async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedbac
 
 
 async def add_note(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedback:
+    """A message in the team's internal conversation; the holder, the approver and whoever else wrote
+    there are told (D101). The person who raised it never sees it."""
     require_digital(user)
     if not body.strip():
         raise ServiceError("empty", "Write a note first.")
     fb = await load(db, ref_no=ref_no)
+    message_id = uuid.uuid4()
     db.add(
         FeedbackMessage(
+            id=message_id,
             feedback_id=fb.id,
             author_type="digital",
             author_email=user.email,
@@ -819,6 +817,16 @@ async def add_note(db: AsyncSession, user: User, ref_no: str, body: str) -> Feed
         )
     )
     await _answered(db, fb, user)
+    await notifications.notify(
+        db,
+        await notifications.in_conversation(db, fb, internal=True),
+        type="team_note",
+        title=f"{fb.ref_no}: {user.name} wrote to the team",
+        body=body.strip(),
+        link=notifications.console_link(fb, message_id),
+        feedback_id=fb.id,
+        actor_email=user.email,
+    )
     return fb
 
 

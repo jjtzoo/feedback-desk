@@ -16,7 +16,6 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { api, errorText, type Detail, type Message, type Project, type Staff } from "@/lib/api";
 import {
   CATEGORIES,
@@ -49,13 +48,19 @@ const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
   ["submitter_quote", "Submitter's words"],
 ];
 const MESSAGE_LABEL: Record<string, string> = { chat: "Chat", reply: "Reply", note: "Internal note", progress: "Update", follow_up: "Follow-up" };
+// The panel's tabs; each conversation has its own (D103).
+const TABS = ["brief", "reporter", "team", "history", "files"];
+/** The two conversations: with the person who raised it (replies) and the team's (notes). */
+type Side = "reply" | "note";
+type Field = "project_slug" | "work_type" | "category" | "priority";
 
 function percent(n: number | undefined) {
   return n === undefined ? "–" : `${Math.round(n * 100)}%`;
 }
 
-/** The detail panel beside the board (brief §4.4): developer brief first, then everything else.
- *  A notification opens it on the tab it is about, at its message, briefly highlighted (D81). */
+/** The detail panel beside the board (brief §4.4): developer brief first, then the conversation with the
+ *  person who raised it, the team's internal one, History and Files, each its own tab (D103). A
+ *  notification opens it on the tab it is about, at its message, briefly highlighted (D81). */
 export function ItemPanel({
   reference,
   focusTab = null,
@@ -82,16 +87,16 @@ export function ItemPanel({
   const me = useMe();
   const [item, setItem] = useState<Detail | null>(null);
   const [dialog, setDialog] = useState<{ kind: ActionKind; text?: string } | null>(null);
-  // Internal by default; messaging the person who raised it is a deliberate switch (D96).
-  const [composer, setComposer] = useState<"reply" | "note">("note");
-  const [tab, setTab] = useState(focusMessage ? "activity" : (focusTab ?? "brief"));
+  // A message's tab is known once the item loads (D103).
+  const [tab, setTab] = useState(focusTab && TABS.includes(focusTab) ? focusTab : "brief");
   const [highlight, setHighlight] = useState(focusMessage);
   // When this person last looked before this visit; kept while the panel stays open, so acting doesn't clear New (D82).
   const [lastRead, setLastRead] = useState<string | null | undefined>(undefined);
-  const [feedFilter, setFeedFilter] = useState<"all" | "messages" | "history">("all");
-  // Which side just got a message, so its newest entry is marked "Sent just now".
-  const [justSent, setJustSent] = useState<"reply" | "note" | null>(null);
-  const [message, setMessage] = useState("");
+  // Which conversation just got a message, so its newest entry is marked "Sent just now".
+  const [justSent, setJustSent] = useState<Side | null>(null);
+  const [drafts, setDrafts] = useState<Record<Side, string>>({ reply: "", note: "" });
+  // Corrections to the properties, kept until Save (D104).
+  const [fields, setFields] = useState<Partial<Record<Field, string>>>({});
   // Images to send with a reply, for example to show the fix (D95); notes take none.
   const [images, setImages] = useState<{ file: File; src: string | null }[]>([]);
   const imageInput = useRef<HTMLInputElement>(null);
@@ -105,9 +110,12 @@ export function ItemPanel({
       .then((d) => {
         setItem(d);
         setLastRead((seen) => (seen === undefined ? d.last_read_at : seen));
+        // A notification's message opens in its conversation (D103).
+        const focused = d.messages.find((m) => m.id === focusMessage);
+        if (focused) setTab(focused.is_internal ? "team" : "reporter");
       })
       .catch((e: unknown) => setLoadError(errorText(e)));
-  }, [reference]);
+  }, [reference, focusMessage]);
 
   useEffect(load, [load]);
 
@@ -130,7 +138,7 @@ export function ItemPanel({
   async function onDialog(kind: ActionKind, r: ActionResult): Promise<boolean> {
     const call: Record<ActionKind, [string, unknown]> = {
       approve: ["approve", { instructions: r.text, priority: r.priority ?? null, due_date: r.expectedBy ?? null }],
-      update: ["update", { body: r.text, expected_by: r.expectedBy ?? null, asks_check: r.asksCheck ?? false, due_reason: r.dueReason ?? "" }],
+      update: ["update", { body: r.text, expected_by: r.expectedBy ?? null, due_reason: r.dueReason ?? "" }],
       resolve: ["resolve", { body: r.text }],
       fix: ["close", { ending: "fixed", reason: r.text }],
       close: ["close", { reason: r.text, ending: r.ending }],
@@ -153,10 +161,11 @@ export function ItemPanel({
     setImages((all) => [...all, ...ok.map((file) => ({ file, src: preview(file) }))]);
   }
 
-  async function sendMessage(e: FormEvent) {
+  async function sendMessage(e: FormEvent, side: Side) {
     e.preventDefault();
-    if (!message.trim() || !reference) return;
-    const withImages = composer === "reply" ? images : [];
+    const text = drafts[side];
+    if (!text.trim() || !reference) return;
+    const withImages = side === "reply" ? images : [];
     try {
       // The images go on the item first, so the reply they belong to never arrives without them.
       for (const image of withImages) await api.upload(`/feedback/${reference}/attachments`, image.file);
@@ -164,14 +173,19 @@ export function ItemPanel({
       toast.error(errorText(err));
       return;
     }
-    if (await act(composer, { body: message })) {
+    if (await act(side, { body: text })) {
       withImages.forEach((image) => image.src && URL.revokeObjectURL(image.src));
       if (withImages.length) setImages([]);
-      setMessage("");
-      toast.success(composer === "reply" ? `Sent to ${firstName}` : "Note added");
-      setFeedFilter((f) => (f === "history" ? "all" : f));
-      setJustSent(composer);
-      setComposer("note");
+      setDrafts((d) => ({ ...d, [side]: "" }));
+      toast.success(side === "reply" ? `Sent to ${firstName}` : "Sent to the team");
+      setJustSent(side);
+    }
+  }
+
+  async function saveFields() {
+    if (await act("", fields, "patch")) {
+      setFields({});
+      toast.success("Saved");
     }
   }
 
@@ -200,7 +214,15 @@ export function ItemPanel({
   const instructions = item?.events.find((e) => e.event_type === "instructions");
   const awaiting = item && (item.status === "awaiting_approval" || item.status === "needs_review");
   const open = item && !["declined", "closed", "acknowledged"].includes(item.status);
-  const changeField = (field: string, value: string | null) => void act("", { [field]: value }, "patch");
+  // A pick that puts a property back as it was is no longer a change.
+  const current: Record<Field, string> = { project_slug: item?.project?.slug ?? "", work_type: item?.work_type ?? "", category: item?.category ?? "", priority: item?.priority ?? "" };
+  const changeField = (field: Field, value: string) =>
+    setFields((f) => {
+      const next = { ...f, [field]: value };
+      if (value === current[field]) delete next[field];
+      return next;
+    });
+  const changed = Object.keys(fields).length > 0;
   const can = item ? ownership(item, me, staff) : null;
   // Approving is the Admin's decision, with its own buttons; the Status menu holds the stage moves (D91).
   const moves = item ? allowedMoves(item, me, staff).filter((m) => m.key !== "approve") : [];
@@ -211,6 +233,9 @@ export function ItemPanel({
   // Someone else's words since you last looked; on an item you never opened, only when it's yours (D82).
   const isNew = (m: Message) => m.author_name !== me.name && (lastRead ? m.created_at > lastRead : lastRead === null && Boolean(can?.holder));
   const firstName = item?.submitter_name.split(" ")[0] ?? "";
+  // Who hears about a team note: whoever has it and the approver, apart from you (D101).
+  const approverName = staff.find((s) => s.google_email === item?.approved_by)?.name;
+  const team = [...new Set([item?.assignee?.name, approverName])].filter((n): n is string => Boolean(n) && n !== me.name);
   // The Take over dialog says whose it is and what they last did, so nobody grabs work that is moving (D53).
   const holder = item?.assignee?.name;
   function messageRow(m: Message, sentNow: boolean) {
@@ -235,6 +260,65 @@ export function ItemPanel({
         </p>
         <p className="whitespace-pre-wrap">{m.body}</p>
       </li>
+    );
+  }
+  function composer(side: Side) {
+    const reply = side === "reply";
+    return (
+      <form
+        onSubmit={(e) => void sendMessage(e, side)}
+        className={cn("grid gap-2 rounded-2xl border p-3", reply ? "border-primary/50 bg-primary/5" : "border-dashed border-warning/60 bg-warning-tint")}
+      >
+        <Textarea
+          rows={3}
+          value={drafts[side]}
+          onChange={(e) => setDrafts((d) => ({ ...d, [side]: e.target.value }))}
+          onPaste={(e) => {
+            const pasted = reply ? pastedImages(e) : [];
+            if (pasted.length === 0) return;
+            e.preventDefault();
+            addImages(pasted);
+          }}
+          aria-label={reply ? `Message to ${firstName} (they'll see it)` : "Note to the team (staff never see it)"}
+          placeholder={reply ? `Write to ${firstName}` : team.length > 0 ? `Write to ${team.join(" and ")}` : "Write a note for the team"}
+          className="rounded-xl bg-background"
+        />
+        {reply && images.length > 0 && (
+          <div className="grid gap-2">
+            <FileThumbs
+              files={images.map((image, i) => ({ key: String(i), name: image.file.name, size: image.file.size, src: image.src }))}
+              onRemove={(key) => setImages((all) => all.filter((_, i) => String(i) !== key))}
+            />
+            <ScreenshotNote files={images.map((image, i) => ({ key: String(i), name: image.file.name, src: image.src }))} />
+          </div>
+        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {reply && (
+            <>
+              <input
+                ref={imageInput}
+                type="file"
+                accept={IMAGES}
+                multiple
+                className="sr-only"
+                tabIndex={-1}
+                aria-hidden="true"
+                data-testid="reply-images"
+                onChange={(e) => {
+                  addImages(Array.from(e.target.files ?? []));
+                  e.target.value = "";
+                }}
+              />
+              <Button type="button" variant="ghost" className="rounded-xl" disabled={busy} onClick={() => imageInput.current?.click()}>
+                <ImagePlus /> Add an image
+              </Button>
+            </>
+          )}
+          <Button type="submit" variant={reply ? "default" : "outline"} className="rounded-xl" disabled={busy || !drafts[side].trim()}>
+            {reply ? `Send to ${firstName}` : "Send to the team"}
+          </Button>
+        </div>
+      </form>
     );
   }
   const takeOverText = !item
@@ -361,11 +445,21 @@ export function ItemPanel({
               <aside aria-label="Properties" className="order-first grid content-start gap-3 lg:sticky lg:top-44 lg:order-last lg:self-start">
                 <p className="text-sm font-semibold">Properties (corrections are logged)</p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  <FieldSelect label={`Project (${percent(item.ai_confidence.project)})`} value={item.project?.slug ?? ""} options={projects.map((p) => [p.slug, p.name])} onChange={(v) => changeField("project_slug", v)} />
-                  <FieldSelect label={`Work type (${percent(item.ai_confidence.work_type)})`} value={item.work_type ?? ""} options={WORK_TYPES.map((w) => [w, WORK_TYPE_LABEL[w]])} onChange={(v) => changeField("work_type", v)} />
-                  <FieldSelect label={`Category (${percent(item.ai_confidence.category)})`} value={item.category ?? ""} options={CATEGORIES.map((c) => [c, CATEGORY_LABEL[c]])} onChange={(v) => changeField("category", v)} />
-                  <FieldSelect label={`Priority (${percent(item.ai_confidence.priority)})`} value={item.priority ?? ""} options={PRIORITIES.map((p) => [p, PRIORITY_LABEL[p]])} onChange={(v) => changeField("priority", v)} />
+                  <FieldSelect label={`Project (${percent(item.ai_confidence.project)})`} value={fields.project_slug ?? item.project?.slug ?? ""} options={projects.map((p) => [p.slug, p.name])} onChange={(v) => changeField("project_slug", v)} />
+                  <FieldSelect label={`Work type (${percent(item.ai_confidence.work_type)})`} value={fields.work_type ?? item.work_type ?? ""} options={WORK_TYPES.map((w) => [w, WORK_TYPE_LABEL[w]])} onChange={(v) => changeField("work_type", v)} />
+                  <FieldSelect label={`Category (${percent(item.ai_confidence.category)})`} value={fields.category ?? item.category ?? ""} options={CATEGORIES.map((c) => [c, CATEGORY_LABEL[c]])} onChange={(v) => changeField("category", v)} />
+                  <FieldSelect label={`Priority (${percent(item.ai_confidence.priority)})`} value={fields.priority ?? item.priority ?? ""} options={PRIORITIES.map((p) => [p, PRIORITY_LABEL[p]])} onChange={(v) => changeField("priority", v)} />
                 </div>
+                {changed && (
+                  <div className="flex gap-2">
+                    <Button className="h-10 rounded-xl" disabled={busy} onClick={() => void saveFields()}>
+                      Save
+                    </Button>
+                    <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setFields({})}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
                 <section aria-label="Who has it" className="grid gap-1">
                   <p className="text-xs font-medium text-muted-foreground">Who has it</p>
                   <RoutingLine item={item} />
@@ -384,7 +478,13 @@ export function ItemPanel({
               <Tabs value={tab} onValueChange={setTab} className="min-w-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="brief">Brief</TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
+                  <TabsTrigger value="reporter">
+                    With {firstName} ({withThem.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="team">
+                    <Lock aria-hidden="true" /> Team ({internal.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="history">History</TabsTrigger>
                   <TabsTrigger value="files">Files ({item.attachments.length})</TabsTrigger>
                 </TabsList>
 
@@ -458,155 +558,69 @@ export function ItemPanel({
                   )}
                 </dl>
 
-                </TabsContent>
-
-                <TabsContent value="activity" className="grid gap-4 pt-3">
-                  <ToggleGroup type="single" value={feedFilter} onValueChange={(v) => v && setFeedFilter(v as typeof feedFilter)} variant="outline" size="sm" spacing={0} aria-label="Show">
-                    <ToggleGroupItem value="all">All</ToggleGroupItem>
-                    <ToggleGroupItem value="messages">Messages</ToggleGroupItem>
-                    <ToggleGroupItem value="history">History</ToggleGroupItem>
-                  </ToggleGroup>
-
-                  {feedFilter !== "history" && (
-                    <>
-                      {chat.length > 0 && (
-                        <section aria-label="Intake transcript" className="rounded-2xl border bg-muted/30">
-                          <details open className="group">
-                            <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-2 p-3 text-sm font-semibold">
-                              Intake transcript
-                              <span className="text-xs font-normal text-muted-foreground">
-                                Word for word, as written in the chat. It can&apos;t be edited. ({chat.length})
-                              </span>
-                            </summary>
-                            <ol className="grid gap-3 border-t p-3">
-                              {chat.map((m) => (
-                                <li key={m.id} className="text-sm">
-                                  <p className="mb-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                                    <span className="font-semibold text-foreground">{m.author_type === "staff" ? (m.author_name ?? "Staff member") : "Assistant"}</span>
-                                    {m.author_type === "staff" && <span>Staff member</span>}
-                                    <span>{when(m.created_at)}</span>
-                                  </p>
-                                  <blockquote className="border-l-2 pl-3 whitespace-pre-wrap italic">&ldquo;{m.body}&rdquo;</blockquote>
-                                </li>
-                              ))}
-                            </ol>
-                          </details>
-                        </section>
-                      )}
-
-                      <section aria-label="Conversation" className="grid gap-3">
-                        <h3 className="text-sm font-semibold">Conversation</h3>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <section aria-label={`With ${firstName}`} className="grid content-start gap-2">
-                            <h4 className="text-xs font-semibold text-muted-foreground">With {firstName}</h4>
-                            {withThem.length === 0 && <p className="text-sm text-muted-foreground">Nothing sent to {firstName} yet.</p>}
-                            <ol className="grid gap-2">{withThem.map((m, i) => messageRow(m, justSent === "reply" && i === withThem.length - 1))}</ol>
-                          </section>
-                          <section aria-label="Internal notes" className="grid content-start gap-2 border-t pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-4">
-                            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                              <Lock className="size-3" aria-hidden="true" /> Internal notes · only the Digital team
-                            </h4>
-                            {internal.length === 0 && <p className="text-sm text-muted-foreground">No internal notes yet.</p>}
-                            <ol className="grid gap-2">{internal.map((m, i) => messageRow(m, justSent === "note" && i === internal.length - 1))}</ol>
-                          </section>
-                        </div>
-                        {open && (
-                          <form
-                            onSubmit={sendMessage}
-                            className={cn(
-                              "grid gap-2 rounded-2xl border p-3 transition-colors",
-                              composer === "note" ? "border-dashed border-warning/60 bg-warning-tint" : "border-primary/50 bg-primary/5",
-                            )}
-                          >
-                            <ToggleGroup type="single" value={composer} onValueChange={(v) => v && setComposer(v as "reply" | "note")} variant="outline" size="sm" spacing={0} aria-label="Write" className="justify-self-start bg-background">
-                              <ToggleGroupItem value="note">
-                                <Lock aria-hidden="true" /> Internal note
-                              </ToggleGroupItem>
-                              <ToggleGroupItem value="reply">Message {firstName} (they&apos;ll see this)</ToggleGroupItem>
-                            </ToggleGroup>
-                            <Textarea
-                              rows={3}
-                              value={message}
-                              onChange={(e) => setMessage(e.target.value)}
-                              onPaste={(e) => {
-                                const pasted = composer === "reply" ? pastedImages(e) : [];
-                                if (pasted.length === 0) return;
-                                e.preventDefault();
-                                addImages(pasted);
-                              }}
-                              aria-label={composer === "reply" ? `Message to ${firstName} (they'll see it)` : "Internal note (staff never see it)"}
-                              placeholder={composer === "reply" ? `${firstName} sees this on their tracker and by email` : "Only the Digital team sees this"}
-                              className="rounded-xl bg-background"
-                            />
-                            {composer === "reply" && images.length > 0 && (
-                              <div className="grid gap-2">
-                                <FileThumbs
-                                  files={images.map((image, i) => ({ key: String(i), name: image.file.name, size: image.file.size, src: image.src }))}
-                                  onRemove={(key) => setImages((all) => all.filter((_, i) => String(i) !== key))}
-                                />
-                                <ScreenshotNote files={images.map((image, i) => ({ key: String(i), name: image.file.name, src: image.src }))} />
-                              </div>
-                            )}
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                {composer === "note" && <Lock className="size-3" aria-hidden="true" />}
-                                {composer === "reply" ? `${firstName} sees this.` : "Only the Digital team sees this."}
-                              </p>
-                              {composer === "reply" && (
-                                <>
-                                  <input
-                                    ref={imageInput}
-                                    type="file"
-                                    accept={IMAGES}
-                                    multiple
-                                    className="sr-only"
-                                    tabIndex={-1}
-                                    aria-hidden="true"
-                                    data-testid="reply-images"
-                                    onChange={(e) => {
-                                      addImages(Array.from(e.target.files ?? []));
-                                      e.target.value = "";
-                                    }}
-                                  />
-                                  <Button type="button" variant="ghost" className="ml-auto rounded-xl" disabled={busy} onClick={() => imageInput.current?.click()}>
-                                    <ImagePlus /> Add an image
-                                  </Button>
-                                </>
-                              )}
-                              <Button type="submit" variant={composer === "reply" ? "default" : "outline"} className="rounded-xl" disabled={busy || !message.trim()}>
-                                {composer === "reply" ? `Send to ${firstName}` : "Add note"}
-                              </Button>
-                            </div>
-                          </form>
-                        )}
-                      </section>
-                    </>
-                  )}
-
-                  {feedFilter !== "messages" && (
-                    <section aria-label="History" className="grid gap-2">
-                      <h3 className="flex items-baseline gap-2 text-sm font-semibold">
-                        History
-                        <span className="inline-flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                          <ArrowDown className="size-3" aria-hidden="true" /> Newest first
+                {chat.length > 0 && (
+                  <section aria-label="Intake transcript" className="rounded-2xl border bg-muted/30">
+                    <details className="group">
+                      <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-2 p-3 text-sm font-semibold">
+                        Intake transcript
+                        <span className="text-xs font-normal text-muted-foreground">
+                          Word for word, as written in the chat. It can&apos;t be edited. ({chat.length})
                         </span>
-                      </h3>
-                      {/* In the API's order: newest first, steps written together in the order they happened (D77). */}
-                      <ol className="grid gap-2">
-                        {item.events.map((e) => (
-                          <li key={e.id} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
-                            <span>
-                              <span className="font-medium">{actorName(e)}</span> · {historyLine(e, projects)}
-                              {!e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
-                            </span>
-                            <time className="font-mono text-xs text-muted-foreground" dateTime={e.created_at}>
-                              {when(e.created_at)}
-                            </time>
+                      </summary>
+                      <ol className="grid gap-3 border-t p-3">
+                        {chat.map((m) => (
+                          <li key={m.id} className="text-sm">
+                            <p className="mb-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                              <span className="font-semibold text-foreground">{m.author_type === "staff" ? (m.author_name ?? "Staff member") : "Assistant"}</span>
+                              {m.author_type === "staff" && <span>Staff member</span>}
+                              <span>{when(m.created_at)}</span>
+                            </p>
+                            <blockquote className="border-l-2 pl-3 whitespace-pre-wrap italic">&ldquo;{m.body}&rdquo;</blockquote>
                           </li>
                         ))}
                       </ol>
-                    </section>
-                  )}
+                    </details>
+                  </section>
+                )}
+                </TabsContent>
+
+                <TabsContent value="reporter" className="grid gap-3 pt-3">
+                  <p className="text-sm text-muted-foreground">
+                    {firstName} sees these on their tracker and by email; what they write goes to whoever has it and the approver.
+                  </p>
+                  {withThem.length === 0 && <p className="text-sm text-muted-foreground">Nothing sent to {firstName} yet.</p>}
+                  <ol className="grid gap-2">{withThem.map((m, i) => messageRow(m, justSent === "reply" && i === withThem.length - 1))}</ol>
+                  {open && composer("reply")}
+                </TabsContent>
+
+                <TabsContent value="team" className="grid gap-3 pt-3">
+                  <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Lock className="size-3.5" aria-hidden="true" />
+                    {team.length > 0 ? `Only the Digital team sees this. Each note goes to ${team.join(" and ")}.` : "Only the Digital team sees this."}
+                  </p>
+                  {internal.length === 0 && <p className="text-sm text-muted-foreground">No notes yet.</p>}
+                  <ol className="grid gap-2">{internal.map((m, i) => messageRow(m, justSent === "note" && i === internal.length - 1))}</ol>
+                  {open && composer("note")}
+                </TabsContent>
+
+                <TabsContent value="history" className="grid gap-2 pt-3">
+                  <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <ArrowDown className="size-3" aria-hidden="true" /> Newest first
+                  </p>
+                  {/* In the API's order: newest first, steps written together in the order they happened (D77). */}
+                  <ol className="grid gap-2">
+                    {item.events.map((e) => (
+                      <li key={e.id} className="flex flex-wrap justify-between gap-2 border-b pb-2 text-sm">
+                        <span>
+                          <span className="font-medium">{actorName(e)}</span> · {historyLine(e, projects)}
+                          {!e.is_public && <span className="ml-1 text-xs text-muted-foreground">(internal)</span>}
+                        </span>
+                        <time className="font-mono text-xs text-muted-foreground" dateTime={e.created_at}>
+                          {when(e.created_at)}
+                        </time>
+                      </li>
+                    ))}
+                  </ol>
                 </TabsContent>
 
                 <TabsContent value="files" className="grid gap-3 pt-3">

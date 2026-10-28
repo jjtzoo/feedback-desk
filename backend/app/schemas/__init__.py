@@ -252,6 +252,10 @@ class TimelineOut(Out):
     at: datetime
     text: str
     detail: str | None = None
+    # Something a person wrote in the tracker's conversation: "You" or their name; update marks a progress
+    # update (D100).
+    said_by: str | None = None
+    update: bool = False
 
 
 class GeneralOut(Out):
@@ -295,8 +299,8 @@ class TrackerOut(UploadLimits):
     attachments: list[TrackerFileOut]
     can_reply: bool
     muted: bool
-    # An update that asked them to try an in-progress fix, not yet answered (D80).
-    check: dict[str, Any] | None
+    # Who approved it, in the conversation with the holder (D101).
+    approver: dict[str, str] | None
     # For the person who raised it: Is it fixed? while Resolved (it closes by itself at closes_at), then
     # I still have an issue until reopen_until (D92). state is resolved or closed.
     is_it_fixed: dict[str, Any] | None
@@ -308,11 +312,6 @@ class ReplyIn(BaseModel):
 
 class MuteIn(BaseModel):
     muted: bool
-
-
-class CheckIn(BaseModel):
-    fixed: bool
-    comment: str = Field(default="", max_length=4000)
 
 
 class StillAnIssueIn(BaseModel):
@@ -459,7 +458,6 @@ class HandOverIn(BaseModel):
 class UpdateIn(BaseModel):
     body: str = Field(default="", max_length=4000)
     expected_by: date | None = None
-    asks_check: bool = False
     # Moving the due date after approval: why, for the Digital team only (D94).
     due_reason: str = Field(default="", max_length=500)
 

@@ -163,6 +163,9 @@ export interface TimelineEntry {
   at: string;
   text: string;
   detail: string | null;
+  /** Something a person wrote in the tracker's conversation: "You" or their name; update marks a progress update (D100). */
+  said_by?: string | null;
+  update?: boolean;
 }
 
 export interface StageStep {
@@ -195,8 +198,8 @@ export interface Tracker {
   attachments: TrackerFile[];
   can_reply: boolean;
   muted: boolean;
-  /** An update that asked them to try an in-progress fix, not answered yet (D80). */
-  check: { by: string | null; body: string; at: string } | null;
+  /** Who approved it, in the conversation with whoever has it (D101). */
+  approver: { name: string } | null;
   /** For the person who raised it: Is it fixed? while Resolved (it closes by itself at closes_at), then I still have an issue until reopen_until (D92). */
   is_it_fixed: { state: "resolved" | "closed"; closes_at: string | null; reopen_until: string | null } | null;
   max_file_mb: number;

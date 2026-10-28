@@ -1,6 +1,6 @@
 """The 27 Oct review: no direct contact on the tracker (D75), plain words (D76), history in a fixed
-order (D77), one bell row per item and one email per step (D78), "asked you to check" (D80),
-notifications that open where the news is (D81), New since you last looked (D82) and the fix told
+order (D77), one bell row per item and one email per step (D78), notifications that open where the
+news is (D81), New since you last looked (D82) and the fix told
 to everyone who can see Triage (D84)."""
 
 import asyncio
@@ -104,35 +104,6 @@ async def test_notifications_written_together_go_as_one_email(
     assert {n.email_status for n in await rows(MARC) if n.feedback_id} == {"sent"}
 
 
-async def test_an_update_can_ask_them_to_check_and_they_answer(
-    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
-) -> None:
-    ref = await started(staff, marc, darlene)
-    assert (await darlene.post(f"/api/console/items/{ref}/update", json={"asks_check": True})).status_code == 400
-    r = await darlene.post(
-        f"/api/console/items/{ref}/update", json={"body": "Fix is live, please test the form", "asks_check": True}
-    )
-    assert r.status_code == 200 and r.json()["messages"][-1]["asks_check"] is True
-    t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
-    assert t["check"]["by"] == "Darlene" and t["check"]["body"] == "Fix is live, please test the form"
-    # The notification says what's asked and opens the tracker at Latest update.
-    asked = (await rows(STAFF, "progress"))[-1]
-    assert asked.title == f"Darlene asked you to check {ref}" and asked.link == f"/track/{ref}#latest"
-    assert asked.step == "Asked to check"
-
-    # Someone who only follows it can't answer for a colleague's item they can't see.
-    other = await signed_in(STAFF2)
-    assert (await other.post(f"/api/feedback/{ref}/check", json={"fixed": True})).status_code == 404
-    await other.aclose()
-
-    t = (await staff.post(f"/api/feedback/{ref}/check", json={"fixed": True, "comment": "All good now"})).json()
-    assert t["check"] is None and t["status"] == "in_progress"  # what It's fixed does next is open (decision 3)
-    assert [h["text"] for h in t["history"][:2]] == ["Sam Lee said it's fixed", "You added details"]
-    told = (await rows(DARLENE, "check"))[-1]
-    assert told.title == f"{ref}: Sam Lee says it's fixed" and "&tab=activity&msg=" in told.link
-    assert (await staff.post(f"/api/feedback/{ref}/check", json={"fixed": True})).status_code == 409
-
-
 async def test_a_reply_notification_opens_the_message(
     staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
 ) -> None:
@@ -140,7 +111,7 @@ async def test_a_reply_notification_opens_the_message(
     await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Tested the forms, no bugs found"})
     detail = (await darlene.get(f"/api/console/items/{ref}")).json()
     reply = next(m for m in detail["messages"] if m["body"] == "Tested the forms, no bugs found")
-    assert (await rows(DARLENE, "submitter_reply"))[-1].link == f"/console?item={ref}&tab=activity&msg={reply['id']}"
+    assert (await rows(DARLENE, "submitter_reply"))[-1].link == f"/console?item={ref}&msg={reply['id']}"
     await darlene.post(f"/api/console/items/{ref}/reply", json={"body": "Thanks"})
     assert (await rows(STAFF, "reply"))[-1].link == f"/track/{ref}#latest"
 

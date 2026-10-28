@@ -12,6 +12,10 @@ for your approval" row, updated in place and gone at zero (D55).
 Each row about an item carries its step in a word or two ("Approved", "Fixed"): the bell shows
 one row per item with the steps as a trail (D78). Links open the item where the news is: the
 console panel on the message, the tracker at its Latest update (D81).
+
+Each item has two conversations (D101): one with the person who raised it and the team's internal one.
+A message from the person who raised it, or a team note, reaches the team's side of that conversation:
+the holder, the approver and the Digital Staff who wrote in it. A reply reaches the person who raised it.
 """
 
 import uuid
@@ -24,7 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
-from app.models import DigitalStaff, Feedback, FeedbackFollower, Notification, NotificationMute
+from app.models import DigitalStaff, Feedback, FeedbackFollower, FeedbackMessage, Notification, NotificationMute
 from app.models.enums import APPROVAL_STATUSES
 from app.services.privacy import hide_names, mask
 
@@ -50,6 +54,7 @@ STEPS = {
     "praise": "Thanks",
     "plus_one": "Reported again",
     "submitter_reply": "Reply",
+    "team_note": "Team note",
     "taken_over": "Taken over",
     "handed_over": "Handed over",
     "progress": "Update",
@@ -102,9 +107,10 @@ async def ask_is_it_fixed(
 
 
 def console_link(fb: Feedback, message_id: uuid.UUID | None = None, tab: str | None = None) -> str:
-    """The item's panel; on its Activity tab at one message when the news is a message."""
+    """The item's panel, on a tab; at one message when the news is a message, whose conversation the panel
+    opens (D103)."""
     if message_id:
-        return f"/console?item={fb.ref_no}&tab=activity&msg={message_id}"
+        return f"/console?item={fb.ref_no}&msg={message_id}"
     return f"/console?item={fb.ref_no}" + (f"&tab={tab}" if tab else "")
 
 
@@ -232,6 +238,21 @@ async def notify_assignee(
         actor_email=actor_email,
         step=step,
     )
+
+
+async def in_conversation(db: AsyncSession, fb: Feedback, *, internal: bool) -> list[str]:
+    """Who hears about a new message in one of the item's conversations (D101): the holder, the approver,
+    and every Digital Staff member who has written in it. The person who raised it is never one of them;
+    they hear about replies to them as before."""
+    holder = await db.get(DigitalStaff, fb.assignee_id) if fb.assignee_id else None
+    wrote = await db.scalars(
+        select(FeedbackMessage.author_email).where(
+            FeedbackMessage.feedback_id == fb.id,
+            FeedbackMessage.author_type == "digital",
+            FeedbackMessage.is_internal.is_(internal),
+        )
+    )
+    return [e for e in (holder.google_email if holder else None, fb.approved_by, *wrote) if e]
 
 
 async def admin_emails(db: AsyncSession) -> list[str]:
