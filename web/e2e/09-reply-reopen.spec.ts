@@ -144,7 +144,7 @@ test("S09.08 I still have an issue needs words, takes a screenshot, and sends it
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
   await expect(question(page)).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Who has it" })).toContainText("Darlene");
-  await expect(page.getByRole("region", { name: "What you sent" })).toContainText("phone.png");
+  await expect(page.getByRole("region", { name: "What you sent" }).getByRole("img", { name: "phone.png" })).toBeVisible();
   const history = await expandHistory(page);
   await expect(history.getByRole("listitem").first()).toContainText("Reopened: Liam Carter still has an issue");
   await expect(history).toContainText("Still empty on my phone");
