@@ -58,34 +58,26 @@ test("S24.01 a staff member who submits an item sees only their own items in My 
   expect(list.map((i) => i.reference)).toEqual([mine]);
 });
 
-test("S24.02 staff opening one of Mario's items get the same 'We can't find that feedback' as an unknown number", async ({ page, signIn, team }) => {
+test("S24.02 staff opening one of Mario's items get general information, never his tracker; an unknown number is still not found", async ({ page, signIn, team }) => {
   const marios = await raiseBug(await team.as("Mario"), "rake-agent", "RAKE Agent shows an error that only Mario raised");
 
-  // Mario himself can open it, so the page below is refused by who is asking and not by a missing item.
-  const mario = await team.as("Mario");
-  await mario.goto(`/track/${marios}`);
-  await expect(mario.getByRole("heading", { level: 1 })).toHaveText("Under review");
-
   await signIn("Rafael");
-  const heading = page.getByRole("heading", { name: "We can't find that feedback" });
-
   await page.goto("/track/FB-9999");
-  await expect(heading).toBeVisible();
-  const unknownText = (await heading.locator("..").textContent()) ?? "";
-  expect(unknownText).toContain("Check the reference");
+  await expect(page.getByRole("heading", { name: "We can't find that feedback" })).toBeVisible();
 
   await page.goto(`/track/${marios}`);
-  await expect(heading).toBeVisible();
-  await expect(heading.locator("..")).toHaveText(unknownText);
-  await expect(page.getByRole("link", { name: "Go to My feedback" })).toBeVisible();
-  await expect(page.getByText("only Mario raised")).toHaveCount(0);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Under review");
+  await expect(page.getByText("Someone else's feedback")).toBeVisible();
 
-  // The call behind the page answers both the same way.
+  // The API decides what each viewer gets (D97): the tracker is refused like an unknown number, and
+  // general information comes with only its own fields.
   const unknown = await page.request.get("/api/feedback/FB-9999/tracker");
   const refused = await page.request.get(`/api/feedback/${marios}/tracker`);
-  expect(unknown.status()).toBe(404);
   expect(refused.status()).toBe(404);
   expect(await refused.json()).toEqual(await unknown.json());
+  expect((await page.request.get("/api/feedback/FB-9999/general")).status()).toBe(404);
+  const general = await page.request.get(`/api/feedback/${marios}/general`);
+  expect(Object.keys(await general.json()).sort()).toEqual(["can_plus_one", "expected_by", "following", "merged_into", "muted", "project", "reference", "stage", "stages", "status_text", "summary", "title", "updates"]);
 });
 
 test("S24.03 the duplicate box and What's new show no other submitter's name", async ({ page, signIn, team }) => {

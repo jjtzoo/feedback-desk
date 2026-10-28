@@ -1,6 +1,7 @@
 """Mask secrets before anything is stored, and spot abuse about a named colleague (brief §5.5)."""
 
 import re
+from collections.abc import Iterable
 
 # The separator is atomic and an existing marker is skipped, so masking twice changes nothing.
 _PASSWORD = re.compile(
@@ -8,6 +9,7 @@ _PASSWORD = re.compile(
     re.IGNORECASE,
 )
 _DIGIT_RUN = re.compile(r"(?<![\w-])\d(?:[ -]?\d){8,18}(?![\w-])")
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _ABUSE_WORDS = (
     "idiot",
     "stupid",
@@ -54,6 +56,19 @@ def mask(text: str) -> str:
         return m.group(0)
 
     return _DIGIT_RUN.sub(number, _PASSWORD.sub(password, text))
+
+
+def hide_names(text: str, names: Iterable[str]) -> str:
+    """For someone else's view of an item (D97): email addresses, and the names of the people on it, full
+    or in part, read "someone". Names match as written (capitalised), so "Will" is hidden but "will" is
+    not; a name nobody on the item has is not caught."""
+    words = {w for n in names for w in (n.strip(), *re.split(r"[\s-]+", n)) if len(w) > 1}
+    text = _EMAIL.sub("someone", text)
+    if not words:
+        return text
+    # Longest first, so "Mei Lin" becomes one "someone", not two.
+    alternatives = "|".join(re.escape(w) for w in sorted(words, key=len, reverse=True))
+    return re.sub(rf"\b(?:{alternatives})\b", "someone", text)
 
 
 def is_abusive_about(text: str, names: list[str]) -> bool:

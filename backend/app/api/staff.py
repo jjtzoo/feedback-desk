@@ -9,13 +9,14 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, Db
 from app.config import get_settings
-from app.errors import NotFound
+from app.errors import Conflict, NotFound
 from app.models import Attachment, Feedback, FeedbackFollower
 from app.models.enums import STAGE_OF
 from app.schemas import (
     AllowanceOut,
     AttachmentOut,
     CheckIn,
+    GeneralOut,
     MuteIn,
     MyItemOut,
     ProjectOut,
@@ -29,6 +30,7 @@ from app.schemas import (
 )
 from app.services import catalog, files, lifecycle, notifications, releases, usage
 from app.services import feedback as feedback_service
+from app.services.privacy import hide_names
 
 router = APIRouter(tags=["staff"])
 
@@ -51,7 +53,9 @@ async def my_feedback(db: Db, user: CurrentUser) -> list[MyItemOut]:
     return [
         MyItemOut(
             reference=f.ref_no,
-            title=f.title,
+            title=f.title
+            if f.submitter_email == user.email
+            else hide_names(f.title, await notifications.people_on(db, f)),
             project=f.project.name if f.project else None,
             stage=STAGE_OF[f.status],
             status=f.status,
@@ -105,6 +109,42 @@ async def tracker(ref: str, db: Db, user: CurrentUser) -> TrackerOut:
     return await _tracker(db, user, ref)
 
 
+@router.get("/feedback/{ref}/general", response_model=GeneralOut)
+async def general(ref: str, db: Db, user: CurrentUser) -> GeneralOut:
+    """Someone else's item as general information (D97); the person who raised it gets the tracker."""
+    return await _general(db, user, ref)
+
+
+@router.post("/feedback/{ref}/plus-one", response_model=GeneralOut)
+async def affects_me_too(ref: str, db: Db, user: CurrentUser) -> GeneralOut:
+    """This affects me too, from the general view: follows the item and tells the owner (D97)."""
+    fb = await feedback_service.load(db, ref_no=ref)
+    if feedback_service.sees_in_full(user, fb):
+        raise Conflict("yours", "This one is already yours to follow.")
+    await feedback_service.plus_one(db, user, ref, "")
+    return await _general(db, user, ref)
+
+
+async def _general(db: Db, user: CurrentUser, ref: str) -> GeneralOut:
+    v = await feedback_service.general(db, user, ref)
+    fb = v.feedback
+    return GeneralOut(
+        reference=fb.ref_no,
+        title=v.title,
+        summary=v.summary,
+        project=fb.project.name if fb.project else None,
+        status_text=v.status_text,
+        stage=STAGE_OF[fb.status],
+        stages=v.stages,
+        expected_by=fb.expected_by,
+        updates=[TimelineOut(at=u.at, text=u.text) for u in v.updates],
+        merged_into=v.merged_into,
+        following=v.following,
+        muted=v.muted,
+        can_plus_one=v.can_plus_one,
+    )
+
+
 @router.post("/feedback/{ref}/replies", response_model=TrackerOut)
 async def add_details(ref: str, body: ReplyIn, db: Db, user: CurrentUser) -> TrackerOut:
     await feedback_service.submitter_reply(db, user, ref, body.body)
@@ -135,7 +175,7 @@ async def still_an_issue(ref: str, body: StillAnIssueIn, db: Db, user: CurrentUs
 @router.post("/feedback/{ref}/attachments", response_model=AttachmentOut, status_code=201)
 async def add_file(ref: str, db: Db, user: CurrentUser, file: UploadFile = File(...)) -> AttachmentOut:  # noqa: B008
     fb = await feedback_service.load(db, ref_no=ref)
-    if not await feedback_service.can_view(db, user, fb):
+    if not feedback_service.sees_in_full(user, fb):
         raise NotFound("We can't find that feedback.")
     content = await file.read(get_settings().max_file_mb * 1024 * 1024 + 1)
     att = await files.save(db, files.Upload(file.filename or "file", content), user.email, feedback_id=fb.id)
@@ -156,7 +196,7 @@ async def add_file(ref: str, db: Db, user: CurrentUser, file: UploadFile = File(
 @router.post("/feedback/{ref}/mute", status_code=204)
 async def mute(ref: str, body: MuteIn, db: Db, user: CurrentUser) -> Response:
     fb = await feedback_service.load(db, ref_no=ref)
-    if not await feedback_service.can_view(db, user, fb):
+    if not (feedback_service.sees_in_full(user, fb) or await feedback_service.is_following(db, user, fb)):
         raise NotFound("We can't find that feedback.")
     await notifications.set_mute(db, user.email, fb.id, body.muted)
     return Response(status_code=204)
@@ -173,7 +213,7 @@ async def open_file(attachment_id: uuid.UUID, db: Db, user: CurrentUser) -> Resp
             raise NotFound("No such file.")
     else:
         fb = await db.get(Feedback, att.feedback_id)
-        if fb is None or not await feedback_service.can_view(db, user, fb):
+        if fb is None or not feedback_service.sees_in_full(user, fb):
             raise NotFound("No such file.")
     return RedirectResponse(await files.signed_url(att), status_code=303)
 

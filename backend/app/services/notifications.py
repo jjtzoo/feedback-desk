@@ -26,7 +26,7 @@ from sqlalchemy.orm import selectinload
 from app.config import get_settings
 from app.models import DigitalStaff, Feedback, FeedbackFollower, Notification, NotificationMute
 from app.models.enums import APPROVAL_STATUSES
-from app.services.privacy import mask
+from app.services.privacy import hide_names, mask
 
 KEEP_DAYS = 90
 MAX_CHARS = 300
@@ -60,6 +60,8 @@ STEPS = {
 
 # Asks the person who raised a resolved item whether it's fixed; its email carries the two answers (D92).
 IS_IT_FIXED = "is_it_fixed"
+# Messages to the person who raised it are theirs alone (D96); followers never get them.
+TO_SUBMITTER_ONLY = ("reply", "ask_info")
 
 
 def tracker_link(fb: Feedback, latest: bool = False) -> str:
@@ -85,12 +87,13 @@ async def ask_is_it_fixed(
     )
     if not followers:
         return
+    names = await people_on(db, fb)
     await notify(
         db,
         (await submitters(db, fb))[1:],
         type="stage",
-        title=title,
-        body=body,
+        title=hide_names(title, names),
+        body=hide_names(body, names),
         link=tracker_link(fb, latest=True),
         feedback_id=fb.id,
         actor_email=actor_email,
@@ -151,6 +154,12 @@ async def submitters(db: AsyncSession, fb: Feedback) -> list[str]:
     return [fb.submitter_email, *followers]
 
 
+async def people_on(db: AsyncSession, fb: Feedback) -> list[str]:
+    """Whose names others never see on the item (D97): who raised it, its followers, the Digital team."""
+    followers = await db.scalars(select(FeedbackFollower.name).where(FeedbackFollower.feedback_id == fb.id))
+    return [fb.submitter_name, *followers, *await db.scalars(select(DigitalStaff.name))]
+
+
 async def notify_submitters(
     db: AsyncSession,
     fb: Feedback,
@@ -161,14 +170,33 @@ async def notify_submitters(
     actor_email: str | None = None,
     step: str | None = None,
     latest: bool = False,
+    followers_title: str | None = None,
 ) -> int:
-    """Everyone who raised it, merged duplicates included: merging makes their people followers."""
-    return await notify(
+    """Everyone who raised it, merged duplicates included: merging makes their people followers. A follower
+    sees the item as general information (D97): no message to the person who raised it (D96), names hidden
+    in the title (`followers_title` when the title speaks to the person who raised it), and the words only
+    of a progress update, which the general view shows too."""
+    submitter, *followers = await submitters(db, fb)
+    sent = await notify(
         db,
-        await submitters(db, fb),
+        [submitter],
         type=type,
         title=title,
         body=body,
+        link=tracker_link(fb, latest),
+        feedback_id=fb.id,
+        actor_email=actor_email,
+        step=step,
+    )
+    if type in TO_SUBMITTER_ONLY or not followers:
+        return sent
+    names = await people_on(db, fb)
+    return sent + await notify(
+        db,
+        followers,
+        type=type,
+        title=hide_names(followers_title or title, names),
+        body=hide_names(body, names) if type == "progress" else "",
         link=tracker_link(fb, latest),
         feedback_id=fb.id,
         actor_email=actor_email,

@@ -291,6 +291,7 @@ async def test_duplicate_is_offered_and_plus_one_adds_the_comment(staff: httpx.A
         json={"reference": first_ref, "comment": "Same here on the induction booklet"},
     )
     assert r.status_code == 200 and r.json()["reference"] == first_ref
+    assert r.json()["assigned_to"] == "the Digital team"  # never the owner's name: it is someone else's item (D97)
     assert await count() == 1
     mine = (await other.get("/api/my/feedback")).json()
     assert mine[0]["reference"] == first_ref and mine[0]["following"] is True

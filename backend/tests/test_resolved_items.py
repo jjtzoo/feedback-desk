@@ -98,7 +98,7 @@ async def test_only_the_person_who_raised_it_answers(
         fb = await db.scalar(select(Feedback).where(Feedback.ref_no == ref))
         assert fb is not None
         db.add(FeedbackFollower(feedback_id=fb.id, email=STAFF2, name="Colleague"))
-    assert (await stranger.get(f"/api/feedback/{ref}/tracker")).json()["is_it_fixed"] is None
+    assert "is_it_fixed" not in (await stranger.get(f"/api/feedback/{ref}/general")).json()
     assert (await stranger.post(f"/api/feedback/{ref}/fixed")).status_code == 403
     await stranger.aclose()
     assert (await darlene.post(f"/api/feedback/{ref}/fixed")).status_code == 403

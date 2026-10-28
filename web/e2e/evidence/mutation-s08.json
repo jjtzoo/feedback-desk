@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-27T23:44:28.673Z",
-  "commit": "2c8413a",
+  "ran": "2026-10-28T04:27:20.779Z",
+  "commit": "0873eff",
   "uncommitted": true,
   "spec": "08-tracker.spec.ts",
-  "fingerprint": "4e1aaa5cf99e973f",
+  "fingerprint": "5544cc45c55a04de",
   "caught": {
     "S08.01": true,
     "S08.02": true,
@@ -18,6 +18,8 @@
     "S08.11": true,
     "S08.12": true,
     "S08.13": true,
-    "S08.14": true
+    "S08.14": true,
+    "S08.15": true,
+    "S08.16": true
   }
 }

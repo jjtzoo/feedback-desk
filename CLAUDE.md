@@ -28,7 +28,7 @@ Staff feedback agent and management system for REDADAIR. Staff tell a chat agent
 
 - Company code and files stay in the company GitHub org and approved storage; never personal or private repos (D27).
 - Work on feature branches cut from main, named by type (`feat/`, `fix/`, `ui/`, `db/`, `infra/`, `deps/`). Push feature branches after significant changes; main is the working branch until staging and production exist (D28).
-- Roles are checked server-side on every call; staff see only their own items; the model never names an assignee (D1, D2); nothing saves without the confirm card (D12).
+- Roles are checked server-side on every call; staff see their own items in full and others' only as general information, with names hidden (D97); the model never names an assignee (D1, D2); nothing saves without the confirm card (D12).
 - No secrets in code, `.env.example`, YAML, images or logs; secrets come from Secret Manager (D13). Mask PII before storing.
 - Every schema change is an Alembic revision; check what existing data it affects.
 - Keep the codebase clean: no unused code, debug leftovers, hard-coded config or temporary files. Check an existing dependency before adding one; regenerate `backend/requirements.txt` from `uv.lock` when dependencies change.

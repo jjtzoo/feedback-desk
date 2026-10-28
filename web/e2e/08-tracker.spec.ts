@@ -345,13 +345,16 @@ test.describe("8. Staff: tracker", () => {
     await expect(page).toHaveURL(/\/my$/);
   });
 
-  test("S08.12 staff opening someone else's item get the same We can't find that feedback page", async ({ page, signIn, team }) => {
+  test("S08.12 staff opening someone else's item see general information: no names, no history, no reply box", async ({ page, signIn, team }) => {
     await signIn("Liam");
     const marios = await raiseBug(await team.as("Mario"), "rake-agent", "RAKE Agent crashes for Mario only");
     await page.goto(`/track/${marios}`);
-    await expect(page.getByRole("heading", { name: "We can't find that feedback" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Go to My feedback" })).toBeVisible();
-    await expect(page.getByText("RAKE Agent crashes for Mario only")).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Under review");
+    await expect(page.getByText("Someone else's feedback")).toBeVisible();
+    // The title names the person who raised it, so the name reads "someone" (D97).
+    await expect(page.getByRole("region", { name: "What it's about" })).toContainText("RAKE Agent crashes for someone only");
+    await expect(page.getByText("Mario")).toHaveCount(0);
+    for (const gone of ["Who has it", "Tracking history", "Reply or add details"]) await expect(page.getByText(gone)).toHaveCount(0);
   });
 });
 
@@ -376,6 +379,39 @@ test("S08.13 When Darlene's update asks them to check, the tracker leads with It
   await page.reload();
   await expect(page.getByRole("region", { name: "Is it fixed?" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Darlene asked you to check this" })).toHaveCount(0);
+});
+
+test("S08.15 On someone else's item the progress updates show, with the names of the people on it hidden", async ({ page, signIn, team }) => {
+  const ref = await approvedBug(await team.as("Liam"), team, "RAKE Agent crashes when I filter my roster");
+  const darlene = await team.as("Darlene");
+  await postJson(darlene, `/console/items/${ref}/start`);
+  await postJson(darlene, `/console/items/${ref}/update`, { body: "Hi Liam, we reproduced it on the roster page." });
+  await postJson(darlene, `/console/items/${ref}/note`, { body: "Probably the filter cache" });
+
+  await signIn("Rafael");
+  await page.goto(`/track/${ref}`);
+  const updates = page.getByRole("region", { name: "Progress updates" });
+  await expect(updates).toContainText("Hi someone, we reproduced it on the roster page.");
+  await expect(updates).not.toContainText("Liam");
+  await expect(page.getByText("filter cache")).toHaveCount(0);
+  await expect(page.getByText("Darlene")).toHaveCount(0);
+});
+
+test("S08.16 'This affects me too' on someone else's item follows it, with Mute, and it stays general information", async ({ page, signIn, team }) => {
+  const ref = await approvedBug(await team.as("Liam"), team, "RAKE Agent crashes when I sort my roster");
+  await signIn("Rafael");
+  await page.goto(`/track/${ref}`);
+  await page.getByRole("button", { name: "This affects me too" }).click();
+  await expect(page.getByText("You're following this")).toBeVisible();
+  await expect(page.getByRole("button", { name: "This affects me too" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Mute notifications for this item" }).click();
+  await expect(page.getByRole("button", { name: "Unmute this item" })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByText("You're following this")).toBeVisible();
+  await expect(page.getByText("Who has it")).toHaveCount(0);
+  await page.goto("/my");
+  await expect(page.getByRole("link", { name: new RegExp(ref) })).toContainText("Following");
 });
 
 test("S08.14 On a Resolved item the priority under What you sent is grey, with its icon and word", async ({ page, signIn, team }) => {

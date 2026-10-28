@@ -17,6 +17,7 @@ const PAIRS = {
   finance: { project: "financial-platform", first: "The Financial Platform is slow to export big reports", second: "Financial Platform is really slow to export big reports" },
   afss: { project: "afss-portal", first: "The AFSS Portal is slow to save big statements", second: "AFSS Portal is really slow to save big statements" },
   asset: { project: "it-asset", first: "The IT Asset register is slow to load big lists", second: "IT Asset register is really slow to load big lists" },
+  cpd: { project: "cpd-tracker", first: "The CPD Tracker is slow to load big histories", second: "CPD Tracker is really slow to load big histories" },
 };
 
 const SOMEONE = "Someone may have raised this already";
@@ -157,4 +158,19 @@ test("S05.06 Ignoring the box and pressing Confirm makes a separate item, shown 
   const original = await getJson<{ status: string; linked: string[] }>(darlene, `/console/items/${ref}`);
   expect(original.status).not.toBe("closed");
   expect(original.linked).toHaveLength(0);
+});
+
+test("S05.07 'View it' in the duplicate box opens that item's general information in a new tab, and the chat stays as it was", async ({ page, signIn, team }) => {
+  const { project, first, second } = PAIRS.cpd;
+  await signIn("Mario");
+  const ref = await raise(page, first, ["Slowing me down"], project);
+
+  const tom = await team.as("Tom");
+  const box = await describeAgain(tom, second);
+  const [tab] = await Promise.all([tom.context().waitForEvent("page"), box.getByRole("link", { name: /View it/ }).click()]);
+  await expect(tab).toHaveURL(new RegExp(`/track/${ref}$`));
+  await expect(tab.getByText("Someone else's feedback")).toBeVisible();
+  await expect(tab.getByRole("button", { name: "This affects me too" })).toBeVisible();
+  await tab.close();
+  await expect(box.getByRole("button", { name: "Add my comment there instead" })).toBeVisible();
 });

@@ -8,13 +8,15 @@ import { toast } from "sonner";
 
 import { ACCEPT, FileThumbs, PhotoButton, ScreenshotNote, isImage, pastedImages, preview, withinLimits, type Shown } from "@/components/attach";
 import { PriorityBadge } from "@/components/badges";
+import { GeneralView } from "@/components/general-view";
 import { IsItFixed } from "@/components/is-it-fixed";
+import { StageStepper } from "@/components/stage-stepper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { api, ApiError, errorText, type Attachment, type Tracker, type TrackerFile } from "@/lib/api";
+import { api, ApiError, errorText, type Attachment, type GeneralItem, type Tracker, type TrackerFile } from "@/lib/api";
 import { day, initials, isSettled, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -31,10 +33,12 @@ function shownFiles(files: TrackerFile[]): Shown[] {
 /** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, who has it,
  *  the latest update, and the full history newest first. A resolved item asks the person who
  *  raised it Is it fixed? (D92); an update asking them to try a fix in progress comes first with
- *  It's fixed and Still happening (D80). A notification about news opens it at #latest (D81). */
+ *  It's fixed and Still happening (D80). A notification about news opens it at #latest (D81). Anyone else,
+ *  followers included, gets general information about it instead (D97). */
 export default function TrackerPage() {
   const { ref } = useParams<{ ref: string }>();
   const [t, setT] = useState<Tracker | null>(null);
+  const [general, setGeneral] = useState<GeneralItem | null>(null);
   const [error, setError] = useState<{ notFound: boolean; text: string } | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [reply, setReply] = useState("");
@@ -51,13 +55,27 @@ export default function TrackerPage() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
+    const shown = (data: { reference: string; status_text: string }) => {
+      document.title = `${data.reference}: ${data.status_text} · Smoke Signal`;
+    };
+    const failed = (e: unknown) => setError({ notFound: e instanceof ApiError && e.status === 404, text: errorText(e) });
     api
       .get<Tracker>(`/feedback/${ref}/tracker`)
       .then((data) => {
         setT(data);
-        document.title = `${data.reference}: ${data.status_text} · Smoke Signal`;
+        shown(data);
       })
-      .catch((e: unknown) => setError({ notFound: e instanceof ApiError && e.status === 404, text: errorText(e) }));
+      .catch((e: unknown) => {
+        // Not theirs: the API decides what else they may see (D97).
+        if (!(e instanceof ApiError && e.status === 404)) return failed(e);
+        api
+          .get<GeneralItem>(`/feedback/${ref}/general`)
+          .then((data) => {
+            setGeneral(data);
+            shown(data);
+          })
+          .catch(failed);
+      });
   }, [ref]);
   useEffect(load, [load]);
 
@@ -166,6 +184,7 @@ export default function TrackerPage() {
       </div>
     );
   }
+  if (general) return <GeneralView item={general} onChange={setGeneral} />;
   if (!t) {
     return (
       <div className="mx-auto grid max-w-4xl gap-4 px-4 py-10" aria-busy="true">
@@ -201,35 +220,7 @@ export default function TrackerPage() {
 
       <div className="mx-auto -mt-12 grid max-w-4xl grid-cols-[minmax(0,1fr)] gap-6 px-4 sm:px-6">
         <section className="rounded-3xl border bg-card p-5 shadow-card sm:p-6" aria-label="Progress">
-          <ol className="grid grid-cols-5 gap-1">
-            {t.stages.map((s, i) => (
-              <li key={s.key} className="relative grid justify-items-center gap-2 text-center">
-                {i > 0 && (
-                  <span
-                    className={cn("absolute top-4 right-1/2 h-1 w-full -translate-y-1/2", s.state === "todo" ? "bg-border" : "bg-primary")}
-                    aria-hidden="true"
-                  />
-                )}
-                <span
-                  className={cn(
-                    "relative grid size-8 place-items-center rounded-full border-2",
-                    s.state === "done" && "border-primary bg-primary text-primary-foreground",
-                    s.state === "current" && "border-primary bg-card ring-4 ring-primary/20",
-                    s.state === "todo" && "border-border bg-card",
-                  )}
-                  title={s.at ? when(s.at) : undefined}
-                >
-                  {s.state === "done" && <Check className="size-4" aria-hidden="true" />}
-                  {s.state === "current" && <span className="size-3 rounded-full bg-primary" aria-hidden="true" />}
-                </span>
-                <span className={cn("text-xs sm:text-sm", s.state === "current" ? "font-bold" : "text-muted-foreground")}>
-                  {s.label}
-                  <span className="sr-only">{s.state === "done" ? ", done" : s.state === "current" ? ", current stage" : ", not yet"}</span>
-                </span>
-                {s.at && <span className="hidden font-mono text-[11px] text-muted-foreground sm:block">{day(s.at)}</span>}
-              </li>
-            ))}
-          </ol>
+          <StageStepper stages={t.stages} />
           {(t.close_reason || t.merged_into) && (
             <p className="mt-5 rounded-2xl bg-muted p-4 text-sm">
               {t.merged_into ? (

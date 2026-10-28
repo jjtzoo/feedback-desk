@@ -254,6 +254,25 @@ class TimelineOut(Out):
     detail: str | None = None
 
 
+class GeneralOut(Out):
+    """Someone else's item as general information (D97): no names, transcript, replies, files or anything
+    internal. updates are the public progress updates, newest first, with names hidden."""
+
+    reference: str
+    title: str
+    summary: str
+    project: str | None
+    status_text: str
+    stage: str
+    stages: list[dict[str, Any]]
+    expected_by: date | None
+    updates: list[TimelineOut]
+    merged_into: str | None
+    following: bool
+    muted: bool
+    can_plus_one: bool
+
+
 class TrackerOut(UploadLimits):
     reference: str
     title: str

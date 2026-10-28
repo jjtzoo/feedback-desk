@@ -35,6 +35,7 @@ const PAIRS = {
   flipbook: { project: "flipbook", first: "The Flipbook is slow to open big brochures", second: "Flipbook is really slow to open big brochures" },
   training: { project: "training-portal", first: "The Training Portal is slow to load big courses", second: "Training Portal is really slow to load big courses" },
   afss: { project: "afss-portal", first: "The AFSS Portal is slow to save big statements", second: "AFSS Portal is really slow to save big statements" },
+  cpd: { project: "cpd-tracker", first: "The CPD Tracker is slow to load big histories", second: "CPD Tracker is really slow to load big histories" },
 };
 
 /** Liam raises the original and Aisha the same problem again, so merging gives Aisha something to follow. */
@@ -167,4 +168,18 @@ test("S16.04 Two near-identical items sit side by side offering 'Merge into it',
     expect(item.close_reason ?? "", `${card.reference} close_reason`).not.toContain("Merged");
     expect(item.status, `${card.reference} status`).not.toBe("declined");
   }
+});
+
+test("S16.05 Someone else opening the merged item sees 'View original ticket', which opens the original as general information", async ({ team }) => {
+  const { original, separate } = await pair(team, PAIRS.cpd);
+  const darlene = await team.as("Darlene");
+  await postJson(darlene, `/console/items/${separate}/merge`, { into: original });
+  await merged(darlene, separate, original);
+
+  const tom = await team.as("Tom");
+  await tom.goto(`/track/${separate}`);
+  await expect(tom.getByRole("heading", { level: 1 })).toHaveText(`Duplicate of ${original}`);
+  await tom.getByRole("link", { name: "View original ticket" }).click();
+  await expect(tom).toHaveURL(new RegExp(`/track/${original}$`));
+  await expect(tom.getByText("Someone else's feedback")).toBeVisible();
 });

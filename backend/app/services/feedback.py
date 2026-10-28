@@ -20,7 +20,7 @@ from app.services import embeddings, events, notifications
 from app.services.actors import AGENT, SYSTEM, User
 from app.services.catalog import list_staff, project_by_slug
 from app.services.drafts import CATEGORY_LABEL, GENERAL, WORK_TYPE_LABEL, Draft, first_sentence
-from app.services.privacy import is_abusive_about, mask
+from app.services.privacy import hide_names, is_abusive_about, mask
 from app.services.router import Routing, route
 
 # Staff-side words (D43): stage 2 is "Planned" for staff; the console and Admins keep "Approved".
@@ -89,9 +89,13 @@ async def load(db: AsyncSession, *, ref_no: str | None = None, feedback_id: uuid
     return fb
 
 
-async def can_view(db: AsyncSession, user: User, fb: Feedback) -> bool:
-    if user.is_digital or fb.submitter_email == user.email:
-        return True
+def sees_in_full(user: User, fb: Feedback) -> bool:
+    """The whole tracker, its files and replies: the person who raised it and the Digital team. Everyone
+    else, followers included, gets general information only (D97)."""
+    return user.is_digital or fb.submitter_email == user.email
+
+
+async def is_following(db: AsyncSession, user: User, fb: Feedback) -> bool:
     follower = await db.scalar(
         select(FeedbackFollower.email).where(
             FeedbackFollower.feedback_id == fb.id, FeedbackFollower.email == user.email
@@ -277,6 +281,8 @@ async def _notify_new(db: AsyncSession, fb: Feedback, routing: Routing) -> None:
 async def plus_one(db: AsyncSession, user: User, ref_no: str, comment: str) -> Feedback:
     """Add the user's comment to an existing item instead of opening a new one (brief §4.1.9)."""
     fb = await load(db, ref_no=ref_no)
+    if fb.flagged:
+        raise NotFound("We can't find that feedback.")  # for the Admins only
     if fb.status not in OPEN_STATUSES:
         raise Conflict("closed", "That item is already closed. Send yours as new feedback.")
     if fb.submitter_email != user.email:
@@ -367,6 +373,22 @@ class TrackerView:
     is_it_fixed: dict[str, Any] | None = None
 
 
+@dataclass
+class GeneralView:
+    """Someone else's item (D97): no names, transcript, replies, files or anything internal."""
+
+    feedback: Feedback
+    title: str
+    summary: str
+    status_text: str
+    stages: list[dict[str, Any]]
+    updates: list[TimelineEntry]
+    merged_into: str | None
+    following: bool
+    muted: bool
+    can_plus_one: bool
+
+
 def _public_text(e: FeedbackEvent) -> str:
     # Approvals logged before D43 read "Approved by Chris"; staff see "Planned (Chris accepted it)".
     if e.event_type == "status" and e.after.get("status") == "approved" and e.actor_name:
@@ -388,10 +410,42 @@ def open_check(fb: Feedback, messages: list[FeedbackMessage], evs: list[Feedback
     return ask
 
 
+async def _status_events(db: AsyncSession, fb: Feedback) -> list[FeedbackEvent]:
+    return list(
+        await db.scalars(
+            select(FeedbackEvent)
+            .where(FeedbackEvent.feedback_id == fb.id, FeedbackEvent.event_type == "status")
+            .order_by(FeedbackEvent.created_at)
+        )
+    )
+
+
+def _stages(fb: Feedback, status_events: list[FeedbackEvent]) -> list[dict[str, Any]]:
+    """The five-stage stepper, each stage with when it was reached."""
+    reached: dict[str, datetime] = {"received": fb.created_at}
+    for ev in status_events:
+        to = STAGE_OF.get(str(ev.after.get("status", "")))
+        if to and to not in reached:
+            reached[to] = ev.created_at
+    current_index = STAGES.index(STAGE_OF[fb.status])
+    last_label = (
+        status_text(fb) if fb.ending else "Acknowledged" if fb.status == "acknowledged" else STAGE_LABEL["closed"]
+    )
+    return [
+        {
+            "key": s,
+            "label": last_label if s == "closed" else STAGE_LABEL[s],
+            "state": "done" if i < current_index else "current" if i == current_index else "todo",
+            "at": reached.get(s).isoformat() if reached.get(s) and i <= current_index else None,  # type: ignore[union-attr]
+        }
+        for i, s in enumerate(STAGES)
+    ]
+
+
 async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
     fb = await load(db, ref_no=ref_no)
-    if not await can_view(db, user, fb):
-        raise NotFound("We can't find that feedback.")  # same answer as unknown: reveals nothing
+    if not sees_in_full(user, fb):
+        raise NotFound("We can't find that feedback.")  # everyone else opens the general view (D97)
 
     public_events = list(
         await db.scalars(
@@ -400,13 +454,7 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
             .order_by(FeedbackEvent.created_at, FeedbackEvent.id)
         )
     )
-    status_events = list(
-        await db.scalars(
-            select(FeedbackEvent)
-            .where(FeedbackEvent.feedback_id == fb.id, FeedbackEvent.event_type == "status")
-            .order_by(FeedbackEvent.created_at)
-        )
-    )
+    status_events = await _status_events(db, fb)
     messages = list(
         await db.scalars(
             select(FeedbackMessage)
@@ -420,24 +468,7 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
     )
 
     stage = STAGE_OF[fb.status]
-    reached: dict[str, datetime] = {"received": fb.created_at}
-    for ev in status_events:
-        to = STAGE_OF.get(str(ev.after.get("status", "")))
-        if to and to not in reached:
-            reached[to] = ev.created_at
-    current_index = STAGES.index(stage)
-    last_label = (
-        status_text(fb) if fb.ending else "Acknowledged" if fb.status == "acknowledged" else STAGE_LABEL["closed"]
-    )
-    stages = [
-        {
-            "key": s,
-            "label": last_label if s == "closed" else STAGE_LABEL[s],
-            "state": "done" if i < current_index else "current" if i == current_index else "todo",
-            "at": reached.get(s).isoformat() if reached.get(s) and i <= current_index else None,  # type: ignore[union-attr]
-        }
-        for i, s in enumerate(STAGES)
-    ]
+    stages = _stages(fb, status_events)
 
     # A Resolve note is written just before its status event, whose text quotes it; the two show as one
     # entry, "Resolved by" with the note under it, so the words appear once (D80).
@@ -518,6 +549,46 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
     )
 
 
+async def general(db: AsyncSession, user: User, ref_no: str) -> GeneralView:
+    """Any signed-in person's view of an item (D97): reference, title, masked summary, tool, stage,
+    Expected by and the public progress updates, with the names of the people on it hidden. An item
+    flagged as abusive is for the Admins only, so it is not found here."""
+    fb = await load(db, ref_no=ref_no)
+    if fb.flagged:
+        raise NotFound("We can't find that feedback.")
+    following = await is_following(db, user, fb)
+    names = await notifications.people_on(db, fb)
+
+    def shown(text: str) -> str:
+        return hide_names(mask(text), names)
+
+    updates = await db.scalars(
+        select(FeedbackMessage)
+        .where(
+            FeedbackMessage.feedback_id == fb.id,
+            FeedbackMessage.is_internal.is_(False),
+            FeedbackMessage.message_type == "progress",
+        )
+        .order_by(FeedbackMessage.created_at.desc(), FeedbackMessage.id.desc())
+    )
+    merged = None
+    if fb.duplicate_of:
+        target = await db.get(Feedback, fb.duplicate_of)
+        merged = target.ref_no if target else None
+    return GeneralView(
+        feedback=fb,
+        title=shown(fb.title),
+        summary=shown(fb.summary),
+        status_text=status_text(fb, merged),
+        stages=_stages(fb, await _status_events(db, fb)),
+        updates=[TimelineEntry(m.created_at, shown(m.body)) for m in updates],
+        merged_into=merged,
+        following=following,
+        muted=following and await notifications.is_muted(db, user.email, fb.id),
+        can_plus_one=not (following or sees_in_full(user, fb)) and fb.status in OPEN_STATUSES,
+    )
+
+
 def reopen_until(fb: Feedback, status_events: list[FeedbackEvent]) -> datetime | None:
     """Until when the person who raised a fixed item can still say I still have an issue (D92):
     REOPEN_DAYS after it closed. None once that has passed, or if it didn't end as Fixed."""
@@ -563,9 +634,10 @@ async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) 
 
 
 async def _load_for_reporter(db: AsyncSession, user: User, ref_no: str) -> Feedback:
-    """The item, for someone who raised it or followed it, while it is still open."""
+    """The item, for the person who raised it, while it is still open; a follower sees general information
+    only (D97)."""
     fb = await load(db, ref_no=ref_no)
-    if not await can_view(db, user, fb):
+    if not sees_in_full(user, fb):
         raise NotFound("We can't find that feedback.")
     if user.is_digital and fb.submitter_email != user.email:
         raise Forbidden("Reply from the console instead.")

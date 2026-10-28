@@ -207,7 +207,8 @@ async def plus_one(session_id: str, body: PlusOneIn, user: CurrentUser, db: Db) 
     fb = await feedback_service.plus_one(db, user, body.reference, mask(comment))
     saved = {
         "reference": fb.ref_no,
-        "assigned_to": fb.assignee.name if fb.assignee else "the Digital team",
+        # Never the owner's name: the item is someone else's (D97).
+        "assigned_to": "the Digital team",
         "status": fb.status,
         "plus_one": True,
     }

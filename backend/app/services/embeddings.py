@@ -228,6 +228,7 @@ async def find_similar(
             Feedback.project_id == project_id,
             searched,
             Feedback.duplicate_of.is_(None),
+            Feedback.flagged.is_(False),  # for the Admins only: never offered as a match
             FeedbackEmbedding.model == model,
         )
         .order_by(distance)

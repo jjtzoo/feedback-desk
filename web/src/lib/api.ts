@@ -203,6 +203,24 @@ export interface Tracker {
   max_files: number;
 }
 
+/** Someone else's item as general information (D97): no names, replies, files or anything internal.
+ *  `updates` are the public progress updates, newest first, with the names of the people on it hidden. */
+export interface GeneralItem {
+  reference: string;
+  title: string;
+  summary: string;
+  project: string | null;
+  status_text: string;
+  stage: Stage;
+  stages: StageStep[];
+  expected_by: string | null;
+  updates: TimelineEntry[];
+  merged_into: string | null;
+  following: boolean;
+  muted: boolean;
+  can_plus_one: boolean;
+}
+
 /** A file on the tracker; `from_team` when Digital Staff added it with a reply (D95). */
 export interface TrackerFile extends Attachment {
   from_team: boolean;

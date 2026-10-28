@@ -2,5 +2,6 @@
   "S16.01": ["name: \"Merge into it\" }).click()", "name: \"Merge into it\" }).hover()"],
   "S16.02": [".fill(typed.toLowerCase())", ".fill(candidate)"],
   "S16.03": ["`Merged here: ${separate}`", "`Merged here: ${original}`"],
-  "S16.04": ["name: \"Merge into it\" })", "name: \"Merge into itx\" })"]
+  "S16.04": ["name: \"Merge into it\" })", "name: \"Merge into itx\" })"],
+  "S16.05": ["Someone else's feedback\")).toBeVisible();", "Someone else's feedbackx\")).toBeVisible();"]
 }

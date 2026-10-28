@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Paperclip, RotateCcw, Send } from "lucide-react";
+import { ExternalLink, Loader2, Paperclip, RotateCcw, Send } from "lucide-react";
 import Link from "next/link";
 import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
@@ -482,9 +482,18 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                         <span className="text-sm">
                           <span className="font-mono font-semibold">{d.reference}</span> · {d.title}
                         </span>
-                        <Button variant="outline" size="lg" className="h-11 rounded-xl" onClick={() => void plusOne(d.reference)}>
-                          Add my comment there instead
-                        </Button>
+                        <span className="flex flex-wrap gap-2">
+                          {/* A new tab, so the chat stays as it is; the item opens as general information (D97). */}
+                          <Button asChild variant="ghost" size="lg" className="h-11 rounded-xl">
+                            <Link href={`/track/${d.reference}`} target="_blank" rel="noopener">
+                              View it <ExternalLink aria-hidden="true" />
+                              <span className="sr-only">(opens in a new tab)</span>
+                            </Link>
+                          </Button>
+                          <Button variant="outline" size="lg" className="h-11 rounded-xl" onClick={() => void plusOne(d.reference)}>
+                            Add my comment there instead
+                          </Button>
+                        </span>
                       </li>
                     ))}
                   </ul>

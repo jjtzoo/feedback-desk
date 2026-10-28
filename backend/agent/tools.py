@@ -14,10 +14,12 @@ from google.adk.tools.tool_context import ToolContext
 from agent.callbacks import cost_aud
 from app.config import get_settings
 from app.db import session_scope
-from app.services import catalog, embeddings
+from app.models import Feedback
+from app.services import catalog, embeddings, notifications
 from app.services import feedback as feedback_service
 from app.services.actors import User
 from app.services.drafts import CONTINUE, GENERAL, NEXT_STEPS, apply_update, missing, quick_replies
+from app.services.privacy import hide_names
 
 log = logging.getLogger(__name__)
 UNSURE_RE = re.compile(r"\b(not sure|unsure|don'?t know|no idea|dunno)\b")
@@ -203,8 +205,13 @@ async def find_duplicates(tool_context: ToolContext, limit: int = 3) -> dict[str
             if project
             else []
         )
+        # Someone else's titles, with the names of the people on them hidden (D97).
+        titles = {}
+        for s in found:
+            fb = await db.get(Feedback, s.feedback_id)
+            titles[s.ref_no] = hide_names(s.title, await notifications.people_on(db, fb)) if fb else s.title
     candidates = [
-        {"reference": s.ref_no, "title": s.title, "date": s.created_at_iso[:10]}
+        {"reference": s.ref_no, "title": titles[s.ref_no], "date": s.created_at_iso[:10]}
         | ({"fixed_on": s.fixed_at_iso[:10]} if s.fixed_at_iso else {})
         for s in found
     ]

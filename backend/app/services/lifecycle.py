@@ -16,7 +16,7 @@ from app.models import Feedback, FeedbackEvent, FeedbackMessage
 from app.models.entities import stamp
 from app.services import console, events, notifications
 from app.services.actors import SYSTEM, User
-from app.services.feedback import can_view, day_text, load, reopen_until
+from app.services.feedback import day_text, is_following, load, reopen_until, sees_in_full
 from app.services.privacy import mask
 
 BATCH = 100
@@ -26,7 +26,7 @@ async def _load_for_submitter(db: AsyncSession, user: User, ref_no: str) -> Feed
     """Only the person who raised it closes or reopens it; followers see the stage."""
     fb = await load(db, ref_no=ref_no)
     if fb.submitter_email != user.email:
-        if await can_view(db, user, fb):
+        if sees_in_full(user, fb) or await is_following(db, user, fb):
             raise Forbidden("Only the person who raised it can answer this.")
         raise NotFound("We can't find that feedback.")
     return fb

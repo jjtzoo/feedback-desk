@@ -248,7 +248,9 @@ async def test_merge_moves_the_submitter_to_the_original(
     assert r.json()["status"] == "declined" and r.json()["merged_into"] == original
     t = (await other.get(f"/api/feedback/{dup}/tracker")).json()
     assert t["status_text"] == f"Duplicate of {original}" and t["ending"] == "duplicate"
-    assert (await other.get(f"/api/feedback/{original}/tracker")).status_code == 200  # now follows the original
+    # Now follows the original, which they see as general information like any colleague (D97).
+    assert (await other.get(f"/api/feedback/{original}/tracker")).status_code == 404
+    assert (await other.get(f"/api/feedback/{original}/general")).json()["following"] is True
     await other.aclose()
 
 

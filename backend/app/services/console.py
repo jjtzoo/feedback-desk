@@ -618,15 +618,13 @@ async def post_update(
     fb.updated_at = _now()
     _first_response(fb)
     await _answered(db, fb, user)
-    if asks_check:
-        title = f"{user.name} asked you to check {fb.ref_no}"
-    else:
-        title = f"Update on {fb.ref_no}" + (f", expected by {day_text(expected_by)}" if expected_by else "")
+    update = f"Update on {fb.ref_no}" + (f", expected by {day_text(expected_by)}" if expected_by else "")
     await notifications.notify_submitters(
         db,
         fb,
         type="progress",
-        title=title,
+        title=f"{user.name} asked you to check {fb.ref_no}" if asks_check else update,
+        followers_title=update,
         body=body.strip(),
         actor_email=user.email,
         step="Asked to check" if asks_check else None,

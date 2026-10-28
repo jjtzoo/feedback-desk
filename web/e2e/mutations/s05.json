@@ -4,5 +4,6 @@
   "S05.03": ["Added to ", "Added tox "],
   "S05.04": ["\"Following\"", "\"Followingx\""],
   "S05.05": ["Also following: Mike", "Also following: Mikex"],
-  "S05.06": ["% similar", "% similarx"]
+  "S05.06": ["% similar", "% similarx"],
+  "S05.07": ["Someone else's feedback\")).toBeVisible();", "Someone else's feedbackx\")).toBeVisible();"]
 }

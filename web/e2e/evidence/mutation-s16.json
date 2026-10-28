@@ -1,13 +1,14 @@
 {
-  "ran": "2026-10-27T23:56:05.958Z",
-  "commit": "2c8413a",
+  "ran": "2026-10-28T04:28:54.108Z",
+  "commit": "0873eff",
   "uncommitted": true,
   "spec": "16-merge-duplicates.spec.ts",
-  "fingerprint": "f1470aaac09568d1",
+  "fingerprint": "2c0ecbeb4e693c28",
   "caught": {
     "S16.01": true,
     "S16.02": true,
     "S16.03": true,
-    "S16.04": true
+    "S16.04": true,
+    "S16.05": true
   }
 }

@@ -10,7 +10,9 @@
   "S08.09": ["\"_blank\"", "\"_blankx\""],
   "S08.10": ["Reason: Working as designed", "Reason: Working as designedx"],
   "S08.11": ["find that feedback", "find that feedbackx"],
-  "S08.12": ["find that feedback", "find that feedbackx"],
+  "S08.12": ["crashes for someone only", "crashes for Mario only"],
   "S08.13": ["Liam Carter said it's fixed", "Liam Carter said it's fixedx"],
-  "S08.14": ["toHaveClass(/text-muted-foreground/)", "not.toHaveClass(/text-muted-foreground/)"]
+  "S08.14": ["toHaveClass(/text-muted-foreground/)", "not.toHaveClass(/text-muted-foreground/)"],
+  "S08.15": ["Hi someone, we reproduced", "Hi Liam, we reproduced"],
+  "S08.16": ["You're following this\")).toBeVisible();", "You're following thisx\")).toBeVisible();"]
 }
