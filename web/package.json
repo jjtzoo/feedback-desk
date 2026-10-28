@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:full": "node e2e/shards.mjs",
     "test:e2e:report": "playwright show-report",
     "test:e2e:coverage": "node e2e/coverage.mjs",
     "test:e2e:mutation": "node e2e/mutation-check.mjs",

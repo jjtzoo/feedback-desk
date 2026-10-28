@@ -63,7 +63,7 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 
 Staging never points at production resources, and the scripts refuse to deploy a branch to the wrong environment.
 
-Browser tests (`web/e2e/`, Playwright) are a fourth, local-only setup: API on port 8002 (`backend/scripts/e2e_server.py`, which runs it as a child process and restarts it with `MODEL_PROVIDER` stub or none on request from 127.0.0.1:8012), a production web build in `web/.next-e2e/` on port 3100, the `fd_e2e` database in the same `pgserver`, the stub model, email off. `backend/scripts/e2e_reset.py` puts that database back to the seed before each spec file. Nothing in it reaches the local hand-testing servers (8001, 3000) or the cloud.
+Browser tests (`web/e2e/`, Playwright) are a fourth, local-only setup: API on port 8002 (`backend/scripts/e2e_server.py`, which runs it as a child process and restarts it with `MODEL_PROVIDER` stub or none on request from 127.0.0.1:8012), a production web build in `web/.next-e2e/` on port 3100, the `fd_e2e` database in the same `pgserver`, the stub model, email off. `backend/scripts/e2e_reset.py` puts that database back to the seed before each spec file; the tests ask the supervisor to run it in its own process (POST /reset on the control port), which saves starting Python each time. The full run (`web/e2e/shards.mjs`) runs several of these setups at once, each with its own ports and database (`E2E_DATABASE`, `fd_e2e_<n>`) and one shared web build, and merges their reports. Nothing in it reaches the local hand-testing servers (8001, 3000) or the cloud.
 
 ## Cloud resources (australia-southeast1)
 

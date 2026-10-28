@@ -1,23 +1,22 @@
 import { execFileSync } from "node:child_process";
-import path from "node:path";
 
 import { expect, test as base, type Page } from "@playwright/test";
 
+import { API_CONTROL } from "./env";
 import { otherWindow, signInAs, type Person } from "./helpers";
 
 /**
- * backend/scripts/e2e_reset.py with these arguments, on the test database. Run without a shell, so
- * the time limit ends `uv` itself (through cmd.exe it ended only the shell, S11.01); a failure says
- * how long it ran and what the script printed.
+ * backend/scripts/e2e_reset.py with these arguments, run by the test API's supervisor (POST /reset),
+ * which is already started and connected to the test database. The fixtures stay synchronous, so the
+ * request goes through a short-lived node process; a failure says how long it ran and why.
  */
 function e2eReset(...args: string[]) {
   const started = Date.now();
+  const post = `fetch(${JSON.stringify(`${API_CONTROL}/reset`)}, { method: "POST", body: ${JSON.stringify(JSON.stringify({ args }))} })
+    .then(async (r) => { if (!r.ok) { console.error(r.status, await r.text()); process.exit(1); } })
+    .catch((e) => { console.error(String(e)); process.exit(1); });`;
   try {
-    execFileSync("uv", ["run", "python", "-m", "scripts.e2e_reset", ...args], {
-      cwd: path.join(__dirname, "..", "..", "backend"),
-      stdio: "pipe",
-      timeout: 60_000,
-    });
+    execFileSync(process.execPath, ["-e", post], { stdio: "pipe", timeout: 60_000 });
   } catch (e) {
     const stderr = (e as { stderr?: Buffer }).stderr?.toString().trim().slice(-2000);
     throw new Error(`e2e_reset ${args.join(" ")} failed after ${Date.now() - started} ms: ${e}\n${stderr ?? ""}`);

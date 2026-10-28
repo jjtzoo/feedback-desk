@@ -19,6 +19,7 @@ web/.next/
 web/out/
 web/test-results/
 web/playwright-report/
+web/blob-report/
 web/.next-e2e/
 web/e2e-results.json
 
