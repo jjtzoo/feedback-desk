@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { moveTo, postJson, raiseBug, statusMoves } from "./helpers";
+import { getJson, moveTo, openActivity, postJson, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 14: Digital Staff change an item's status from the console panel.
 // Staff raise RAKE Agent, IT Asset, Workflow Atlas, AFSS Portal and Fire Safety Blog Agent bugs (all
@@ -51,7 +51,7 @@ const headerButton = (panel: Locator, name: string) => panel.locator("header").g
 const updateButton = (panel: Locator) => panel.locator("header").getByRole("button", { name: /^Update [A-Z][a-z]+$/ });
 const updateDialog = (page: Page) => page.getByRole("dialog", { name: /^Update [A-Z][a-z]+ on progress$/ });
 
-/** Pick a day on the Expected by calendar (D79), moving month by month to the one it is in. */
+/** Pick a day on the due date calendar (D79), moving month by month to the one it is in. */
 async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
   await dialog.locator("#expected-by").click();
   const d = new Date(`${iso}T00:00:00`);
@@ -104,7 +104,7 @@ test("S14.01 Status, then Start work, on an Approved item gives In progress in o
   await expect(page.getByRole("link", { name: new RegExp(`${ref} is being worked on`) })).toBeVisible();
 });
 
-test("S14.02 Post update with text and Expected by shows both on the tracker and notifies the submitter", async ({ page, signIn, team }) => {
+test("S14.02 Post update with text and a due date shows both on the tracker and notifies the submitter", async ({ page, signIn, team }) => {
   await signIn("Aisha");
   const ref = await inProgress(page, team, "it-asset", "IT Asset barcode scanner");
   const update = "Waiting on the vendor for a patch";
@@ -131,7 +131,7 @@ test("S14.02 Post update with text and Expected by shows both on the tracker and
   await expect(page.getByRole("link", { name: new RegExp(`Update on ${ref}, expected by`) })).toBeVisible();
 });
 
-test("S14.03 An update with only a date is accepted; one with neither says 'Write an update or set an Expected by date.'", async ({ page, signIn, team }) => {
+test("S14.03 An update with only a date is accepted; one with neither says 'Write an update or set a due date.'", async ({ page, signIn, team }) => {
   await signIn("Tom");
   const ref = await inProgress(page, team, "workflow-atlas", "Workflow Atlas process map");
   const expectedBy = isoDay(10);
@@ -151,7 +151,7 @@ test("S14.03 An update with only a date is accepted; one with neither says 'Writ
   await updateButton(panel).click();
   const neither = updateDialog(darlene);
   await submit(neither).click();
-  await expect(neither.getByRole("alert")).toHaveText("Write an update or set an Expected by date.");
+  await expect(neither.getByRole("alert")).toHaveText("Write an update or set a due date.");
   await expect(neither).toBeVisible();
   const refused = await darlene.request.post(`/api/console/items/${ref}/update`, { data: { body: "", expected_by: null } });
   expect(refused.ok()).toBe(false);
@@ -326,7 +326,7 @@ test("S14.07 The dashboard's Avg time to first response changes after the first 
   await expect(average).toHaveText(/^\d+(\.\d+)? h$/);
 });
 
-test("S14.09 Update Liam says when to use it and picks Expected by on a calendar in the app's date style; Resolve shows an example", async ({ page, signIn, team }) => {
+test("S14.09 Update Liam says when to use it and picks the due date on a calendar in the app's date style; Resolve shows an example", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const ref = await inProgress(await team.as("Liam"), team, "rake-agent", "RAKE Agent training calendar");
   const panel = await openPanel(page, ref);
@@ -345,4 +345,37 @@ test("S14.09 Update Liam says when to use it and picks Expected by on a calendar
   await moveTo(page, panel, "Resolve…");
   const resolve = actionDialog(page, "Resolve");
   await expect(resolve.getByRole("textbox")).toHaveAttribute("placeholder", /Please try it and tell us if it still happens/);
+});
+
+test("S14.10 Moving the due date after approval asks why, for the Digital team only; Chris, who approved it, is told", async ({ page, signIn, team }) => {
+  await signIn("Tom");
+  const ref = await raiseBug(page, "workflow-atlas", "The Workflow Atlas export screen shows an error when I open it");
+  const [first, later] = [isoDay(5), isoDay(12)];
+  const reason = "Waiting on the vendor's index fix";
+  const chris = await team.as("Chris");
+  await postJson(chris, `/console/items/${ref}/approve`, { due_date: first });
+
+  const darlene = await team.as("Darlene");
+  const panel = await openPanel(darlene, ref);
+  await updateButton(panel).click();
+  const dialog = updateDialog(darlene);
+  await expect(dialog).toContainText("Now due");
+  await pickExpectedBy(darlene, dialog, later);
+  const why = dialog.getByRole("textbox", { name: "Why the date moved (only the Digital team sees it)" });
+  await expect(why).toBeVisible();
+  await submit(dialog).click();
+  await expect(dialog.getByRole("alert")).toHaveText("Say why the due date moved.");
+  await why.fill(reason);
+  await submit(dialog).click();
+  await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
+  await openActivity(panel, "History");
+  await expect(panel.getByRole("region", { name: "History" })).toContainText(`: ${reason}`);
+
+  const told = (await getJson<{ items: { title: string; body: string }[] }>(chris, "/notifications")).items.find((n) => n.title.startsWith(`${ref}: due date moved from`));
+  expect(told?.body).toBe(`Darlene: ${reason}`);
+
+  // Tom sees the new date, never the reason.
+  await openTracker(page, ref);
+  await expect(band(page)).toContainText(dayText(later));
+  await expect(page.getByRole("main")).not.toContainText("vendor");
 });

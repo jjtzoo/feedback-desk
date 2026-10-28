@@ -11,5 +11,6 @@
   "S18.10": ["toHaveCount(0)", "toHaveCount(1)"],
   "S18.11": ["toBe(409)", "toBe(200)"],
   "S18.12": ["\"Nobody has it yet · flagged for the Admins\"", "\"Nobody has it yet · flagged for the Adminsx\""],
-  "S18.13": ["\"2 over 2 business days\"", "\"3 over 2 business days\""]
+  "S18.13": ["\"2 over 2 business days\"", "\"3 over 2 business days\""],
+  "S18.14": ["expect(pinned).toContainText(instructions)", "expect(pinned).not.toContainText(instructions)"]
 }

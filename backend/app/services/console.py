@@ -563,29 +563,45 @@ async def start_work(db: AsyncSession, user: User, ref_no: str) -> Feedback:
     return await load(db, feedback_id=fb.id)
 
 
+def _set_due(db: AsyncSession, fb: Feedback, user: User, due: date, reason: str = "") -> None:
+    """The one due date (D94): staff see it as Expected by; a reason for moving it stays internal."""
+    events.log(
+        db,
+        fb.id,
+        user.actor,
+        "expected_by",
+        before={"expected_by": str(fb.expected_by or "")},
+        after={"expected_by": str(due), **({"reason": reason} if reason else {})},
+        public_text=f"Expected by {day_text(due)}",
+    )
+    fb.expected_by = due
+
+
 async def post_update(
-    db: AsyncSession, user: User, ref_no: str, body: str, expected_by: date | None, asks_check: bool = False
+    db: AsyncSession,
+    user: User,
+    ref_no: str,
+    body: str,
+    expected_by: date | None,
+    asks_check: bool = False,
+    due_reason: str = "",
 ) -> Feedback:
     """News for the person who raised it: on their tracker, in the app and by email. asks_check marks
-    an update that asks them to try it; their tracker then asks whether it's fixed (D80)."""
+    an update that asks them to try it; their tracker then asks whether it's fixed (D80). Moving the due
+    date after approval needs a reason, which only the Digital team sees, and tells the approver (D94)."""
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
     require_holder(fb, user)
     if not body.strip() and expected_by is None:
-        raise ServiceError("empty", "Write an update or set an Expected by date.")
+        raise ServiceError("empty", "Write an update or set a due date.")
     if asks_check and not body.strip():
         raise ServiceError("empty", "Say what to check.")
+    moved_from = fb.expected_by if fb.approved_by and expected_by not in (None, fb.expected_by) else None
+    reason = due_reason.strip()[:500]
+    if moved_from and not reason:
+        raise ServiceError("reason_required", "Say why the due date moved; only the Digital team sees it.")
     if expected_by is not None and expected_by != fb.expected_by:
-        events.log(
-            db,
-            fb.id,
-            user.actor,
-            "expected_by",
-            before={"expected_by": str(fb.expected_by or "")},
-            after={"expected_by": str(expected_by)},
-            public_text=f"Expected by {day_text(expected_by)}",
-        )
-        fb.expected_by = expected_by
+        _set_due(db, fb, user, expected_by, reason if moved_from else "")
     if body.strip():
         db.add(
             FeedbackMessage(
@@ -616,6 +632,17 @@ async def post_update(
         step="Asked to check" if asks_check else None,
         latest=True,
     )
+    if moved_from and expected_by and fb.approved_by:
+        await notifications.notify(
+            db,
+            [fb.approved_by],
+            type="due_moved",
+            title=f"{fb.ref_no}: due date moved from {day_text(moved_from)} to {day_text(expected_by)}",
+            body=f"{user.name}: {reason}",
+            link=notifications.console_link(fb, tab="activity"),
+            feedback_id=fb.id,
+            actor_email=user.email,
+        )
     return await load(db, feedback_id=fb.id)
 
 
@@ -924,13 +951,33 @@ async def approvals(db: AsyncSession, user: User) -> list[Feedback]:
     )
 
 
-async def approve(db: AsyncSession, user: User, ref_no: str) -> Feedback:
+async def approve(
+    db: AsyncSession,
+    user: User,
+    ref_no: str,
+    instructions: str = "",
+    priority: str | None = None,
+    due_date: date | None = None,
+) -> Feedback:
+    """Approve, with the priority and due date confirmed or changed and optional instructions for the
+    developer (D93, D94). The instructions are internal: an event the panel pins and History lists, and
+    the body of the assignee's notification; never on the tracker."""
     require_admin(user)
     fb = await load(db, ref_no=ref_no)
     if fb.status not in ("awaiting_approval", "needs_review"):
         raise Conflict("decided", "That item has already been decided.")
+    if priority is not None and priority not in PRIORITIES:
+        raise ServiceError("bad_value", "Unknown priority.")
     fb.approved_by, fb.approved_at = user.email, _now()
     fb.routed = None  # an Admin accepted routing's choice
+    if priority is not None and priority != fb.priority:
+        events.log(db, fb.id, user.actor, "correction", before={"priority": fb.priority}, after={"priority": priority})
+        fb.priority = priority
+    if due_date is not None and due_date != fb.expected_by:
+        _set_due(db, fb, user, due_date)
+    note = instructions.strip()[:4000]
+    if note:
+        events.log(db, fb.id, user.actor, "instructions", after={"instructions": note})
     # Staff see stage 2 as Planned (D43); the console keeps Approved.
     _set_status(db, fb, user, "approved", f"Planned ({user.name} accepted it)")
     _first_response(fb)
@@ -946,7 +993,12 @@ async def approve(db: AsyncSession, user: User, ref_no: str) -> Feedback:
         step="Planned",
     )
     await notifications.notify_assignee(
-        db, fb, type="approved", title=f"Approved, ready to start: {fb.ref_no} · {fb.title}", actor_email=user.email
+        db,
+        fb,
+        type="approved",
+        title=f"Approved, ready to start: {fb.ref_no} · {fb.title}",
+        body=f"Instructions from {user.name}: {note}" if note else "",
+        actor_email=user.email,
     )
     return await load(db, feedback_id=fb.id)
 

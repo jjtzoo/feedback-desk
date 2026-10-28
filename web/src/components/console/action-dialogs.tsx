@@ -14,9 +14,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Staff } from "@/lib/api";
-import { day } from "@/lib/format";
+import { PRIORITIES, PRIORITY_LABEL, day } from "@/lib/format";
 
-export type ActionKind = "update" | "resolve" | "fix" | "close" | "decline" | "ask" | "merge" | "take_over" | "hand_over";
+export type ActionKind = "approve" | "update" | "resolve" | "fix" | "close" | "decline" | "ask" | "merge" | "take_over" | "hand_over";
 
 /** How an open item can end by hand (D45). Fixed comes from a resolved item; duplicate and declined have their own actions. */
 export type CloseEnding = "wont_fix" | "no_longer_needed";
@@ -27,6 +27,15 @@ const CLOSE_ENDINGS: [CloseEnding, string, string][] = [
 ];
 
 const COPY: Record<ActionKind, { title: string; description: string; field: string; button: string; required: boolean; placeholder?: string }> = {
+  // Confirm or change the priority and due date, and tell the developer how to handle it (D93, D94).
+  approve: {
+    title: "Approve",
+    description: "Confirm the priority and due date. Instructions go to whoever has it, with the approval, and stay pinned on the item. Only the Digital team sees them.",
+    field: "Instructions for the developer (optional)",
+    button: "Approve",
+    required: false,
+    placeholder: "Check the leave index first; don't change the prompt.",
+  },
   // Says when to use it, not only where it goes (D79); the panel names the person in the title.
   update: {
     title: "Update the person who raised it",
@@ -104,19 +113,25 @@ export interface ActionResult {
   expectedBy?: string;
   /** Update: ask them to try it, so their tracker asks whether it's fixed (D80). */
   asksCheck?: boolean;
+  /** Approve: the priority, confirmed or changed (D93). */
+  priority?: string;
+  /** Update: why the due date moved, for the Digital team only (D94). */
+  dueReason?: string;
   ending?: CloseEnding;
   ask?: "submitter" | "owner";
   /** Hand over: who takes it. */
   to?: string;
 }
 
-/** One dialog for every action that needs words or a choice (update, resolve, close, decline, ask, merge, take over, hand over). */
+/** One dialog for every action that needs words or a choice (approve, update, resolve, close, decline, ask, merge, take over, hand over). */
 export function ActionDialog({
   kind,
   initialText = "",
   title,
   description,
   people = [],
+  priority = null,
+  due = null,
   onClose,
   onSubmit,
 }: {
@@ -128,13 +143,18 @@ export function ActionDialog({
   description?: string;
   /** Hand over: the people who can take it. */
   people?: Staff[];
+  /** Approve: the item's priority, to confirm or change. */
+  priority?: string | null;
+  /** The item's due date: Approve starts from it, and Update asks why when it moves (D94). */
+  due?: string | null;
   onClose: () => void;
   onSubmit: (kind: ActionKind, result: ActionResult) => Promise<boolean>;
 }) {
   const [text, setText] = useState(initialText);
-  const [expectedBy, setExpectedBy] = useState("");
+  const [expectedBy, setExpectedBy] = useState(kind === "approve" ? (due ?? "") : "");
+  const [newPriority, setNewPriority] = useState(priority ?? "");
+  const [dueReason, setDueReason] = useState("");
   const [asksCheck, setAsksCheck] = useState(false);
-  const [picking, setPicking] = useState(false);
   const [ending, setEnding] = useState<CloseEnding | null>(null);
   const [ask, setAsk] = useState<"submitter" | "owner">("submitter");
   const [to, setTo] = useState("");
@@ -145,6 +165,8 @@ export function ActionDialog({
 
   if (!kind) return null;
   const copy = COPY[kind];
+  // Moving a date already set needs a reason; setting the first one doesn't (D94).
+  const moving = kind === "update" && Boolean(due && expectedBy && expectedBy !== due);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -162,7 +184,11 @@ export function ActionDialog({
       return;
     }
     if (kind === "update" && !text.trim() && !expectedBy) {
-      setError("Write an update or set an Expected by date.");
+      setError("Write an update or set a due date.");
+      return;
+    }
+    if (moving && !dueReason.trim()) {
+      setError("Say why the due date moved.");
       return;
     }
     if (kind === "update" && asksCheck && !text.trim()) {
@@ -170,11 +196,21 @@ export function ActionDialog({
       return;
     }
     setBusy(true);
-    const ok = await onSubmit(kind, { text: text.trim(), expectedBy: expectedBy || undefined, asksCheck, ending: ending ?? undefined, ask, to: to || undefined });
+    const ok = await onSubmit(kind, {
+      text: text.trim(),
+      expectedBy: expectedBy || undefined,
+      asksCheck,
+      priority: newPriority || undefined,
+      dueReason: moving ? dueReason.trim() : undefined,
+      ending: ending ?? undefined,
+      ask,
+      to: to || undefined,
+    });
     setBusy(false);
     if (ok) {
       setText("");
       setExpectedBy("");
+      setDueReason("");
       setAsksCheck(false);
       setEnding(null);
       setError(null);
@@ -183,37 +219,43 @@ export function ActionDialog({
   }
 
   let extra: ReactNode = null;
-  if (kind === "update") {
-    // A calendar in the app's own date style: the browser's date field shows US order in an en-US browser (D79).
+  if (kind === "approve") {
+    extra = (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid content-start gap-2">
+          <Label htmlFor="approve-priority">Priority</Label>
+          <Select value={newPriority || undefined} onValueChange={setNewPriority}>
+            <SelectTrigger id="approve-priority" className="h-11 w-full rounded-xl">
+              <SelectValue placeholder="Not set" />
+            </SelectTrigger>
+            <SelectContent>
+              {PRIORITIES.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {PRIORITY_LABEL[p]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <DuePicker id="approve-due" label="Due date (optional)" value={expectedBy} onChange={setExpectedBy} />
+      </div>
+    );
+  } else if (kind === "update") {
     extra = (
       <div className="grid gap-2">
-        <Label htmlFor="expected-by">Expected by (optional)</Label>
-        <div className="flex flex-wrap items-center gap-2">
-          <Popover open={picking} onOpenChange={setPicking}>
-            <PopoverTrigger asChild>
-              <Button id="expected-by" type="button" variant="outline" className="h-11 justify-start rounded-xl font-normal">
-                <CalendarDays aria-hidden="true" />
-                {expectedBy ? day(expectedBy) : "Pick a date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto p-0">
-              <Calendar
-                mode="single"
-                locale={enAU}
-                selected={expectedBy ? new Date(`${expectedBy}T00:00:00`) : undefined}
-                onSelect={(d) => {
-                  setExpectedBy(d ? isoDay(d) : "");
-                  setPicking(false);
-                }}
-              />
-            </PopoverContent>
-          </Popover>
-          {expectedBy && (
-            <Button type="button" variant="ghost" className="h-11 rounded-xl" onClick={() => setExpectedBy("")}>
-              Clear date
-            </Button>
-          )}
-        </div>
+        <DuePicker
+          id="expected-by"
+          label="Due date (optional)"
+          hint={due ? `Now due ${day(due)}. They see it as Expected by.` : "They see it as Expected by."}
+          value={expectedBy}
+          onChange={setExpectedBy}
+        />
+        {moving && (
+          <div className="grid gap-2">
+            <Label htmlFor="due-reason">Why the date moved (only the Digital team sees it)</Label>
+            <Input id="due-reason" value={dueReason} maxLength={500} onChange={(e) => setDueReason(e.target.value)} className="h-11 rounded-xl" />
+          </div>
+        )}
         <Label className="mt-2 flex items-start gap-2 font-normal">
           <Checkbox checked={asksCheck} onCheckedChange={(v) => setAsksCheck(v === true)} className="mt-0.5" />
           <span>
@@ -311,6 +353,43 @@ export function ActionDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** A due date in the app's own date style: the browser's date field shows US order in an en-US browser (D79). */
+function DuePicker({ id, label, hint, value, onChange }: { id: string; label: string; hint?: string; value: string; onChange: (v: string) => void }) {
+  const [picking, setPicking] = useState(false);
+  return (
+    <div className="grid content-start gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex flex-wrap items-center gap-2">
+        <Popover open={picking} onOpenChange={setPicking}>
+          <PopoverTrigger asChild>
+            <Button id={id} type="button" variant="outline" className="h-11 justify-start rounded-xl font-normal">
+              <CalendarDays aria-hidden="true" />
+              {value ? day(value) : "Pick a date"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-auto p-0">
+            <Calendar
+              mode="single"
+              locale={enAU}
+              selected={value ? new Date(`${value}T00:00:00`) : undefined}
+              onSelect={(d) => {
+                onChange(d ? isoDay(d) : "");
+                setPicking(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+        {value && (
+          <Button type="button" variant="ghost" className="h-11 rounded-xl" onClick={() => onChange("")}>
+            Clear date
+          </Button>
+        )}
+      </div>
+      {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
+    </div>
   );
 }
 

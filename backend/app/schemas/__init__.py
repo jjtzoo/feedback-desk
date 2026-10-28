@@ -441,6 +441,16 @@ class UpdateIn(BaseModel):
     body: str = Field(default="", max_length=4000)
     expected_by: date | None = None
     asks_check: bool = False
+    # Moving the due date after approval: why, for the Digital team only (D94).
+    due_reason: str = Field(default="", max_length=500)
+
+
+class ApproveIn(BaseModel):
+    """All optional, so Approve from the board or the row menu still works with no input (D93)."""
+
+    instructions: str = Field(default="", max_length=4000)
+    priority: str | None = None
+    due_date: date | None = None
 
 
 class NoteIn(BaseModel):

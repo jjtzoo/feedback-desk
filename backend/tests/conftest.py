@@ -73,6 +73,7 @@ async def clean_db(migrated: None) -> AsyncIterator[None]:
                 "app.user_sessions, app.user_preferences, app.job_runs, app.model_usage CASCADE"
             )
         )
+        await db.execute(text("ALTER SEQUENCE app.feedback_ref_seq RESTART WITH 1"))
         await seed_all(db)
     session_limiter.reset()
     agent_runtime.reset()

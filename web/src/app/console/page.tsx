@@ -71,7 +71,8 @@ const ARCHIVE_GROUPS: Group[] = [
   { title: "Praise", match: (c) => c.status === "acknowledged" },
 ];
 
-type Pending = { ref: string; kind: "resolve" | "update" | "close" | "fix" };
+/** due: the item's due date, so Update asks why when it moves (D94). */
+type Pending = { ref: string; kind: "resolve" | "update" | "close" | "fix"; due?: string | null };
 const MOVE_DIALOG: Partial<Record<MoveKey, Pending["kind"]>> = { resolve: "resolve", close: "close", close_fixed: "fix" };
 
 function Work() {
@@ -186,7 +187,7 @@ function Work() {
     if (!pending) return false;
     try {
       if (pending.kind === "update") {
-        await api.post(`/console/items/${pending.ref}/update`, { body: r.text, expected_by: r.expectedBy ?? null });
+        await api.post(`/console/items/${pending.ref}/update`, { body: r.text, expected_by: r.expectedBy ?? null, due_reason: r.dueReason ?? "" });
         toast.success("Saved");
       } else if (pending.kind === "close" || pending.kind === "fix") {
         await api.post(`/console/items/${pending.ref}/close`, { reason: r.text, ending: pending.kind === "fix" ? "fixed" : r.ending });
@@ -234,7 +235,7 @@ function Work() {
       card={c}
       staff={staff}
       onOpen={() => setParam("item", c.reference)}
-      onUpdate={() => setPending({ ref: c.reference, kind: "update" })}
+      onUpdate={() => setPending({ ref: c.reference, kind: "update", due: c.expected_by })}
       onAssignToMe={() => void assign(c.reference, null)}
       onHandOver={(id) => void assign(c.reference, id)}
       moves={allowedMoves(c, me, staff)}
@@ -363,7 +364,7 @@ function Work() {
                     <TableHead>Stage</TableHead>
                     <TableHead>Assignee</TableHead>
                     <TableHead>Age</TableHead>
-                    <TableHead>Expected by</TableHead>
+                    <TableHead>Due</TableHead>
                     <TableHead className="sticky right-0 bg-card">
                       <span className="sr-only">Actions</span>
                     </TableHead>
@@ -443,7 +444,7 @@ function Work() {
         onClose={() => setParams({ item: null, tab: null, msg: null })}
         onChanged={reload}
       />
-      <ActionDialog key={`${pending?.ref}-${pending?.kind}`} kind={pending ? pending.kind : null} onClose={() => setPending(null)} onSubmit={finishPending} />
+      <ActionDialog key={`${pending?.ref}-${pending?.kind}`} kind={pending ? pending.kind : null} due={pending?.due} onClose={() => setPending(null)} onSubmit={finishPending} />
     </div>
   );
 }

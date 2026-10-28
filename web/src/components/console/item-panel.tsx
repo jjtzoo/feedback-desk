@@ -82,13 +82,15 @@ export function ItemPanel({
   const me = useMe();
   const [item, setItem] = useState<Detail | null>(null);
   const [dialog, setDialog] = useState<{ kind: ActionKind; text?: string } | null>(null);
-  const [composer, setComposer] = useState<"reply" | "note">("reply");
+  // Internal by default; messaging the person who raised it is a deliberate switch (D96).
+  const [composer, setComposer] = useState<"reply" | "note">("note");
   const [tab, setTab] = useState(focusMessage ? "activity" : (focusTab ?? "brief"));
   const [highlight, setHighlight] = useState(focusMessage);
   // When this person last looked before this visit; kept while the panel stays open, so acting doesn't clear New (D82).
   const [lastRead, setLastRead] = useState<string | null | undefined>(undefined);
   const [feedFilter, setFeedFilter] = useState<"all" | "messages" | "history">("all");
-  const [justSent, setJustSent] = useState<string | null>(null);
+  // Which side just got a message, so its newest entry is marked "Sent just now".
+  const [justSent, setJustSent] = useState<"reply" | "note" | null>(null);
   const [message, setMessage] = useState("");
   // Images to send with a reply, for example to show the fix (D95); notes take none.
   const [images, setImages] = useState<{ file: File; src: string | null }[]>([]);
@@ -127,7 +129,8 @@ export function ItemPanel({
 
   async function onDialog(kind: ActionKind, r: ActionResult): Promise<boolean> {
     const call: Record<ActionKind, [string, unknown]> = {
-      update: ["update", { body: r.text, expected_by: r.expectedBy ?? null, asks_check: r.asksCheck ?? false }],
+      approve: ["approve", { instructions: r.text, priority: r.priority ?? null, due_date: r.expectedBy ?? null }],
+      update: ["update", { body: r.text, expected_by: r.expectedBy ?? null, asks_check: r.asksCheck ?? false, due_reason: r.dueReason ?? "" }],
       resolve: ["resolve", { body: r.text }],
       fix: ["close", { ending: "fixed", reason: r.text }],
       close: ["close", { reason: r.text, ending: r.ending }],
@@ -139,7 +142,7 @@ export function ItemPanel({
       hand_over: ["hand-over", { to: r.to, reason: r.text }],
     };
     const ok = await act(...call[kind]);
-    if (ok) toast.success("Saved");
+    if (ok) toast.success(kind === "approve" ? "Approved" : "Saved");
     return ok;
   }
 
@@ -165,9 +168,10 @@ export function ItemPanel({
       withImages.forEach((image) => image.src && URL.revokeObjectURL(image.src));
       if (withImages.length) setImages([]);
       setMessage("");
-      toast.success(composer === "reply" ? "Reply sent to the submitter" : "Note added");
+      toast.success(composer === "reply" ? `Sent to ${firstName}` : "Note added");
       setFeedFilter((f) => (f === "history" ? "all" : f));
-      setJustSent("latest");
+      setJustSent(composer);
+      setComposer("note");
     }
   }
 
@@ -189,6 +193,11 @@ export function ItemPanel({
 
   const chat = item?.messages.filter((m) => m.message_type === "chat") ?? [];
   const talk = item?.messages.filter((m) => m.message_type !== "chat") ?? [];
+  // The two sides of the conversation, kept apart (D96).
+  const withThem = talk.filter((m) => !m.is_internal);
+  const internal = talk.filter((m) => m.is_internal);
+  // Pinned for whoever works it; newest first, so the first is the approval's (D93).
+  const instructions = item?.events.find((e) => e.event_type === "instructions");
   const awaiting = item && (item.status === "awaiting_approval" || item.status === "needs_review");
   const open = item && !["declined", "closed", "acknowledged"].includes(item.status);
   const changeField = (field: string, value: string | null) => void act("", { [field]: value }, "patch");
@@ -204,6 +213,30 @@ export function ItemPanel({
   const firstName = item?.submitter_name.split(" ")[0] ?? "";
   // The Take over dialog says whose it is and what they last did, so nobody grabs work that is moving (D53).
   const holder = item?.assignee?.name;
+  function messageRow(m: Message, sentNow: boolean) {
+    return (
+      <li
+        key={m.id}
+        id={sentNow ? "sent-just-now" : `msg-${m.id}`}
+        className={cn(
+          "rounded-2xl border p-3 text-sm transition-shadow",
+          m.is_internal && "border-dashed border-warning/60 bg-warning-tint",
+          !m.is_internal && m.author_type === "staff" && "bg-muted/50",
+          (sentNow || highlight === m.id) && "ring-2 ring-ring",
+        )}
+      >
+        <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {isNew(m) && <NewMark />}
+          <span className="font-semibold text-foreground">{m.author_type === "system" ? "System" : (m.author_name ?? "Someone")}</span>
+          {m.is_internal && <Lock className="size-3" aria-hidden="true" />}
+          {MESSAGE_LABEL[m.message_type]}
+          {m.asks_check && " · asked them to check"} · {when(m.created_at)}
+          {sentNow && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">Sent just now</span>}
+        </p>
+        <p className="whitespace-pre-wrap">{m.body}</p>
+      </li>
+    );
+  }
   const takeOverText = !item
     ? undefined
     : item.assignee_away
@@ -277,7 +310,7 @@ export function ItemPanel({
               <div className="mt-3 flex flex-wrap gap-2">
                 {awaiting && me.role === "admin" && (
                   <>
-                    <Button className="h-10 rounded-xl" disabled={busy} onClick={() => void act("approve").then((ok) => ok && toast.success("Approved"))}>
+                    <Button className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "approve" })}>
                       Approve
                     </Button>
                     <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => setDialog({ kind: "decline" })}>
@@ -313,6 +346,17 @@ export function ItemPanel({
               {awaiting && me.role !== "admin" && <p className="mt-2 text-sm text-muted-foreground">Waiting for an Admin to approve. Work starts once it&apos;s approved.</p>}
             </header>
 
+            {instructions && (
+              <section aria-label="Instructions at approval" className="mx-5 mt-4 rounded-2xl border border-dashed border-warning/60 bg-warning-tint p-3 text-sm">
+                <p className="mb-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                  <Lock className="size-3" aria-hidden="true" />
+                  <span className="font-semibold text-foreground">From {instructions.actor_name ?? "an Admin"}, at approval</span>
+                  <span>Only the Digital team sees this · {when(instructions.created_at)}</span>
+                </p>
+                <p className="whitespace-pre-wrap">{String(instructions.after.instructions ?? "")}</p>
+              </section>
+            )}
+
             <div className="grid gap-5 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
               <aside aria-label="Properties" className="order-first grid content-start gap-3 lg:sticky lg:top-44 lg:order-last lg:self-start">
                 <p className="text-sm font-semibold">Properties (corrections are logged)</p>
@@ -328,7 +372,7 @@ export function ItemPanel({
                 </section>
                 <div className="grid gap-1 text-sm">
                   <p className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Expected by</span>
+                    <span className="text-muted-foreground">Due</span>
                     <span className={cn(item.overdue && "font-semibold text-destructive")}>{item.expected_by ? day(item.expected_by) : "Not set"}</span>
                   </p>
                   {item.followers.length > 0 && (
@@ -450,40 +494,35 @@ export function ItemPanel({
                         </section>
                       )}
 
-                      <section aria-label="Conversation" className="grid gap-2">
+                      <section aria-label="Conversation" className="grid gap-3">
                         <h3 className="text-sm font-semibold">Conversation</h3>
-                        {talk.length === 0 && <p className="text-sm text-muted-foreground">No replies or notes yet.</p>}
-                        <ol className="grid gap-2">
-                          {talk.map((m, i) => (
-                            <li
-                              key={m.id}
-                              id={justSent && i === talk.length - 1 ? "sent-just-now" : `msg-${m.id}`}
-                              className={cn(
-                                "rounded-2xl border p-3 text-sm transition-shadow",
-                                m.is_internal && "border-dashed border-warning/60 bg-warning-tint",
-                                !m.is_internal && m.author_type === "staff" && "bg-muted/50",
-                                ((justSent && i === talk.length - 1) || highlight === m.id) && "ring-2 ring-ring",
-                              )}
-                            >
-                              <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                {isNew(m) && <NewMark />}
-                                <span className="font-semibold text-foreground">{m.author_type === "system" ? "System" : (m.author_name ?? "Someone")}</span>
-                                {m.is_internal && <Lock className="size-3" aria-hidden="true" />}
-                                {MESSAGE_LABEL[m.message_type]}
-                                {m.asks_check && " · asked them to check"} · {when(m.created_at)}
-                                {justSent && i === talk.length - 1 && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">Sent just now</span>}
-                              </p>
-                              <p className="whitespace-pre-wrap">{m.body}</p>
-                            </li>
-                          ))}
-                        </ol>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <section aria-label={`With ${firstName}`} className="grid content-start gap-2">
+                            <h4 className="text-xs font-semibold text-muted-foreground">With {firstName}</h4>
+                            {withThem.length === 0 && <p className="text-sm text-muted-foreground">Nothing sent to {firstName} yet.</p>}
+                            <ol className="grid gap-2">{withThem.map((m, i) => messageRow(m, justSent === "reply" && i === withThem.length - 1))}</ol>
+                          </section>
+                          <section aria-label="Internal notes" className="grid content-start gap-2 border-t pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-4">
+                            <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                              <Lock className="size-3" aria-hidden="true" /> Internal notes · only the Digital team
+                            </h4>
+                            {internal.length === 0 && <p className="text-sm text-muted-foreground">No internal notes yet.</p>}
+                            <ol className="grid gap-2">{internal.map((m, i) => messageRow(m, justSent === "note" && i === internal.length - 1))}</ol>
+                          </section>
+                        </div>
                         {open && (
-                          <form onSubmit={sendMessage} className={cn("grid gap-2 rounded-2xl border p-3 transition-colors", composer === "note" && "border-warning/60 bg-warning-tint")}>
-                            <ToggleGroup type="single" value={composer} onValueChange={(v) => v && setComposer(v as "reply" | "note")} variant="outline" size="sm" spacing={0} aria-label="Message type" className="justify-self-start bg-background">
-                              <ToggleGroupItem value="reply">Reply to submitter</ToggleGroupItem>
+                          <form
+                            onSubmit={sendMessage}
+                            className={cn(
+                              "grid gap-2 rounded-2xl border p-3 transition-colors",
+                              composer === "note" ? "border-dashed border-warning/60 bg-warning-tint" : "border-primary/50 bg-primary/5",
+                            )}
+                          >
+                            <ToggleGroup type="single" value={composer} onValueChange={(v) => v && setComposer(v as "reply" | "note")} variant="outline" size="sm" spacing={0} aria-label="Write" className="justify-self-start bg-background">
                               <ToggleGroupItem value="note">
                                 <Lock aria-hidden="true" /> Internal note
                               </ToggleGroupItem>
+                              <ToggleGroupItem value="reply">Message {firstName} (they&apos;ll see this)</ToggleGroupItem>
                             </ToggleGroup>
                             <Textarea
                               rows={3}
@@ -495,8 +534,8 @@ export function ItemPanel({
                                 e.preventDefault();
                                 addImages(pasted);
                               }}
-                              aria-label={composer === "reply" ? "Reply to the submitter" : "Internal note (staff never see it)"}
-                              placeholder={composer === "reply" ? "They see this on their tracker and by email" : "Only the Digital team sees this"}
+                              aria-label={composer === "reply" ? `Message to ${firstName} (they'll see it)` : "Internal note (staff never see it)"}
+                              placeholder={composer === "reply" ? `${firstName} sees this on their tracker and by email` : "Only the Digital team sees this"}
                               className="rounded-xl bg-background"
                             />
                             {composer === "reply" && images.length > 0 && (
@@ -511,7 +550,7 @@ export function ItemPanel({
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                                 {composer === "note" && <Lock className="size-3" aria-hidden="true" />}
-                                {composer === "reply" ? "The submitter sees this." : "Only the Digital team sees this."}
+                                {composer === "reply" ? `${firstName} sees this.` : "Only the Digital team sees this."}
                               </p>
                               {composer === "reply" && (
                                 <>
@@ -535,7 +574,7 @@ export function ItemPanel({
                                 </>
                               )}
                               <Button type="submit" variant={composer === "reply" ? "default" : "outline"} className="rounded-xl" disabled={busy || !message.trim()}>
-                                {composer === "reply" ? "Send reply" : "Add note"}
+                                {composer === "reply" ? `Send to ${firstName}` : "Add note"}
                               </Button>
                             </div>
                           </form>
@@ -590,9 +629,19 @@ export function ItemPanel({
               key={`${dialog?.kind}-${dialog?.text}`}
               kind={dialog?.kind ?? null}
               initialText={dialog?.text}
-              title={dialog?.kind === "take_over" ? `Take ${item.reference} over from ${holder}?` : dialog?.kind === "update" ? `Update ${firstName} on progress` : undefined}
-              description={dialog?.kind === "take_over" ? `${takeOverText} They are told in the app and by email; the stage, Expected by date and updates stay as they are.` : undefined}
+              title={
+                dialog?.kind === "take_over"
+                  ? `Take ${item.reference} over from ${holder}?`
+                  : dialog?.kind === "update"
+                    ? `Update ${firstName} on progress`
+                    : dialog?.kind === "approve"
+                      ? `Approve ${item.reference}`
+                      : undefined
+              }
+              description={dialog?.kind === "take_over" ? `${takeOverText} They are told in the app and by email; the stage, due date and updates stay as they are.` : undefined}
               people={staff.filter((s) => s.active && s.id !== item.assignee?.id)}
+              priority={item.priority}
+              due={item.expected_by}
               onClose={() => setDialog(null)}
               onSubmit={onDialog}
             />

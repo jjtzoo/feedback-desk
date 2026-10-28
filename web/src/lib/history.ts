@@ -69,8 +69,12 @@ export function historyLine(e: FeedbackEvent, projects: Project[]): string {
       if ("priority" in after) return `Changed the priority from ${PRIORITY_LABEL[before.priority as Priority] ?? "none"} to ${PRIORITY_LABEL[after.priority as Priority]}`;
       return "Corrected a field";
     }
+    // The console calls it Due; staff read Expected by. A move after approval carries its internal reason (D94).
     case "expected_by":
-      return after.expected_by ? `Set Expected by to ${day(String(after.expected_by))}` : "Cleared Expected by";
+      if (!after.expected_by) return "Cleared the due date";
+      return `Set the due date to ${day(String(after.expected_by))}` + (after.reason ? `: ${String(after.reason)}` : "");
+    case "instructions":
+      return `Instructions at approval: ${String(after.instructions ?? "")}`;
     case "classified": {
       // From what was saved, so an item classified before D76 doesn't show "P1" or a tool's slug.
       const parts = [CATEGORY_LABEL[after.category as Category], PRIORITY_LABEL[after.priority as Priority], projectName(after.project)];

@@ -72,6 +72,13 @@ export async function statusMoves(page: Page, panel: Locator): Promise<string[]>
   return moves.map((m) => m.trim());
 }
 
+/** Approve opens its dialog (D93); pressing Approve there with nothing changed approves it as it is. */
+export async function confirmApprove(page: Page, ref: string) {
+  const dialog = page.getByRole("dialog", { name: `Approve ${ref}`, exact: true });
+  await dialog.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+}
+
 export async function holderOf(page: Page, ref: string) {
   const item = await getJson<{ assignee: { name: string } | null }>(page, `/console/items/${ref}`);
   return item.assignee!.name.split(" ")[0];

@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { BUG, BUG_ANSWERS, getJson, openActivity, postJson, raise, raiseBug, statusMoves } from "./helpers";
+import { BUG, BUG_ANSWERS, confirmApprove, getJson, openActivity, postJson, raise, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 18: Admin approvals (/console/approvals). Staff raise feedback through the
 // API, Admins decide it on the screen, and the staff member's tracker and bell are read afterwards.
@@ -113,6 +113,7 @@ test("S18.02 Approve takes it off the list into Darlene's Approved column; the t
   await expect(approval(page, ref)).toBeVisible();
 
   await approval(page, ref).getByRole("button", { name: "Approve", exact: true }).click();
+  await confirmApprove(page, ref);
   await expect(page.getByText(`${ref} approved`)).toBeVisible();
   await expect(approval(page, ref)).toHaveCount(0);
 
@@ -264,6 +265,7 @@ test("S18.08 As Marc, approving works from the item panel and from the board's A
   const panel = page.getByRole("dialog");
   await expect(panel.getByText(panelRef, { exact: true })).toBeVisible();
   await panel.getByRole("button", { name: "Approve", exact: true }).click();
+  await confirmApprove(page, panelRef);
   await expect(panel.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
   expect(await statusMoves(page, panel)).toContain("Start work");
   await page.keyboard.press("Escape");
@@ -331,6 +333,7 @@ test("S18.11 A plain bug waits in Approvals, and its owner can't start it until 
   expect(await statusMoves(marc, panel)).not.toContain("Start work");
 
   await panel.getByRole("button", { name: "Approve", exact: true }).click();
+  await confirmApprove(marc, ref);
   await expect(panel.getByRole("button", { name: "Approve", exact: true })).toHaveCount(0);
   expect(await statusMoves(marc, panel)).toContain("Start work");
 });
@@ -402,4 +405,46 @@ test("S18.13 The dashboard's Waiting for approval shows the count and, in amber,
   await page.reload();
   await expect(stat.getByText("2 over 2 business days")).toHaveClass(/text-warning/);
   await expect(value).toHaveText(String(before));
+});
+
+test("S18.14 Approve opens a dialog with the priority, a due date and instructions; Darlene gets the instructions with the approval, pinned on the item, and the tracker never shows them", async ({ page, signIn, team }) => {
+  const liam = await team.as("Liam");
+  const ref = await raiseRake(liam, "The RAKE Agent leave answers are blank on Mondays");
+  const instructions = "Check the leave index first; don't change the prompt.";
+  await signIn("Chris");
+  await openApprovals(page);
+  await approval(page, ref).getByRole("button", { name: "Approve", exact: true }).click();
+
+  const dialog = page.getByRole("dialog", { name: `Approve ${ref}`, exact: true });
+  const priority = dialog.getByRole("combobox", { name: "Priority" });
+  await expect(priority).toHaveText("P2 · Major");
+  await priority.click();
+  await page.getByRole("option", { name: "P1 · Blocking" }).click();
+  await dialog.locator("#approve-due").click();
+  await page.getByRole("grid").locator("button:not([disabled])").last().click();
+  await expect(dialog.locator("#approve-due")).not.toHaveText("Pick a date");
+  await dialog.getByRole("textbox", { name: "Instructions for the developer (optional)" }).fill(instructions);
+  await dialog.getByRole("button", { name: "Approve", exact: true }).click();
+  await expect(page.getByText(`${ref} approved`)).toBeVisible();
+  const item = await getJson<{ priority: string; expected_by: string | null }>(page, `/console/items/${ref}`);
+  expect(item.priority).toBe("P1");
+  expect(item.expected_by).not.toBeNull();
+
+  // Darlene, who has it: told with the approval, and the instructions pinned at the top of the panel.
+  const darlene = await team.as("Darlene");
+  const told = (await getJson<{ items: { title: string; body: string }[] }>(darlene, "/notifications")).items.find((n) => n.title.startsWith(`Approved, ready to start: ${ref}`));
+  expect(told?.body).toBe(`Instructions from Chris: ${instructions}`);
+  await darlene.goto(`/console?item=${ref}`);
+  const pinned = darlene.getByRole("region", { name: "Instructions at approval" });
+  await expect(pinned).toContainText("From Chris, at approval");
+  await expect(pinned).toContainText(instructions);
+  const panel = darlene.getByRole("dialog");
+  await openActivity(panel, "History");
+  await expect(panel.getByRole("region", { name: "History" })).toContainText(`Instructions at approval: ${instructions}(internal)`);
+
+  // Liam sees the date as Expected by, and never the instructions.
+  await liam.goto(`/track/${ref}`);
+  await expect(liam.getByRole("heading", { level: 1 })).toBeVisible();
+  await expect(liam.getByRole("main")).toContainText("Expected by");
+  await expect(liam.getByRole("main")).not.toContainText("leave index");
 });

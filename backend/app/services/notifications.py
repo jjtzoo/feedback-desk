@@ -45,6 +45,7 @@ STEPS = {
     "approval_p1": "Needs approval",
     "flagged": "Flagged",
     "approved": "Approved",
+    "due_moved": "Due date moved",
     "ask_info": "Question",
     "praise": "Thanks",
     "plus_one": "Reported again",

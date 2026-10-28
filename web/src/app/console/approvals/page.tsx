@@ -22,7 +22,6 @@ export default function ApprovalsPage() {
   const [items, setItems] = useState<Detail[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ kind: ActionKind; ref: string } | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(() => {
     api
@@ -35,26 +34,14 @@ export default function ApprovalsPage() {
   }, []);
   useEffect(load, [load]);
 
-  async function approve(ref: string) {
-    setBusy(ref);
-    try {
-      await api.post(`/console/items/${ref}/approve`);
-      toast.success(`${ref} approved`);
-      load();
-      refreshCounts();
-    } catch (e) {
-      toast.error(errorText(e));
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function onDialog(kind: ActionKind, r: ActionResult): Promise<boolean> {
     if (!dialog) return false;
     try {
-      if (kind === "decline") await api.post(`/console/items/${dialog.ref}/decline`, { reason: r.text });
+      if (kind === "approve")
+        await api.post(`/console/items/${dialog.ref}/approve`, { instructions: r.text, priority: r.priority ?? null, due_date: r.expectedBy ?? null });
+      else if (kind === "decline") await api.post(`/console/items/${dialog.ref}/decline`, { reason: r.text });
       else await api.post(`/console/items/${dialog.ref}/ask-info`, { question: r.text, ask: r.ask });
-      toast.success(kind === "decline" ? `${dialog.ref} declined` : "Question sent");
+      toast.success(kind === "approve" ? `${dialog.ref} approved` : kind === "decline" ? `${dialog.ref} declined` : "Question sent");
       load();
       refreshCounts();
       return true;
@@ -115,7 +102,7 @@ export default function ApprovalsPage() {
             </p>
           )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button className="h-11 rounded-xl px-5" disabled={busy === i.reference} onClick={() => void approve(i.reference)}>
+            <Button className="h-11 rounded-xl px-5" onClick={() => setDialog({ kind: "approve", ref: i.reference })}>
               Approve
             </Button>
             <Button variant="outline" className="h-11 rounded-xl" onClick={() => setDialog({ kind: "decline", ref: i.reference })}>
@@ -127,7 +114,13 @@ export default function ApprovalsPage() {
           </div>
         </article>
       ))}
-      <ActionDialog key={`${dialog?.ref}-${dialog?.kind}`} kind={dialog?.kind ?? null} onClose={() => setDialog(null)} onSubmit={onDialog} />
+      <ActionDialog
+        key={`${dialog?.ref}-${dialog?.kind}`}
+        kind={dialog?.kind ?? null}
+        title={dialog?.kind === "approve" ? `Approve ${dialog.ref}` : undefined}
+        priority={items?.find((i) => i.reference === dialog?.ref)?.priority}
+        due={items?.find((i) => i.reference === dialog?.ref)?.expected_by}
+        onClose={() => setDialog(null)} onSubmit={onDialog} />
     </div>
   );
 }

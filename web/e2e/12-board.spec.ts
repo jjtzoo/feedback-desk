@@ -598,10 +598,10 @@ test("The console says so, and loads the filters on Try again, when the project 
   await expect(page.getByRole("menuitemradio", { name: "RAKE Agent" })).toBeVisible();
 });
 
-test("S12.14 List view has the columns Ref, Title, Project, Type, Priority, Stage, Assignee, Age and Expected by (red when overdue)", async ({ page, signIn }) => {
+test("S12.14 List view has the columns Ref, Title, Project, Type, Priority, Stage, Assignee, Age and Due (red when overdue)", async ({ page, signIn }) => {
   await signIn("Darlene");
   await openWork(page, "List");
-  await expect(page.getByRole("columnheader")).toHaveText(["Ref", "Title", "Project", "Type", "Priority", "Stage", "Assignee", "Age", "Expected by", "Actions"]);
+  await expect(page.getByRole("columnheader")).toHaveText(["Ref", "Title", "Project", "Type", "Priority", "Stage", "Assignee", "Age", "Due", "Actions"]);
 
   const overdue = page.getByRole("row").filter({ hasText: world.p1 });
   // Its submitter replied since Darlene last looked, so the title carries New reply (D82).

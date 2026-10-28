@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { PNG, getJson, openActivity, pdf, postJson, raise, raiseBug, statusMoves } from "./helpers";
+import { PNG, confirmApprove, getJson, openActivity, pdf, postJson, raise, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 13: Digital Staff, the item panel. Submitters raise through the API and
 // Darlene (who owns RAKE Agent) looks at the panel on screen; Chris approves where an item must be
@@ -528,6 +528,7 @@ test("S13.16 A newly routed item says 'Auto-assigned to Darlene · owner of RAKE
   await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/Auto-assigned to Darlene · owner of RAKE Agent/);
 
   await panel.getByRole("button", { name: "Approve", exact: true }).click();
+  await confirmApprove(page, ref);
   await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/^Who has itWith Darlene$/);
   await page.keyboard.press("Escape");
   await expect(card).not.toContainText("Auto");
@@ -609,7 +610,7 @@ test("S13.20 The recommendation and the Context time are in words, never raw val
   await expect(shown).not.toContainText("GMT");
 });
 
-test("S13.21 A reply to the submitter can carry an image, which shows on their tracker under From the team; a note can't", async ({ page, signIn, team }) => {
+test("S13.21 A message to the submitter can carry an image, which shows on their tracker under From the team; a note can't", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const aisha = await team.as("Aisha");
   const ref = await raiseBug(aisha, "rake-agent", "RAKE Agent search box overlaps the answers");
@@ -617,14 +618,15 @@ test("S13.21 A reply to the submitter can carry an image, which shows on their t
 
   const panel = await openItem(page, ref);
   await openActivity(panel, "Messages");
-  await panel.getByRole("radio", { name: "Internal note" }).click();
+  // The composer opens as an internal note (D96), which takes no image.
+  await expect(panel.getByRole("radio", { name: "Internal note" })).toBeChecked();
   await expect(panel.getByRole("button", { name: "Add an image" })).toHaveCount(0);
-  await panel.getByRole("radio", { name: "Reply to submitter", exact: true }).click();
+  await panel.getByRole("radio", { name: "Message Aisha (they'll see this)", exact: true }).click();
   await panel.getByTestId("reply-images").setInputFiles({ name: "fixed.png", mimeType: "image/png", buffer: PNG });
   await expect(panel.getByRole("img", { name: "fixed.png" })).toBeVisible();
-  await panel.getByRole("textbox", { name: "Reply to the submitter" }).fill("Fixed, here's how it looks now");
-  await panel.getByRole("button", { name: "Send reply" }).click();
-  await expect(page.getByText("Reply sent to the submitter")).toBeVisible();
+  await panel.getByRole("textbox", { name: "Message to Aisha (they'll see it)" }).fill("Fixed, here's how it looks now");
+  await panel.getByRole("button", { name: "Send to Aisha" }).click();
+  await expect(page.getByText("Sent to Aisha", { exact: true })).toBeVisible();
   await expect(panel.getByRole("img", { name: "fixed.png" })).toHaveCount(0);
 
   await aisha.goto(`/track/${ref}`);

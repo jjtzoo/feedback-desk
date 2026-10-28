@@ -11,6 +11,7 @@ from app.models import Feedback
 from app.models.enums import DUE_STATUSES, STAGE_OF
 from app.schemas import (
     ActivityOut,
+    ApproveIn,
     AskInfoIn,
     AttachmentOut,
     BoardOut,
@@ -239,7 +240,7 @@ async def hand_over(ref: str, body: HandOverIn, db: Db, user: DigitalUser) -> De
 
 @router.post("/items/{ref}/update", response_model=DetailOut)
 async def post_update(ref: str, body: UpdateIn, db: Db, user: DigitalUser) -> DetailOut:
-    await console.post_update(db, user, ref, body.body, body.expected_by, body.asks_check)
+    await console.post_update(db, user, ref, body.body, body.expected_by, body.asks_check, body.due_reason)
     return await _detail(db, user, ref)
 
 
@@ -299,8 +300,9 @@ async def approvals(db: Db, user: AdminUser) -> list[DetailOut]:
 
 
 @router.post("/items/{ref}/approve", response_model=DetailOut)
-async def approve(ref: str, db: Db, user: AdminUser) -> DetailOut:
-    await console.approve(db, user, ref)
+async def approve(ref: str, db: Db, user: AdminUser, body: ApproveIn | None = None) -> DetailOut:
+    b = body or ApproveIn()
+    await console.approve(db, user, ref, b.instructions, b.priority, b.due_date)
     return await _detail(db, user, ref)
 
 
