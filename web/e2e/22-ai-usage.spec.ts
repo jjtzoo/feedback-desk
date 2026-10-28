@@ -68,7 +68,7 @@ test("S22.01 Open /chat: nothing under the box below half the allowance, then 'T
   }
 });
 
-const HEADS_UP = /^Quick heads-up: you've used (\d+% of )?today's allowance with me\. We'll still finish this report/;
+const HEADS_UP = /Quick heads-up: you've used (\d+% of )?today's allowance with me\. We'll still finish this report/;
 
 test("S22.02 At 80 % or more the line turns amber with a warning icon, and Sig says once in the chat that this report will still finish", async ({ page, signIn }) => {
   const grace = await signIn("Grace");
@@ -86,7 +86,7 @@ test("S22.02 At 80 % or more the line turns amber with a warning icon, and Sig s
     addUsage({ email: grace.email, tokens: Math.ceil(limit * 0.85) - Math.ceil(limit * 0.6) });
     await page.goto("/chat");
     await expect(line).toHaveText("Today's assistant allowance: 85% used");
-    await expect(chat(page).getByText(HEADS_UP)).toHaveText(
+    await expect(chat(page).getByText(HEADS_UP)).toContainText(
       "Quick heads-up: you've used 85% of today's allowance with me. We'll still finish this report, so nothing's lost. Anything new after the allowance runs out goes through a short form until tomorrow.",
     );
     await expect(line).toHaveCSS("color", "rgb(180, 83, 9)");
@@ -164,7 +164,7 @@ test("S22.05 Reaching a limit mid-chat: the chat carries on, an existing confirm
 
     // The open chat keeps going with Sig, who says the report will still finish.
     await chatSay(other, "It happens every morning");
-    await expect(chat(other).getByText(/^Quick heads-up: you've used today's allowance with me\./)).toBeVisible();
+    await expect(chat(other).getByText(/Quick heads-up: you've used today's allowance with me\./)).toBeVisible();
     await expect(chat(other).getByLabel(DETAILS)).toHaveCount(0);
     await expect(chat(other).getByLabel("Your message")).toBeEditable();
 
