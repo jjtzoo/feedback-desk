@@ -1,7 +1,9 @@
 {
+  "S22.01": ["expect(meter).toHaveCount(0)", "expect(meter).toHaveCount(1)"],
   "S22.02": ["\"rgb(180, 83, 9)\"", "\"rgb(91, 97, 107)\""],
   "S22.03": ["It resets tomorrow.", "It resets tomorrowx."],
   "S22.04": ["keep costs in check.", "keep costs in checkx."],
+  "S22.05": ["getByLabel(DETAILS)).toHaveCount(0)", "getByLabel(DETAILS)).toHaveCount(1)"],
   "S22.06": ["Target: under A$0.05", "Target: under A$0.05x"],
   "S22.07": ["\"Top users today\" })).toHaveCount(0)", "\"Top users today\" })).toHaveCount(1)"]
 }
