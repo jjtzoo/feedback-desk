@@ -64,3 +64,22 @@ The 5 misses all failed in the Sig branch's own runs of 27 Oct, and none picks a
 Routing misses: the Flipbook tile item went to `intranet` (as on 26, 27 and 28 Oct); two items saved nothing, one of them a timed-out turn.
 
 Also on the merged code: 156 backend tests, Ruff and mypy; the web build; the browser suite 261 passed, 1 skipped by design (S10.09), and 2 that D90 changed (S03.16: the chat now survives F5; S05.02: a new report starts a new chat), fixed and passing; mutation records for sections 3 and 5, all caught.
+
+## After merging Sprint 5A (D91, D92, same day)
+
+Branch `feat/sprint-5-merge`, cut from `main` at 9b37894 (5C with D69 to D90), with `claude/lifecycle-status-menu-e47636` merged in. 5A changes nothing in `backend/agent`, the chat API or the router; its backend work is the item lifecycle after submission. The two runs went one after the other.
+
+| Run | Model | Result | Cost |
+| --- | --- | --- | --- |
+| Conversation checks (98 cases) | gemini-3.8-flash | **92 of 98** in the full run (one turn timed out); 95 of 98 with the cases that failed only here run again | about A$5.10 (263 calls), plus A$0.27 for the reruns |
+| Routing gate | gemini-3.8-flash | **Pass**: 97.5 % project, 100 % work type, 100 % assignee, every brief complete | not logged by the runner |
+
+Against the run above:
+- Failed here, passed when run again on their own: switch-to-small-talk-and-back (impact chips under small talk), two-problems-same-tool (the tool question on a two-problem opener), praise-afss-export (the timed-out turn).
+- real-23-goformz-slow-then-submit-fails failed in the run and again on its own: the card leaves out the opening "so slow", as in both runs of 27 Oct.
+- Still failing, as above: answers-impact-when-asked-tool (the recorded conflict) and typo-go-forms-extention (the impact question instead of the card).
+- Now passing: answers-steps-when-asked-tool, no-tool-page-slow, vent-then-useful.
+
+Routing miss: the Flipbook tile item went to `intranet`, as in every run since 26 Oct.
+
+So the merge adds no conversation or routing failure; the misses are the known ones and run-to-run variation.
