@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { chatSay, getJson, raise } from "./helpers";
+import { chatSay, getJson, openTab, raise } from "./helpers";
 
 // Manual checklist section 5: staff duplicates ("+1 and comment").
 
@@ -119,6 +119,8 @@ test("S05.05 The owner sees 'Also following: Mike', impact raised to a team, and
 
   await darlene.goto(`/console?inbox=open&item=${ref}`);
   await expect(panel).toContainText(/Also following: Mike/);
+  // Mike's comment opens the panel on Conversation; the impact is on the Brief.
+  await openTab(panel, "Brief");
   await expect(panel).toContainText(/Affects a team/);
 
   await page.goto(`/track/${ref}`);

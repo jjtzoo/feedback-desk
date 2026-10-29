@@ -86,7 +86,8 @@ function expectOrder(stops: Stop[], wanted: (string | RegExp)[]) {
   expect(missing, `not reached in this order; Tab went: ${stops.map((s) => s.name).join(" > ")}`).toEqual([]);
 }
 
-const HEADER = ["Give feedback", "My feedback", "Fixes and updates", "Guide", /^Notifications/];
+// The two places, then the red Give feedback button beside the menus (D109).
+const HEADER = ["My feedback", "Fixes and updates", "Give feedback", "Guide", /^Notifications/];
 
 const card = (page: Page) => page.getByRole("region", { name: "Your feedback" });
 
