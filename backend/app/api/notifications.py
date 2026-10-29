@@ -6,37 +6,50 @@ import json
 from collections.abc import AsyncIterator
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Request
+from fastapi import APIRouter, Cookie, Query, Request
 from fastapi.responses import Response
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.deps import STREAM_HEADERS, CurrentUser, Db, StreamUser
 from app.db import session_scope
+from app.models import Notification
 from app.models.enums import STAGE_OF
-from app.schemas import NotificationOut, NotificationsOut, ReadIn
+from app.schemas import NotificationHistoryOut, NotificationOut, NotificationsOut, ReadIn
 from app.services import auth, notifications
 
 router = APIRouter(tags=["notifications"])
 STREAM_CHECK_SECONDS = 3
 
 
+def _out(n: Notification) -> NotificationOut:
+    return NotificationOut.model_validate(n).model_copy(
+        update={
+            "item_status": n.feedback.status,
+            "item_stage": STAGE_OF[n.feedback.status],
+            "item_ending": n.feedback.ending,
+            "reference": n.feedback.ref_no,
+        }
+        if n.feedback
+        else {}
+    )
+
+
 @router.get("/notifications", response_model=NotificationsOut)
 async def list_notifications(db: Db, user: CurrentUser) -> NotificationsOut:
     rows, unread = await notifications.list_for(db, user.email)
-    items = [
-        NotificationOut.model_validate(n).model_copy(
-            update={
-                "item_status": n.feedback.status,
-                "item_stage": STAGE_OF[n.feedback.status],
-                "item_ending": n.feedback.ending,
-                "reference": n.feedback.ref_no,
-            }
-            if n.feedback
-            else {}
-        )
-        for n in rows
-    ]
-    return NotificationsOut(items=items, unread=unread)
+    return NotificationsOut(items=[_out(n) for n in rows], unread=unread)
+
+
+@router.get("/notifications/history", response_model=NotificationHistoryOut)
+async def notification_history(db: Db, user: CurrentUser, page: int = Query(1, ge=1)) -> NotificationHistoryOut:
+    rows, more = await notifications.history(db, user.email, page)
+    return NotificationHistoryOut(items=[_out(n) for n in rows], more=more)
+
+
+@router.post("/notifications/clear", status_code=204)
+async def clear(db: Db, user: CurrentUser) -> Response:
+    await notifications.clear(db, user.email)
+    return Response(status_code=204)
 
 
 @router.post("/notifications/read", status_code=204)

@@ -378,12 +378,40 @@ async def list_for(db: AsyncSession, email: str, limit: int = 60) -> tuple[list[
         await db.scalars(
             select(Notification)
             .options(selectinload(Notification.feedback))
-            .where(*_bell(email))
+            .where(*_bell(email), Notification.cleared_at.is_(None))
             .order_by(Notification.created_at.desc(), Notification.id)
             .limit(limit)
         )
     )
     return rows, await unread_count(db, email)
+
+
+HISTORY_PAGE = 50
+
+
+async def history(db: AsyncSession, email: str, page: int) -> tuple[list[Notification], bool]:
+    """The notifications page: everything of the last 90 days, cleared or not, newest first (D108)."""
+    rows = list(
+        await db.scalars(
+            select(Notification)
+            .options(selectinload(Notification.feedback))
+            .where(*_bell(email))
+            .order_by(Notification.created_at.desc(), Notification.id)
+            .offset((page - 1) * HISTORY_PAGE)
+            .limit(HISTORY_PAGE + 1)
+        )
+    )
+    return rows[:HISTORY_PAGE], len(rows) > HISTORY_PAGE
+
+
+async def clear(db: AsyncSession, email: str) -> None:
+    """Empty the bell: everything in it is read and cleared, and stays on the notifications page (D108)."""
+    now = datetime.now(UTC)
+    await db.execute(
+        update(Notification)
+        .where(*_bell(email), Notification.cleared_at.is_(None))
+        .values(cleared_at=now, read_at=func.coalesce(Notification.read_at, now), updated_at=now)
+    )
 
 
 async def unread_count(db: AsyncSession, email: str) -> int:

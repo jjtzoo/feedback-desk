@@ -332,6 +332,8 @@ class Notification(Base):
     outcome: Mapped[str | None] = mapped_column(String(300))
     # The stage in a word or two ("Approved", "Fixed"), for the item's trail in the bell (D78).
     step: Mapped[str | None] = mapped_column(String(40))
+    # Cleared from the bell; the notifications page keeps it until the 90-day purge (D108).
+    cleared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _stamped()
     updated_at: Mapped[datetime] = _now()
 

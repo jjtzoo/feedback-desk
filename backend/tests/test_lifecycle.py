@@ -407,6 +407,15 @@ async def test_bell_lists_and_marks_read(staff: httpx.AsyncClient, marc: httpx.A
     assert (await staff.get("/api/notifications")).json()["unread"] == 0
 
 
+async def test_clear_empties_the_bell_and_the_page_keeps_it(staff: httpx.AsyncClient, marc: httpx.AsyncClient) -> None:
+    ref = await raise_bug(staff)
+    await marc.post(f"/api/console/items/{ref}/approve")
+    assert (await staff.post("/api/notifications/clear")).status_code == 204
+    assert (await staff.get("/api/notifications")).json() == {"items": [], "unread": 0}
+    kept = (await staff.get("/api/notifications/history")).json()
+    assert kept["more"] is False and kept["items"][0]["link"] == f"/track/{ref}" and kept["items"][0]["read_at"]
+
+
 async def test_worker_sends_and_retries_then_fails(staff: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
     sent: list[str] = []
     monkeypatch.setattr(email_service, "send", lambda settings, to, subject, body: sent.append(to))

@@ -2,6 +2,7 @@
 
 import { ArrowRight, Bell } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { StageBadge, StatusBadge } from "@/components/badges";
@@ -22,12 +23,14 @@ const RETRY_MAX_MS = 60_000;
  * A request someone has already acted on shows what happened instead ("FB-0003 approved by Chris"),
  * and each item's badge is its stage now, so an old message never contradicts the item (D54).
  * One row per item: its latest step on top, the steps so far as a trail, the summary once; the row
- * is unread while any step in it is, and opening it reads them all (D78).
+ * is unread while any step in it is, and opening it reads them all (D78). Clear empties the bell; the
+ * notifications page keeps everything of the last 90 days (D108).
  */
 export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }) {
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const history = usePathname().startsWith("/console") ? "/console/notifications" : "/notifications";
 
   const load = useCallback(() => {
     api
@@ -81,6 +84,11 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
     load();
   }
 
+  async function clearAll() {
+    await api.post("/notifications/clear", {}).catch(() => undefined);
+    load();
+  }
+
   async function readGroup(group: Notification[]) {
     setOpen(false);
     const ids = group.filter((n) => !n.read_at).map((n) => n.id);
@@ -108,14 +116,21 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
       <PopoverContent align="end" className="w-[min(92vw,380px)] p-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="font-semibold">Notifications</p>
-          {unread > 0 && (
-            <Button variant="ghost" size="sm" onClick={readAll}>
-              Mark all read
-            </Button>
-          )}
+          <div className="flex items-center gap-1">
+            {unread > 0 && (
+              <Button variant="ghost" size="sm" onClick={readAll}>
+                Mark all read
+              </Button>
+            )}
+            {items.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearAll}>
+                Clear
+              </Button>
+            )}
+          </div>
         </div>
         <ul className="max-h-[60vh] divide-y overflow-y-auto" aria-live="polite">
-          {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted-foreground">No updates yet. Progress on your feedback appears here.</li>}
+          {items.length === 0 && <li className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing new. Progress on your feedback appears here.</li>}
           {byItem(items).map((group) => {
             const n = group[group.length - 1];
             const unreadRow = group.some((g) => !g.read_at);
@@ -157,6 +172,9 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
             );
           })}
         </ul>
+        <Link href={history} onClick={() => setOpen(false)} className="block border-t px-4 py-3 text-center text-sm font-semibold hover:bg-muted">
+          See all notifications
+        </Link>
       </PopoverContent>
     </Popover>
   );
@@ -179,7 +197,7 @@ function steps(group: Notification[]): string[] {
 }
 
 /** The item's stage now: console words for the Digital team, the staff stage on a staff tracker link; an ended item shows its ending. */
-function ItemBadge({ n }: { n: Notification }) {
+export function ItemBadge({ n }: { n: Notification }) {
   const small = "h-5 px-2 text-[11px]";
   if (!n.item_status) return null;
   if (n.link.startsWith("/console") || n.item_ending) return <StatusBadge status={n.item_status} ending={n.item_ending} className={small} />;
