@@ -28,6 +28,7 @@ Format:
 - Expected: the backup form takes over with what was typed kept.
 - Actual: Sig keeps answering, the allowance line reads "100% used" and no form appears. Limits are checked only at `POST /api/chat/sessions`. This is deliberate in spec D36 ("a chat in progress always finishes") and in `backend/tests/test_usage.py`, so the checklist and the spec disagree: recorded as OPEN in D36 for Marc.
 - Found: 2026-10-23
+- Decided: 2026-10-29 by the product owner, on `fix/allowance-early-warning`: the chat finishes, and people are warned early instead (D36). At 80 % Sig says once in the chat that this report will still finish. The checklist item now expects the chat to carry on and a new chat to open the backup form; S22.05 asserts that and its `test.fail()` is out.
 
 ## S26.02 (related) A tracker reply's password, card number and TFN reach the owner's bell unmasked
 - Test: none yet. `e2e/26-masking.spec.ts` S26.02 checks the Conversation tab and the tracker, which are masked; the notification is not in the checklist item. Found by reading the code and confirmed against the running test app.
@@ -97,6 +98,7 @@ Each failed or misreported once on 2026-10-22. The causes below come from the se
 - Expected: "Today's assistant allowance: N% used" with a meter (checklist section 22, item 1).
 - Actual: nothing is shown. `src/components/chat/usage-meter.tsx` returns null below 50 %, and its comment says "Quiet until half is used". Either the checklist line is stale (a product call, given the Quiet UI direction) or the meter should always show. The "hidden when the limit is 0" half cannot be reached because the test API fixes the limit.
 - Found: 2026-10-22
+- Decided: 2026-10-29 by the product owner, on `fix/allowance-early-warning`: the meter stays quiet below 50 % (D36). The checklist line now says so; S22.01 asserts nothing shows at 0 % and the line and meter show at 50 %, and its `test.fail()` is out.
 
 ## Wording differences in sections 2 and 22 (not bugs, checklist to update)
 - S02.11, S02.12: "RAKE Agent chip pressed", but `/chat` shows a static "About RAKE Agent" pill with no pressed state.

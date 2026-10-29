@@ -104,10 +104,25 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
   const fileInput = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLDivElement>(null);
   const started = useRef<string | null>(null);
+  const warned = useRef(false);
 
   const refreshAllowance = useCallback(() => {
     api.get<Allowance>("/usage/me").then(setAllowance).catch(() => undefined);
   }, []);
+
+  // Near the limit, Sig says once per chat that this report still finishes (D36), so nobody is caught short.
+  useEffect(() => {
+    if (mode !== "chat" || warned.current || !allowance?.limit_tokens || allowance.percent < 80) return;
+    warned.current = true;
+    const used = allowance.percent >= 100 ? "used today's allowance" : `used ${allowance.percent}% of today's allowance`;
+    setTurns((t) => [
+      ...t,
+      {
+        role: "agent",
+        text: `Quick heads-up: you've ${used} with me. We'll still finish this report, so nothing's lost. Anything new after the allowance runs out goes through a short form until tomorrow.`,
+      },
+    ]);
+  }, [mode, allowance]);
 
   useEffect(() => {
     const key = `${round}:${project ?? ""}`;
@@ -116,6 +131,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     const ctx = captureContext();
     setContext(ctx);
     setMode("starting");
+    warned.current = false;
     setTurns([]);
     setChips([]);
     setDuplicates([]);

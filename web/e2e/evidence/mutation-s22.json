@@ -1,13 +1,15 @@
 {
-  "ran": "2026-10-26T06:13:05.944Z",
-  "commit": "add89a9",
+  "ran": "2026-10-28T21:58:10.415Z",
+  "commit": "2542d5d",
   "uncommitted": false,
   "spec": "22-ai-usage.spec.ts",
-  "fingerprint": "d1078631eec64f92",
+  "fingerprint": "123db5d52dcd8056",
   "caught": {
+    "S22.01": true,
     "S22.02": true,
     "S22.03": true,
     "S22.04": true,
+    "S22.05": true,
     "S22.06": true,
     "S22.07": true
   }

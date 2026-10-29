@@ -45,20 +45,32 @@ async function openPanel(page: Page) {
   await expect(panel(page)).toBeVisible();
 }
 
-test("S22.01 Open /chat: under the box, 'Today's assistant allowance: N% used' with a meter", async ({ page, signIn }) => {
-  test.fail(true, "Known bug: the allowance line and meter stay hidden until half is used, so at 0 % nothing shows under the box (web/src/components/chat/usage-meter.tsx returns null below 50 %); the 'hidden when the limit is 0' half is not reachable, the test API fixes the limit");
-  await signIn("Aisha");
-  const allowance = page.waitForResponse((r) => r.url().includes("/api/usage/me"));
-  await page.goto("/chat");
-  await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
-  // The person has an allowance to show (a limit above 0), and the answer has arrived, so what is checked is the screen.
-  const mine = await (await allowance).json();
-  expect(mine.limit_tokens).toBeGreaterThan(0);
-  await expect(page.getByText(/Today's assistant allowance: \d+% used/)).toBeVisible();
-  await expect(page.getByRole("meter", { name: "Today's assistant allowance used" })).toBeVisible();
+// The "hidden when the limit is 0" half of S22.01 is not reachable: the test API fixes the limit.
+test("S22.01 Open /chat: nothing under the box below half the allowance, then 'Today's assistant allowance: N% used' with a meter", async ({ page, signIn }) => {
+  const aisha = await signIn("Aisha");
+  const limit = await dailyLimit(page);
+  const meter = chat(page).getByRole("meter", { name: "Today's assistant allowance used" });
+  try {
+    // No usage: the answer has arrived and Sig has greeted, so the empty space under the box is what the person sees.
+    const allowance = page.waitForResponse((r) => r.url().includes("/api/usage/me"));
+    await page.goto("/chat");
+    await allowance;
+    await expect(page.getByText("G'day, I'm Sig, Smoke Signal's AI assistant.")).toBeVisible();
+    await expect(allowanceLine(page)).toHaveCount(0);
+    await expect(meter).toHaveCount(0);
+
+    addUsage({ email: aisha.email, tokens: Math.ceil(limit * 0.5) });
+    await page.goto("/chat");
+    await expect(allowanceLine(page)).toHaveText("Today's assistant allowance: 50% used");
+    await expect(meter).toHaveAttribute("aria-valuenow", "50");
+  } finally {
+    clearUsage();
+  }
 });
 
-test("S22.02 At 80 % or more the line turns amber with a warning icon and 'The form still works if it runs out.'", async ({ page, signIn }) => {
+const HEADS_UP = /Quick heads-up: you've used (\d+% of )?today's allowance with me\. We'll still finish this report/;
+
+test("S22.02 At 80 % or more the line turns amber with a warning icon, and Sig says once in the chat that this report will still finish", async ({ page, signIn }) => {
   const grace = await signIn("Grace");
   const limit = await dailyLimit(page);
   try {
@@ -69,16 +81,24 @@ test("S22.02 At 80 % or more the line turns amber with a warning icon and 'The f
     await expect(line).toHaveText("Today's assistant allowance: 60% used");
     await expect(line).toHaveCSS("color", "rgb(91, 97, 107)");
     await expect(line.locator("svg")).toHaveCount(0);
+    await expect(chat(page).getByText(HEADS_UP)).toHaveCount(0);
 
     addUsage({ email: grace.email, tokens: Math.ceil(limit * 0.85) - Math.ceil(limit * 0.6) });
     await page.goto("/chat");
-    await expect(line).toHaveText("Today's assistant allowance: 85% used. The form still works if it runs out.");
+    await expect(line).toHaveText("Today's assistant allowance: 85% used");
+    await expect(chat(page).getByText(HEADS_UP)).toContainText(
+      "Quick heads-up: you've used 85% of today's allowance with me. We'll still finish this report, so nothing's lost. Anything new after the allowance runs out goes through a short form until tomorrow.",
+    );
     await expect(line).toHaveCSS("color", "rgb(180, 83, 9)");
     await expect(line.locator("svg.lucide-triangle-alert")).toBeVisible();
     const meter = chat(page).getByRole("meter", { name: "Today's assistant allowance used" });
     await expect(meter).toHaveAttribute("aria-valuenow", "85");
     await expect(meter.locator("div")).toHaveCSS("background-color", "rgb(180, 83, 9)");
     await expect(chat(page).getByLabel("Your message")).toBeEditable();
+
+    // Once per chat: another turn does not repeat it.
+    await chatSay(page, BUG);
+    await expect(chat(page).getByText(HEADS_UP)).toHaveCount(1);
   } finally {
     clearUsage();
   }
@@ -124,11 +144,11 @@ test("S22.04 At the daily or monthly budget a new chat opens the backup form wit
   }
 });
 
-test("S22.05 Reaching a limit mid-chat: the backup form takes over with your text kept, and an existing confirm card can still be confirmed", async ({ page, signIn }) => {
+test("S22.05 Reaching a limit mid-chat: the chat carries on, an existing confirm card can still be confirmed, and a new chat opens the backup form", async ({ page, signIn }) => {
   test.slow(); // two chats and a usage change
   const tom = await signIn("Tom");
   const limit = await dailyLimit(page);
-  // A second chat, open before the limit: after it no new chat can start, and sending in the first clears its card.
+  // A second chat, open before the limit: it carries on after the limit is reached, while a new chat cannot start.
   const other = await page.context().newPage();
   try {
     await other.goto("/chat");
@@ -142,10 +162,14 @@ test("S22.05 Reaching a limit mid-chat: the backup form takes over with your tex
     await page.getByRole("region", { name: "Your feedback" }).getByRole("button", { name: "Confirm" }).click();
     await expect(page.getByRole("heading", { name: /Sent\. Your reference is FB-\d{4}/ })).toBeVisible();
 
-    test.fail(true, "Known bug or open decision: a limit reached mid-chat does not hand over to the backup form; limits are checked only when a chat starts (spec D36)");
+    // The open chat keeps going with Sig, who says the report will still finish.
     await chatSay(other, "It happens every morning");
-    await expect(chat(other).getByText(/What you typed is kept below\./)).toBeVisible();
-    await expect(chat(other).getByLabel(DETAILS)).toHaveValue(/Training Portal shows an error[\s\S]*every morning/);
+    await expect(chat(other).getByText(/Quick heads-up: you've used today's allowance with me\./)).toBeVisible();
+    await expect(chat(other).getByLabel(DETAILS)).toHaveCount(0);
+    await expect(chat(other).getByLabel("Your message")).toBeEditable();
+
+    expect(await startChat(page)).toMatchObject({ mode: "fallback", limit: "user" });
+    await expect(chat(page).getByLabel(DETAILS)).toBeVisible();
   } finally {
     await other.close();
     clearUsage();
