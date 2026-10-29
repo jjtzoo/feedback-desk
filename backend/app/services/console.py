@@ -111,6 +111,9 @@ def _filtered(user: User, f: Filters) -> Select[Feedback]:
         conds.append(Feedback.assignee_id == user.staff_id)
         conds.append(Feedback.status.in_(OPEN_STATUSES))
     elif f.inbox == "needs_review":
+        # Only what this person's board shows, so the Triage count never holds an item they can't see.
+        shown = [s for _, _, statuses in visible_columns(user) for s in statuses]
+        conds.append(Feedback.status.in_(shown))
         conds.append(
             or_(
                 Feedback.status.in_(("needs_review", "new")),
