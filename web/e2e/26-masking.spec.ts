@@ -124,7 +124,7 @@ test("S26.02 The same text in a tracker message is masked in the console's Conve
 
   const panel = await openPanel(await team.as("Marc"), ref);
   const lines = await conversation(panel);
-  const reply = lines.getByRole("listitem").filter({ hasText: "Follow-up" });
+  const reply = lines.getByRole("listitem").filter({ hasText: "The Flipbook login is broken." });
   await expect(reply).toContainText("Grace O'Brien");
   await expect(reply).toContainText("The Flipbook login is broken.");
   await expectMasked(reply);

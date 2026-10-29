@@ -1,9 +1,10 @@
 {
   "_each": true,
   "S14.01": ["toEqual([\"Resolve…\", \"Close…\"])", "toEqual([\"Start work\", \"Resolve…\", \"Close…\"])"],
-  "S14.02": ["toContainText(update)", "toContainText(update + \"x\")"],
-  "S14.03": ["set a due date.\")", "set a due date.x\")"],
+  "S14.02": ["await expect(note).toHaveCount(1)", "await expect(note).toHaveCount(2)"],
+  "S14.03": ["Choose a new due date.\")", "Choose a new due date.x\")"],
   "S14.04": ["\"1 overdue\"", "\"2 overdue\""],
+  "S14.05": ["`Resolved by Darlene: ${note}`", "`Resolved by Darlene: x${note}`"],
   "S14.06": ["Reason: Duplicate of the register rebuild", "Reason: Duplicate of the register rebuildx"],
   "S14.07": ["? h$/", "? hx$/"],
   "S14.08": ["toEqual([\"Start work again\"])", "toEqual([\"Start work again\", \"Close as fixed…\"])"],
