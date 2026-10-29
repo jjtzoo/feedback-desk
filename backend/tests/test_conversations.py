@@ -114,7 +114,7 @@ async def test_sig_writes_what_the_person_who_raised_it_reads_when_it_moves(
 ) -> None:
     facts: list[str] = []
 
-    async def generate(model: str, text: str) -> tuple[str, int, int]:
+    async def generate(model: str, text: str, instruction: str) -> tuple[str, int, int]:
         facts.append(text)
         return "Darlene has started on it.", 40, 8
 
@@ -139,7 +139,7 @@ async def test_sig_writes_what_the_person_who_raised_it_reads_when_it_moves(
 async def test_a_failed_or_missing_model_leaves_the_template(
     staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    async def broken(model: str, text: str) -> tuple[str, int, int]:
+    async def broken(model: str, text: str, instruction: str) -> tuple[str, int, int]:
         raise TimeoutError
 
     async def under(_db: object) -> bool:
