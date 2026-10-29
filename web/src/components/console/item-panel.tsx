@@ -120,11 +120,14 @@ export function ItemPanel({
       .then((d) => {
         setItem(d);
         setLastRead((seen) => (seen === undefined ? d.last_read_at : seen));
-        // A notification's message opens in the conversation.
-        if (d.messages.some((m) => m.id === focusMessage)) setTab("activity");
+        // A notification's message opens in the conversation; so does an item someone wrote on since you last
+        // looked, unless the link chose a tab. An item you never opened starts on its brief.
+        const since = d.last_read_at;
+        const written = since !== null && d.messages.some((m) => m.message_type !== "chat" && m.author_name !== me.name && m.created_at > since);
+        if (d.messages.some((m) => m.id === focusMessage) || (written && !focusTab)) setTab("activity");
       })
       .catch((e: unknown) => setLoadError(errorText(e)));
-  }, [reference, focusMessage]);
+  }, [reference, focusMessage, focusTab, me.name]);
 
   useEffect(load, [load]);
 
@@ -238,6 +241,7 @@ export function ItemPanel({
   }
   // Someone else's words since you last looked; on an item you never opened, only when it's yours (D82).
   const isNew = (m: Message) => m.author_name !== me.name && (lastRead ? m.created_at > lastRead : lastRead === null && Boolean(can?.holder));
+  const unread = talk.filter(isNew).length;
   const firstName = item?.submitter_name.split(" ")[0] ?? "";
   // Who hears about a team note: whoever has it and the approver, apart from you (D101).
   const approverName = staff.find((s) => s.google_email === item?.approved_by)?.name;
@@ -532,7 +536,10 @@ export function ItemPanel({
               <Tabs value={tab} onValueChange={setTab} className="min-w-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="brief">Brief</TabsTrigger>
-                  <TabsTrigger value="activity">Conversation ({talk.length})</TabsTrigger>
+                  <TabsTrigger value="activity">
+                    Conversation ({talk.length})
+                    {unread > 0 && <span className="rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">{unread} new</span>}
+                  </TabsTrigger>
                   <TabsTrigger value="files">Files ({item.attachments.length})</TabsTrigger>
                 </TabsList>
 
