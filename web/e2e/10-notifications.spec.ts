@@ -1,7 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, postJson, raise, raiseBug, statusMoves } from "./helpers";
+import { commentBox, getJson, postJson, raise, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 10: the bell, what raises a notification, and muting an item.
 // Liam stands in for Mario (the person who raised it); RAKE Agent is Darlene's, so she is assigned.
@@ -153,15 +153,15 @@ test("S10.07 A new item notifies the owner on assignment and again when the subm
   const ref = await raiseBug(page, "rake-agent", "RAKE Agent drops my session after ten minutes");
 
   await page.goto(`/track/${ref}`);
-  await page.getByLabel("Reply or add details").fill("It also happens on my phone");
+  await commentBox(page).fill("It also happens on my phone");
   await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("Added. The owner has been told.")).toBeVisible();
+  await expect(page.getByText("Sent", { exact: true })).toBeVisible();
 
   await darlene.goto("/console");
   await expect(bell(darlene)).toHaveAccessibleName("Notifications, 2 unread");
   await openBell(darlene);
   // One row for the item (D78): the reply on top, the assignment before it.
-  const item = row(darlene, new RegExp(`${ref}: Liam Carter added details`));
+  const item = row(darlene, new RegExp(`${ref}: Liam Carter replied`));
   await expect(item).toBeVisible();
   await expect(item).toContainText("Steps so far: Assigned, then Reply");
 });
@@ -312,10 +312,11 @@ test("S10.14 A notification opens where the news is: the reply in the panel, the
 
   await page.goto("/console");
   await openBell(page);
-  await row(page, new RegExp(`${ref}: Liam Carter added details`)).click();
-  await expect(page).toHaveURL(/tab=activity&msg=/);
+  await row(page, new RegExp(`${ref}: Liam Carter replied`)).click();
+  // The link names the message, and the panel opens the conversation that holds it (D103).
+  await expect(page).toHaveURL(new RegExp(`item=${ref}&msg=`));
   const panel = page.getByRole("dialog");
-  await expect(panel.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByRole("tab", { name: /^With Liam/ })).toHaveAttribute("aria-selected", "true");
   const message = panel.locator("li[id^='msg-']").filter({ hasText: reply });
   // The ring fades after 2.5 s (D81), so it is checked before the wait for the scroll to settle.
   await expect(message).toHaveClass(/ring-2/);

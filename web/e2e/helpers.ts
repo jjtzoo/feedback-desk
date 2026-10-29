@@ -249,8 +249,19 @@ export async function answerUntilCard(page: Page) {
   await expect(page.getByRole("button", { name: "Confirm" })).toBeVisible();
 }
 
-/** Open the console panel's Activity tab, showing everything, only messages or only history. */
-export async function openActivity(panel: Locator, show: "All" | "Messages" | "History" = "All") {
-  await panel.getByRole("tab", { name: "Activity" }).click();
-  await panel.getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: show, exact: true }).click();
+const TABS = { Brief: /^Brief$/, With: /^With /, Team: /^Team \(/, History: /^History$/, Files: /^Files \(/ };
+
+/** Open one of the console panel's tabs (D103): Brief, With <name>, Team, History or Files. */
+export async function openTab(panel: Locator, tab: keyof typeof TABS) {
+  await panel.getByRole("tab", { name: TABS[tab] }).click();
+}
+
+/** The tracker's comment box at the top of Activity (D100). */
+export const commentBox = (page: Page) => page.getByPlaceholder("Add a comment or more details");
+
+/** The tracker's Activity feed, unfolded if it is folded, so any entry can be read. */
+export async function trackerActivity(page: Page) {
+  const more = page.getByRole("button", { name: /See all activity/ });
+  if (await more.count()) await more.click();
+  return page.getByRole("region", { name: "Activity" });
 }

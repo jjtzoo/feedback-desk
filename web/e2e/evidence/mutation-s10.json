@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-27T23:49:40.919Z",
-  "commit": "2c8413a",
+  "ran": "2026-10-28T23:47:08.676Z",
+  "commit": "48ed427",
   "uncommitted": true,
   "spec": "10-notifications.spec.ts",
-  "fingerprint": "07656ce3f821ef4c",
+  "fingerprint": "c6912a17b69a8580",
   "caught": {
     "S10.01": true,
     "S10.02": true,

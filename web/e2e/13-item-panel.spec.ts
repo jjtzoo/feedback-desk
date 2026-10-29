@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { PNG, confirmApprove, getJson, openActivity, pdf, postJson, raise, raiseBug, statusMoves } from "./helpers";
+import { PNG, confirmApprove, getJson, openTab, pdf, postJson, raise, raiseBug, statusMoves, trackerActivity } from "./helpers";
 
 // Manual checklist section 13: Digital Staff, the item panel. Submitters raise through the API and
 // Darlene (who owns RAKE Agent) looks at the panel on screen; Chris approves where an item must be
@@ -27,6 +27,7 @@ const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 type Detail = {
   reference: string;
   assignee: { name: string } | null;
+  priority: string;
   ai_confidence: Record<string, number>;
   messages: { is_internal: boolean; message_type: string }[];
   events: { actor_name: string | null; is_public: boolean; public_text: string | null }[];
@@ -53,12 +54,7 @@ async function choose(page: Page, label: RegExp, option: string) {
   await expect(classField(page, label)).toHaveText(option);
 }
 
-/** Open the tracker's full history if it is folded, so any entry can be read. */
-async function expandHistory(page: Page) {
-  const more = page.getByRole("button", { name: /See full history/ });
-  if (await more.count()) await more.click();
-  return page.getByRole("region", { name: "Tracking history" });
-}
+const expandHistory = trackerActivity;
 
 /** The server-sent events of a chat call. */
 function sseEvents(body: string) {
@@ -222,7 +218,7 @@ test("S13.04 Classification shows the agent's confidence as a % for project, wor
   await expect(labels.filter({ hasText: /^Priority/ })).toContainText(`Priority (${percent("priority")})`);
 });
 
-test("S13.05 Changing project, work type, category and priority saves each, and History says each change in words, marked (internal)", async ({ page, signIn, team }) => {
+test("S13.05 Changes to project, work type, category and priority wait for Save, Cancel drops them, and History says each change in words, marked (internal)", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const ref = await raiseBug(await team.as("Mei"), "rake-agent", "RAKE Agent export page shows an error when I click save");
   await openItem(page, ref);
@@ -231,12 +227,23 @@ test("S13.05 Changing project, work type, category and priority saves each, and 
   await expect(classField(page, /^Category/)).toHaveText("Bug");
   await expect(classField(page, /^Priority/)).toHaveText("P2 · Major");
 
+  // Cancel puts a change back, and nothing was saved.
+  const panel = panelOf(page);
+  await choose(page, /^Category/, "Usability");
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(classField(page, /^Category/)).toHaveText("Bug");
+  await expect(panel.getByRole("button", { name: "Save", exact: true })).toHaveCount(0);
+
   await choose(page, /^Project/, "Training Portal");
   await choose(page, /^Work type/, "Improvement");
   await choose(page, /^Category/, "Performance");
   await choose(page, /^Priority/, "P1 · Blocking");
+  // Held until Save: a reload before it would lose them, so the API still has the old values.
+  expect((await getJson<Detail>(page, `/console/items/${ref}`)).priority).toBe("P2");
+  await panel.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
 
-  // Each one was saved: they are still there after a reload.
+  // All four were saved: they are still there after a reload.
   await page.reload();
   await expect(panelOf(page).getByText(ref, { exact: true })).toBeVisible();
   await expect(classField(page, /^Project/)).toHaveText("Training Portal");
@@ -244,7 +251,7 @@ test("S13.05 Changing project, work type, category and priority saves each, and 
   await expect(classField(page, /^Category/)).toHaveText("Performance");
   await expect(classField(page, /^Priority/)).toHaveText("P1 · Blocking");
 
-  await openActivity(panelOf(page), "History");
+  await openTab(panelOf(page), "History");
   const entries = panelOf(page).getByRole("tabpanel").getByRole("listitem");
   for (const change of [
     "Changed the tool from RAKE Agent to Training Portal",
@@ -318,7 +325,7 @@ test("S13.07 The assignee opening an item for the first time adds 'Darlene opene
   }).toPass({ timeout: 15_000 });
 });
 
-test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed internal notes labelled 'Internal note'", async ({ page, signIn, team }) => {
+test("S13.08 Brief folds in the whole chat, With Aisha has the reply, and Team has the dashed internal note labelled 'Internal note' with a lock", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const words = "RAKE Agent search box shows an error when I type";
   const ref = await raiseBug(await team.as("Aisha"), "rake-agent", words);
@@ -327,14 +334,13 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   const { messages } = await getJson<Detail>(page, `/console/items/${ref}`);
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "Messages");
-  const lines = panel.getByRole("tabpanel").getByRole("listitem");
-  await expect(lines).toHaveCount(messages.length);
-
-  // The chat as it happened: Sig's greeting, what Aisha typed, Sig's questions and her answers.
-  // It sits in its own read-only container, word for word in quotes, with the speaker named plainly.
+  // The chat as it happened: Sig's greeting, what Aisha typed, Sig's questions and her answers. It is folded
+  // at the foot of Brief, in its own read-only container, word for word in quotes, with the speaker named plainly.
+  await openTab(panel, "Brief");
   const transcript = panel.getByRole("region", { name: "Intake transcript" });
-  await expect(transcript.getByRole("listitem")).toHaveCount(messages.filter((m) => m.message_type === "chat").length);
+  await transcript.locator("summary").click();
+  const lines = transcript.getByRole("listitem");
+  await expect(lines).toHaveCount(messages.filter((m) => m.message_type === "chat").length);
   await expect(lines.filter({ hasText: "G'day, I'm Sig, Smoke Signal's AI assistant." })).toContainText("Assistant");
   await expect(lines.filter({ hasText: words })).toContainText("Aisha Rahman");
   await expect(lines.filter({ hasText: words })).toContainText("Staff member");
@@ -344,12 +350,18 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   await expect(lines.filter({ hasText: "What did you expect to happen" })).toHaveCount(1);
   await expect(lines.filter({ hasText: "Here's what I'll send" })).toHaveCount(1);
 
-  const reply = lines.filter({ hasText: "We are looking at the search box today" });
+  await openTab(panel, "With");
+  const withAisha = panel.getByRole("tabpanel").getByRole("listitem");
+  await expect(withAisha).toHaveCount(1);
+  const reply = withAisha.filter({ hasText: "We are looking at the search box today" });
   await expect(reply).toContainText("Darlene");
   await expect(reply).toContainText("Reply");
   await expect(reply).not.toHaveClass(/border-dashed/);
 
-  const note = lines.filter({ hasText: "Probably the same cause as last month" });
+  await openTab(panel, "Team");
+  const teamLines = panel.getByRole("tabpanel").getByRole("listitem");
+  await expect(teamLines).toHaveCount(1);
+  const note = teamLines.filter({ hasText: "Probably the same cause as last month" });
   await expect(note).toContainText("Darlene");
   await expect(note).toContainText("Internal note");
   await expect(note).toHaveClass(/border-dashed/);
@@ -412,7 +424,7 @@ test("S13.10 The History tab lists every event in plain words with who and when,
   expect(events.some((e) => !e.is_public) && events.some((e) => e.is_public)).toBe(true);
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "History");
+  await openTab(panel, "History");
   const entries = panel.getByRole("tabpanel").getByRole("listitem");
   await expect(entries).toHaveCount(events.length);
   await expect(entries.filter({ hasText: "(internal)" })).toHaveCount(events.filter((e) => !e.is_public).length);
@@ -514,7 +526,7 @@ test("S13.15 On an item nobody has, Assign to me makes it yours and History read
   await expect(panel.getByRole("region", { name: "Who has it" })).toContainText("Nobody has it yet");
   await panel.getByRole("button", { name: "Assign to me", exact: true }).click();
   await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/With Mario/);
-  await openActivity(panel, "History");
+  await openTab(panel, "History");
   await expect(panel.getByRole("tabpanel").getByRole("listitem").filter({ hasText: "Mario · Mario took this on" })).toHaveCount(1);
 });
 
@@ -569,13 +581,13 @@ test("S13.18 What came since you last looked shows as New reply on the list and 
   await expect(page.getByRole("row", { name: new RegExp(ref) })).toContainText("New reply");
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "Messages");
-  for (const text of ["Please prioritise this one", "It crashes on the second chapter"]) {
+  for (const [tab, text] of [["Team", "Please prioritise this one"], ["With", "It crashes on the second chapter"]] as const) {
+    await openTab(panel, tab);
     await expect(panel.getByRole("listitem").filter({ hasText: text }).getByText("New", { exact: true })).toBeVisible();
   }
   await page.keyboard.press("Escape");
   const again = await openItem(page, ref);
-  await openActivity(again, "Messages");
+  await openTab(again, "With");
   await expect(again.getByRole("listitem").filter({ hasText: "It crashes on the second chapter" })).toBeVisible();
   await expect(again.getByText("New", { exact: true })).toHaveCount(0);
   await page.request.put("/api/console/view", { data: { view: "board" } });
@@ -585,9 +597,9 @@ test("S13.19 History says Newest first and keeps the intake steps in the order t
   await signIn("Darlene");
   const ref = await raiseBug(await team.as("Liam"), "rake-agent", "RAKE Agent crashes when I search the forms list");
   const panel = await openItem(page, ref);
-  await openActivity(panel, "History");
-  const history = panel.getByRole("region", { name: "History" });
-  await expect(history.getByRole("heading")).toContainText("Newest first");
+  await openTab(panel, "History");
+  const history = panel.getByRole("tabpanel");
+  await expect(history.getByText("Newest first", { exact: true })).toBeVisible();
   const lines = await history.getByRole("listitem").allTextContents();
   const oldest = lines.slice(-4);
   for (const [i, words] of ["Assigned to Darlene by routing", "Sent for approval", "Classified: Bug", "Received via chat"].entries()) {
@@ -617,11 +629,11 @@ test("S13.21 A message to the submitter can carry an image, which shows on their
   await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "Messages");
-  // The composer opens as an internal note (D96), which takes no image.
-  await expect(panel.getByRole("radio", { name: "Internal note" })).toBeChecked();
+  // A team note takes no image.
+  await openTab(panel, "Team");
+  await expect(panel.getByRole("textbox", { name: "Note to the team (staff never see it)" })).toBeVisible();
   await expect(panel.getByRole("button", { name: "Add an image" })).toHaveCount(0);
-  await panel.getByRole("radio", { name: "Message Aisha (they'll see this)", exact: true }).click();
+  await openTab(panel, "With");
   await panel.getByTestId("reply-images").setInputFiles({ name: "fixed.png", mimeType: "image/png", buffer: PNG });
   await expect(panel.getByRole("img", { name: "fixed.png" })).toBeVisible();
   await panel.getByRole("textbox", { name: "Message to Aisha (they'll see it)" }).fill("Fixed, here's how it looks now");

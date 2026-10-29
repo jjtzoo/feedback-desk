@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, moveTo, openActivity, postJson, raiseBug, statusMoves } from "./helpers";
+import { getJson, moveTo, openTab, postJson, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 14: Digital Staff change an item's status from the console panel.
 // Staff raise RAKE Agent, IT Asset, Workflow Atlas, AFSS Portal and Fire Safety Blog Agent bugs (all
@@ -79,7 +79,8 @@ async function openTracker(page: Page, ref: string) {
 }
 
 const band = (page: Page) => page.getByRole("heading", { level: 1 }).locator("..");
-const history = (page: Page) => page.getByRole("region", { name: "Tracking history" });
+/** The tracker's Activity feed (D100). */
+const history = (page: Page) => page.getByRole("region", { name: "Activity" });
 const bell = (page: Page) => page.getByRole("button", { name: /^Notifications/ });
 
 test("S14.01 Status, then Start work, on an Approved item gives In progress in one click, the tracker updates and the submitter is notified", async ({ page, signIn, team }) => {
@@ -124,7 +125,10 @@ test("S14.02 Post update with text and a due date shows both on the tracker and 
   await expect(band(page)).toContainText(dayText(expectedBy));
   await expect(band(page)).toContainText("Expected by");
   await expect(page.getByRole("region", { name: "Latest update" })).toContainText(update);
-  await expect(history(page).getByRole("listitem").filter({ hasText: "Update from Darlene" })).toContainText(update);
+  // The update shows once, under Darlene, marked as an update (D100).
+  const posted = history(page).getByRole("listitem").filter({ hasText: update });
+  await expect(posted).toHaveCount(1);
+  await expect(posted).toContainText(/Darlene\s*has it\s*· Update/);
   await expect(history(page)).toContainText(new RegExp(`Expected by ${dayText(expectedBy).source}`));
 
   await bell(page).click();
@@ -162,7 +166,7 @@ test("S14.03 An update with only a date is accepted; one with neither says 'Writ
   await openTracker(page, ref);
   await expect(band(page)).toContainText(dayText(expectedBy));
   await expect(history(page)).toContainText("Expected by");
-  await expect(history(page)).not.toContainText("Update from");
+  await expect(history(page)).not.toContainText("· Update");
   await expect(page.getByRole("region", { name: "Latest update" })).toHaveCount(0);
 });
 
@@ -294,14 +298,14 @@ test("S14.08 On a Resolved item Darlene's Status menu has no Close; as Chris, Cl
   await submit(dialog).click();
   await expect(chris.getByText("Saved", { exact: true })).toBeVisible();
   await expect(panel.locator("header").getByText("Fixed", { exact: true })).toBeVisible();
-  await panel.getByRole("tab", { name: "Activity" }).click();
-  await expect(panel.getByRole("region", { name: "History" })).toContainText("Chris · Closed as fixed for them: Tom confirmed it on the phone");
+  await openTab(panel, "History");
+  await expect(panel.getByRole("tabpanel")).toContainText("Chris · Closed as fixed for them: Tom confirmed it on the phone");
 
   await openTracker(page, ref);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fixed");
   await expect(page.getByText("Reason:")).toHaveCount(0);
   await expect(page.getByText("Tom confirmed it on the phone")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Tracking history" }).getByRole("listitem").first()).toContainText("Closed as fixed by Chris");
+  await expect(history(page).getByRole("listitem").first()).toContainText("Closed as fixed by Chris");
   const last = page.getByRole("region", { name: "Progress" }).getByRole("listitem").filter({ hasText: "Fixed" });
   await expect(last).toContainText("current stage");
 });
@@ -326,7 +330,7 @@ test("S14.07 The dashboard's Avg time to first response changes after the first 
   await expect(average).toHaveText(/^\d+(\.\d+)? h$/);
 });
 
-test("S14.09 Update Liam says when to use it and picks the due date on a calendar in the app's date style; Resolve shows an example", async ({ page, signIn, team }) => {
+test("S14.09 Update Liam says when to use it, asks nothing of Liam, and picks the due date on a calendar in the app's date style; Resolve shows an example", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const ref = await inProgress(await team.as("Liam"), team, "rake-agent", "RAKE Agent training calendar");
   const panel = await openPanel(page, ref);
@@ -339,7 +343,8 @@ test("S14.09 Update Liam says when to use it and picks the due date on a calenda
   const picked = update.locator("#expected-by");
   await expect(picked).toHaveText(/^[A-Z][a-z]{2},? \d{1,2} [A-Z][a-z]{2}$/);
   await expect(picked).not.toHaveText(/\d+\/\d+\/\d{4}/);
-  await expect(update.getByRole("checkbox", { name: /Ask them to check it/ })).toBeVisible();
+  // An update only informs (D102).
+  await expect(update.getByRole("checkbox")).toHaveCount(0);
   await update.getByRole("button", { name: "Cancel" }).click();
 
   await moveTo(page, panel, "Resolve…");
@@ -368,8 +373,8 @@ test("S14.10 Moving the due date after approval asks why, for the Digital team o
   await why.fill(reason);
   await submit(dialog).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
-  await openActivity(panel, "History");
-  await expect(panel.getByRole("region", { name: "History" })).toContainText(`: ${reason}`);
+  await openTab(panel, "History");
+  await expect(panel.getByRole("tabpanel")).toContainText(`: ${reason}`);
 
   const told = (await getJson<{ items: { title: string; body: string }[] }>(chris, "/notifications")).items.find((n) => n.title.startsWith(`${ref}: due date moved from`));
   expect(told?.body).toBe(`Darlene: ${reason}`);

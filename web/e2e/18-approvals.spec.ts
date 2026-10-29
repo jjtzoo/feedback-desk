@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { BUG, BUG_ANSWERS, confirmApprove, getJson, openActivity, postJson, raise, raiseBug, statusMoves } from "./helpers";
+import { BUG, BUG_ANSWERS, commentBox, confirmApprove, getJson, openTab, postJson, raise, raiseBug, statusMoves } from "./helpers";
 
 // Manual checklist section 18: Admin approvals (/console/approvals). Staff raise feedback through the
 // API, Admins decide it on the screen, and the staff member's tracker and bell are read afterwards.
@@ -128,7 +128,7 @@ test("S18.02 Approve takes it off the list into Darlene's Approved column; the t
   await expect(stages.nth(0)).toContainText(", done");
   await expect(stages.nth(1)).toContainText("Planned");
   await expect(stages.nth(1)).toContainText(", current stage");
-  await expect(liam.getByRole("region", { name: "Tracking history" }).getByRole("listitem").filter({ hasText: "Planned (Chris accepted it)" })).toBeVisible();
+  await expect(liam.getByRole("region", { name: "Activity" }).getByRole("listitem").filter({ hasText: "Planned (Chris accepted it)" })).toBeVisible();
 
   await darlene.goto("/console");
   await bell(darlene).click();
@@ -200,7 +200,7 @@ test("S18.05 Ask for info, to the person who raised it, sends the question and t
   await expect(approval(page, ref)).toContainText("Awaiting approval");
 });
 
-test("S18.06 The person who raised it gets a bell notification with the question, and the tracker shows Reply from Chris", async ({ team }) => {
+test("S18.06 The person who raised it gets a bell notification with the question, and the tracker shows it first in Activity under Chris", async ({ team }) => {
   // Under Docker the same question is also emailed (Mailpit); not checked here.
   const question = "Which certificate were you opening when the error showed?";
   const aisha = await team.as("Aisha");
@@ -218,12 +218,12 @@ test("S18.06 The person who raised it gets a bell notification with the question
   const latest = aisha.getByRole("region", { name: "Latest update" });
   await expect(latest).toContainText(question);
   await expect(latest).toContainText("Chris");
-  const history = aisha.getByRole("region", { name: "Tracking history" });
-  await expect(history.getByRole("listitem").first()).toContainText("Reply from Chris");
+  const history = aisha.getByRole("region", { name: "Activity" });
+  await expect(history.getByRole("listitem").first()).toContainText("Chris");
   await expect(history.getByRole("listitem").first()).toContainText(question);
 });
 
-test("S18.07 The submitter's answer in Reply or add details toasts 'Added. The owner has been told.' and reaches Chris's Conversation tab", async ({
+test("S18.07 The submitter's answer in the comment box toasts 'Sent' and reaches Chris's With Aisha tab", async ({
   page,
   signIn,
   team,
@@ -234,15 +234,15 @@ test("S18.07 The submitter's answer in Reply or add details toasts 'Added. The o
   await postJson(await team.as("Chris"), `/console/items/${ref}/ask-info`, { question: "Which course was it?", ask: "submitter" });
 
   await aisha.goto(`/track/${ref}`);
-  await aisha.getByLabel("Reply or add details").fill(answer);
+  await commentBox(aisha).fill(answer);
   await aisha.getByRole("button", { name: "Send" }).click();
-  await expect(aisha.getByText("Added. The owner has been told.")).toBeVisible();
+  await expect(aisha.getByText("Sent", { exact: true })).toBeVisible();
 
   await signIn("Chris");
   await page.goto(`/console?inbox=open&item=${ref}`);
   const panel = page.getByRole("dialog");
-  await openActivity(panel, "Messages");
-  const entry = panel.getByRole("listitem").filter({ hasText: answer });
+  await openTab(panel, "With");
+  const entry = panel.getByRole("tabpanel").getByRole("listitem").filter({ hasText: answer });
   await expect(entry).toBeVisible();
   await expect(entry).toContainText("Aisha Rahman");
 });
@@ -294,8 +294,8 @@ test("S18.09 The History tab of an approved and a declined item shows who, when 
   ]) {
     await page.goto(`/console?inbox=open&item=${ref}`);
     const panel = page.getByRole("dialog");
-    await openActivity(panel, "History");
-    const entry = panel.getByRole("listitem").filter({ hasText: text });
+    await openTab(panel, "History");
+    const entry = panel.getByRole("tabpanel").getByRole("listitem").filter({ hasText: text });
     await expect(entry, ref).toBeVisible();
     await expect(entry).toContainText(`Chris · ${text}`);
     await expect(entry.locator("time")).toHaveAttribute("datetime", /\d{4}-\d{2}-\d{2}T/);
@@ -439,8 +439,8 @@ test("S18.14 Approve opens a dialog with the priority, a due date and instructio
   await expect(pinned).toContainText("From Chris, at approval");
   await expect(pinned).toContainText(instructions);
   const panel = darlene.getByRole("dialog");
-  await openActivity(panel, "History");
-  await expect(panel.getByRole("region", { name: "History" })).toContainText(`Instructions at approval: ${instructions}(internal)`);
+  await openTab(panel, "History");
+  await expect(panel.getByRole("tabpanel")).toContainText(`Instructions at approval: ${instructions}(internal)`);
 
   // Liam sees the date as Expected by, and never the instructions.
   await liam.goto(`/track/${ref}`);
