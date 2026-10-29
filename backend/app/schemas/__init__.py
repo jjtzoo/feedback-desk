@@ -540,6 +540,11 @@ class NotificationsOut(Out):
     unread: int
 
 
+class NotificationHistoryOut(Out):
+    items: list[NotificationOut]
+    more: bool
+
+
 class ReadIn(BaseModel):
     ids: list[uuid.UUID] | None = None
 
