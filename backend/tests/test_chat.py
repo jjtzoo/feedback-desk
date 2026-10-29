@@ -875,3 +875,30 @@ async def test_the_tracker_shows_the_teams_images_apart_and_gives_the_upload_lim
     ]
     assert tracker["max_files"] == get_settings().max_files_per_item
     assert tracker["max_file_mb"] == get_settings().max_file_mb
+
+
+async def test_an_internal_notes_image_stays_with_the_digital_team(
+    staff: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    sid = await start_chat(staff, project="staff-admin-portal")
+    login_loops = "Login loops on my phone, it's blocking, I expected the dashboard but got the sign-in page"
+    card = first(await say(staff, sid, login_loops), "draft")
+    assert card is not None
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    ref = first(parse_sse(r.text), "done")["reference"]  # type: ignore[index]
+
+    note = await darlene.post(
+        f"/api/feedback/{ref}/attachments", params={"internal": "true"}, files={"file": ("logs.png", PNG, "image/png")}
+    )
+    assert note.status_code == 201 and note.json()["is_internal"] is True
+    panel = (await darlene.get(f"/api/console/items/{ref}")).json()
+    assert [(a["file_name"], a["is_internal"]) for a in panel["attachments"]] == [("logs.png", True)]
+    assert (await darlene.get(f"/api/files/{note.json()['id']}")).status_code == 303
+
+    # The person who raised it never sees it, by the tracker or by its link, and can't mark a file internal.
+    assert (await staff.get(f"/api/feedback/{ref}/tracker")).json()["attachments"] == []
+    assert (await staff.get(f"/api/files/{note.json()['id']}")).status_code == 404
+    mine = await staff.post(
+        f"/api/feedback/{ref}/attachments", params={"internal": "true"}, files={"file": ("x.png", PNG, "image/png")}
+    )
+    assert mine.status_code == 403

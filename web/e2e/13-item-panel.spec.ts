@@ -616,7 +616,7 @@ test("S13.20 The recommendation and the Context time are in words, never raw val
   await expect(shown).not.toContainText("GMT");
 });
 
-test("S13.21 A message to the submitter can carry an image, which shows on their tracker under From the team; a note can't", async ({ page, signIn, team }) => {
+test("S13.21 A message to the submitter can carry an image, which shows on their tracker under From the team", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const aisha = await team.as("Aisha");
   const ref = await raiseBug(aisha, "rake-agent", "RAKE Agent search box overlaps the answers");
@@ -624,9 +624,6 @@ test("S13.21 A message to the submitter can carry an image, which shows on their
 
   const panel = await openItem(page, ref);
   await openActivity(panel);
-  // The composer opens as an internal note (D96), which takes no image.
-  await expect(panel.getByRole("radio", { name: "Internal note" })).toBeChecked();
-  await expect(panel.getByRole("button", { name: "Add an image" })).toHaveCount(0);
   await panel.getByRole("radio", { name: "Reply to Aisha", exact: true }).click();
   await panel.getByTestId("reply-images").setInputFiles({ name: "fixed.png", mimeType: "image/png", buffer: PNG });
   await expect(panel.getByRole("img", { name: "fixed.png" })).toBeVisible();
@@ -657,4 +654,31 @@ test("S13.22 In this conversation names someone with two parts once, with both: 
   const onTracker = marc.locator("p").filter({ hasText: /^In this conversation/ });
   await expect(onTracker.getByText("Marc", { exact: true })).toHaveCount(1);
   await expect(onTracker).toContainText("You · approved it");
+});
+
+test("S13.23 An internal note can carry an image, which only the Digital team sees", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const aisha = await team.as("Aisha");
+  const ref = await raiseBug(aisha, "rake-agent", "RAKE Agent loses the answer when I scroll up");
+  await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
+
+  const panel = await openItem(page, ref);
+  await openActivity(panel);
+  // The composer opens as an internal note (D96), which now takes images too (D107).
+  await expect(panel.getByRole("radio", { name: "Internal note" })).toBeChecked();
+  await panel.getByTestId("reply-images").setInputFiles({ name: "logs.png", mimeType: "image/png", buffer: PNG });
+  await expect(panel.getByRole("img", { name: "logs.png" })).toBeVisible();
+  await panel.getByRole("textbox", { name: "Internal note (staff never see it)" }).fill("The console shows this error");
+  await panel.getByRole("button", { name: "Add internal note" }).click();
+  await expect(page.getByText("Internal note added", { exact: true })).toBeVisible();
+
+  await openTab(panel, "Files");
+  const file = panel.getByRole("link", { name: /logs\.png/ });
+  await expect(file).toContainText("Internal note");
+
+  await aisha.goto(`/track/${ref}`);
+  await expect(trackerConversation(aisha)).toBeVisible();
+  await expect(aisha.getByRole("img", { name: "logs.png" })).toHaveCount(0);
+  const { attachments } = await getJson<{ attachments: { id: string }[] }>(page, `/console/items/${ref}`);
+  expect((await aisha.request.get(`/api/files/${attachments[0].id}`, { maxRedirects: 0 })).status()).toBe(404);
 });

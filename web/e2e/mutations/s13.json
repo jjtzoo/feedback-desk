@@ -20,5 +20,6 @@
   "S13.19": ["\"Received via chat\", \"Classified: Bug\"", "\"Classified: Bug\", \"Received via chat\""],
   "S13.20": ["not.toContainText(\"GMT\")", "toContainText(\"GMT\")"],
   "S13.21": ["{ name: \"From the team\" }).getByRole(\"img\", { name: \"fixed.png\" })", "{ name: \"What you sent\" }).getByRole(\"img\", { name: \"fixed.png\" })"],
-  "S13.22": ["getByText(\"Marc\", { exact: true })).toHaveCount(1)", "getByText(\"Marc\", { exact: true })).toHaveCount(2)"]
+  "S13.22": ["getByText(\"Marc\", { exact: true })).toHaveCount(1)", "getByText(\"Marc\", { exact: true })).toHaveCount(2)"],
+  "S13.23": ["await expect(file).toContainText(\"Internal note\");", "await expect(file).not.toContainText(\"Internal note\");"]
 }

@@ -162,6 +162,7 @@ async def save(
     *,
     session_id: str | None = None,
     feedback_id: uuid.UUID | None = None,
+    is_internal: bool = False,
 ) -> Attachment:
     s = get_settings()
     if len(upload.content) > s.max_file_mb * 1024 * 1024:
@@ -185,6 +186,7 @@ async def save(
         mime_type=mime,
         size_bytes=len(upload.content),
         extracted_text=await asyncio.to_thread(extract_text, upload.content, mime),
+        is_internal=is_internal,
     )
     db.add(att)
     await db.flush()

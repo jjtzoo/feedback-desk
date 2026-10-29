@@ -199,6 +199,7 @@ class AttachmentOut(Out):
     mime_type: str
     size_bytes: int
     created_at: datetime
+    is_internal: bool = False
 
 
 class ChatResumeOut(ChatStartOut):

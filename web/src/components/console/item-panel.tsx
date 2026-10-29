@@ -111,7 +111,7 @@ export function ItemPanel({
   const [draft, setDraft] = useState("");
   // Corrections to the properties, kept until Save (D104).
   const [fields, setFields] = useState<Partial<Record<Field, string>>>({});
-  // Images to send with a reply, for example to show the fix (D95); notes take none.
+  // Images to send with a reply, for example to show the fix (D95), or with an internal note, where they stay internal (D107).
   const [images, setImages] = useState<{ file: File; src: string | null }[]>([]);
   const imageInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -197,10 +197,11 @@ export function ItemPanel({
     e.preventDefault();
     const text = draft;
     if (!text.trim() || !reference) return;
-    const withImages = side === "reply" ? images : [];
+    const withImages = images;
     try {
-      // The images go on the item first, so the reply they belong to never arrives without them.
-      for (const image of withImages) await api.upload(`/feedback/${reference}/attachments`, image.file);
+      // The images go on the item first, so the message they belong to never arrives without them.
+      const path = `/feedback/${reference}/attachments${side === "note" ? "?internal=true" : ""}`;
+      for (const image of withImages) await api.upload(path, image.file);
     } catch (err) {
       toast.error(errorText(err));
       return;
@@ -334,7 +335,7 @@ export function ItemPanel({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onPaste={(e) => {
-          const pasted = reply ? pastedImages(e) : [];
+          const pasted = pastedImages(e);
           if (pasted.length === 0) return;
           e.preventDefault();
           addImages(pasted);
@@ -343,7 +344,7 @@ export function ItemPanel({
         placeholder={reply ? `Write to ${firstName}` : "Write an internal note"}
         className="rounded-xl bg-background"
       />
-      {reply && images.length > 0 && (
+      {images.length > 0 && (
         <div className="grid gap-2">
           <FileThumbs
             files={images.map((image, i) => ({ key: String(i), name: image.file.name, size: image.file.size, src: image.src }))}
@@ -353,27 +354,23 @@ export function ItemPanel({
         </div>
       )}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {reply && (
-          <>
-            <input
-              ref={imageInput}
-              type="file"
-              accept={IMAGES}
-              multiple
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-              data-testid="reply-images"
-              onChange={(e) => {
-                addImages(Array.from(e.target.files ?? []));
-                e.target.value = "";
-              }}
-            />
-            <Button type="button" variant="ghost" className="rounded-xl" disabled={busy} onClick={() => imageInput.current?.click()}>
-              <ImagePlus /> Add an image
-            </Button>
-          </>
-        )}
+        <input
+          ref={imageInput}
+          type="file"
+          accept={IMAGES}
+          multiple
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          data-testid="reply-images"
+          onChange={(e) => {
+            addImages(Array.from(e.target.files ?? []));
+            e.target.value = "";
+          }}
+        />
+        <Button type="button" variant="ghost" className="rounded-xl" disabled={busy} onClick={() => imageInput.current?.click()}>
+          <ImagePlus /> Add an image
+        </Button>
         <Button type="submit" variant={reply ? "default" : "outline"} className="rounded-xl" disabled={busy || !draft.trim()}>
           {reply ? `Send to ${firstName}` : "Add internal note"}
         </Button>
@@ -652,13 +649,24 @@ export function ItemPanel({
                 <TabsContent value="files" className="grid gap-3 pt-3">
                 {item.attachments.length === 0 && <p className="text-sm text-muted-foreground">No files attached.</p>}
                 {item.attachments.map((a) => (
-                  <a key={a.id} href={`/api/files/${a.id}`} target="_blank" rel="noreferrer" className="grid gap-2 rounded-2xl border p-3 hover:bg-muted/50">
+                  <a
+                    key={a.id}
+                    href={`/api/files/${a.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={cn("grid gap-2 rounded-2xl border p-3 hover:bg-muted/50", a.is_internal && "border-dashed border-warning/60 bg-warning-tint")}
+                  >
                     {a.mime_type.startsWith("image/") && (
                       // eslint-disable-next-line @next/next/no-img-element -- a signed, short-lived link; next/image can't optimise it
                       <img src={`/api/files/${a.id}`} alt={`Attachment ${a.file_name}`} className="max-h-64 rounded-xl object-contain" />
                     )}
                     <span className="flex items-center gap-2 text-sm">
                       <FileText className="size-4" aria-hidden="true" /> {a.file_name} · {fileSize(a.size_bytes)}
+                      {a.is_internal && (
+                        <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+                          <Lock className="size-3" aria-hidden="true" /> Internal note
+                        </span>
+                      )}
                     </span>
                   </a>
                 ))}
