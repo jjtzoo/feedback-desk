@@ -74,10 +74,11 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
     button: "Decline",
     required: true,
   },
+  // Whichever item it starts from, the newer one closes into the first report (brief §4.2.6).
   merge: {
-    title: "Merge into another item",
-    description: "This item closes; everyone following it follows the original instead.",
-    field: "Original reference",
+    title: "Merge duplicates",
+    description: "The newer of the two closes into the first report, which keeps everything; everyone following it follows the first report instead.",
+    field: "Other reference",
     button: "Merge",
     required: true,
   },

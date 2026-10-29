@@ -260,6 +260,20 @@ async def test_merge_moves_the_submitter_to_the_original(
     await other.aclose()
 
 
+async def test_a_merge_always_goes_into_the_earlier_report(
+    staff: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    original = await raise_bug(staff)
+    reply = await submit_via_chat(
+        staff, "RAKE gives a blank answer about leave, really annoying", ["Nothing comes back"]
+    )
+    newer = str(reply["reference"])
+    # Asked from the first report: the newer one still closes into it.
+    r = await darlene.post(f"/api/console/items/{original}/merge", json={"into": newer})
+    assert r.is_success and r.json()["status"] != "declined" and newer in r.json()["linked"]
+    assert (await darlene.get(f"/api/console/items/{newer}")).json()["merged_into"] == original
+
+
 async def test_notifications_are_masked_before_they_are_stored(
     staff: httpx.AsyncClient, darlene: httpx.AsyncClient
 ) -> None:

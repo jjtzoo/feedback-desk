@@ -911,10 +911,13 @@ async def update_fields(db: AsyncSession, user: User, ref_no: str, changes: dict
 
 
 async def merge(db: AsyncSession, user: User, ref_no: str, into_ref: str) -> Feedback:
-    """Close as a duplicate of another item; the submitter follows the original (brief §4.2.6)."""
+    """Merge two duplicates: whichever of them was asked for, the newer one closes into the first report,
+    which keeps everything, and its submitter follows it (brief §4.2.6)."""
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
     target = await load(db, ref_no=into_ref)
+    if target.created_at > fb.created_at:
+        fb, target = target, fb
     if fb.id == target.id or target.duplicate_of == fb.id:
         raise ServiceError("bad_value", "Pick a different item to merge into.")
     if target.status in CLOSED_STATUSES:

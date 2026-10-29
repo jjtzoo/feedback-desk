@@ -505,16 +505,17 @@ export function ItemPanel({
                         <span>
                           <span className="font-mono font-semibold">{d.reference}</span> · {d.title} · {Math.round(d.similarity * 100)}% similar
                         </span>
+                        {/* From either item: the server always closes the newer one into the first report. */}
                         {open && (
                           <Button variant="outline" size="sm" disabled={busy} onClick={() => setDialog({ kind: "merge", text: d.reference })}>
-                            Merge into it
+                            Merge
                           </Button>
                         )}
                       </div>
                     ))}
                     {open && (
                       <Button variant="link" className="justify-self-start px-0" onClick={() => setDialog({ kind: "merge" })}>
-                        Merge into another reference…
+                        Merge with another reference…
                       </Button>
                     )}
                   </section>
