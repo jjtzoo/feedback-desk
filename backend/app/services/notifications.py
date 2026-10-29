@@ -54,6 +54,7 @@ STEPS = {
     "praise": "Thanks",
     "plus_one": "Reported again",
     "submitter_reply": "Reply",
+    "team_reply": "Reply",
     "team_note": "Team note",
     "taken_over": "Taken over",
     "handed_over": "Handed over",

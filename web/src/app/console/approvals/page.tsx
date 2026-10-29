@@ -39,9 +39,8 @@ export default function ApprovalsPage() {
     try {
       if (kind === "approve")
         await api.post(`/console/items/${dialog.ref}/approve`, { instructions: r.text, priority: r.priority ?? null, due_date: r.expectedBy ?? null });
-      else if (kind === "decline") await api.post(`/console/items/${dialog.ref}/decline`, { reason: r.text });
-      else await api.post(`/console/items/${dialog.ref}/ask-info`, { question: r.text, ask: r.ask });
-      toast.success(kind === "approve" ? `${dialog.ref} approved` : kind === "decline" ? `${dialog.ref} declined` : "Question sent");
+      else await api.post(`/console/items/${dialog.ref}/decline`, { reason: r.text });
+      toast.success(kind === "approve" ? `${dialog.ref} approved` : `${dialog.ref} declined`);
       load();
       refreshCounts();
       return true;
@@ -108,8 +107,9 @@ export default function ApprovalsPage() {
             <Button variant="outline" className="h-11 rounded-xl" onClick={() => setDialog({ kind: "decline", ref: i.reference })}>
               Decline
             </Button>
-            <Button variant="ghost" className="h-11 rounded-xl" onClick={() => setDialog({ kind: "ask", ref: i.reference })}>
-              Ask for info
+            {/* A question is a message in the item's conversation (D105). */}
+            <Button asChild variant="ghost" className="h-11 rounded-xl">
+              <Link href={`/console?item=${i.reference}&tab=activity`}>Ask a question</Link>
             </Button>
           </div>
         </article>

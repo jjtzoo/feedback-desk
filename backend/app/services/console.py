@@ -38,7 +38,7 @@ from app.models.enums import (
     STATUSES,
     WORK_TYPES,
 )
-from app.services import embeddings, events, notifications
+from app.services import embeddings, events, notifications, sig_updates
 from app.services.actors import Actor, User
 from app.services.drafts import CATEGORY_LABEL, WORK_TYPE_LABEL
 from app.services.feedback import ENDING_TEXT, day_text, load
@@ -442,8 +442,11 @@ async def _change_hands(
     previous = fb.assignee
     before = {"assignee": previous.google_email, "name": previous.name} if previous else {"assignee": None}
     after = {"assignee": target.google_email, "name": target.name} | ({"reason": reason[:500]} if reason else {})
-    # Staff see who has it now; they are not notified (D53).
-    events.log(db, fb.id, user.actor, event, before=before, after=after, public_text=f"Now with {target.name}")
+    # Staff see who has it now; they are not notified (D53). The reason stays internal.
+    text = await _told(
+        db, fb, f"Now with {target.name}", "A different person is now looking after it", {"Now with": target.name}
+    )
+    events.log(db, fb.id, user.actor, event, before=before, after=after, public_text=text)
     fb.assignee_id, fb.assignee_opened_at, fb.routed = target.id, None, None
     fb.updated_at = _now()
     await notifications.settle(db, fb.id, notifications.START, f"{fb.ref_no} is now with {target.name}")
@@ -544,6 +547,13 @@ def _set_status(
     fb.updated_at = _now()
 
 
+async def _told(db: AsyncSession, fb: Feedback, template: str, what: str, facts: dict[str, str | None]) -> str:
+    """What the person who raised it reads about a move: Sig's words from these facts, or the template (D105)."""
+    lines = [f"Item {fb.ref_no}: {fb.title}", f"What happened: {what}"]
+    lines += [f"{name}: {value}" for name, value in facts.items() if value]
+    return await sig_updates.say(db, template, "\n".join(lines))
+
+
 async def start_work(db: AsyncSession, user: User, ref_no: str) -> Feedback:
     require_digital(user)
     fb = await load(db, ref_no=ref_no)
@@ -553,12 +563,26 @@ async def start_work(db: AsyncSession, user: User, ref_no: str) -> Feedback:
         await assign_to_me(db, user, ref_no)
         fb = await load(db, ref_no=ref_no)
     require_holder(fb, user)
-    _set_status(db, fb, user, "in_progress", f"{user.name} started work")
+    again = fb.status == "resolved"
+    text = await _told(
+        db,
+        fb,
+        f"{user.name} started work" + (" again" if again else ""),
+        "Work started again after it was marked resolved" if again else "Work started on it",
+        {"Working on it": user.name, "Expected by": day_text(fb.expected_by) if fb.expected_by else None},
+    )
+    _set_status(db, fb, user, "in_progress", text)
     await notifications.settle(db, fb.id, notifications.START, f"{fb.ref_no}: {user.name} started work")
     fb.resolved_at = None
     _first_response(fb)
     await notifications.notify_submitters(
-        db, fb, type="stage", title=f"{fb.ref_no} is being worked on", actor_email=user.email, step="In progress"
+        db,
+        fb,
+        type="stage",
+        title=f"{fb.ref_no} is being worked on",
+        body=text,
+        actor_email=user.email,
+        step="In progress",
     )
     return await load(db, feedback_id=fb.id)
 
@@ -631,7 +655,7 @@ async def post_update(
             type="due_moved",
             title=f"{fb.ref_no}: due date moved from {day_text(moved_from)} to {day_text(expected_by)}",
             body=f"{user.name}: {reason}",
-            link=notifications.console_link(fb, tab="history"),
+            link=notifications.console_link(fb, tab="activity"),
             feedback_id=fb.id,
             actor_email=user.email,
         )
@@ -710,7 +734,13 @@ async def close(db: AsyncSession, user: User, ref_no: str, reason: str, ending: 
     fb.ending = ending
     fb.close_reason = reason[:1000] or None
     # Won't fix stays a declined item (D21); fixed and no longer needed are closed.
-    text = CLOSE_TEXT[ending] + (f": {reason[:140]}" if reason else "")
+    text = await _told(
+        db,
+        fb,
+        CLOSE_TEXT[ending] + (f": {reason[:140]}" if reason else ""),
+        f"It was closed as {CLOSE_TEXT[ending].lower()}",
+        {"Closed by": user.name, "Reason": reason},
+    )
     _set_status(db, fb, user, "declined" if ending == "wont_fix" else "closed", text)
     await _ended(db, fb, f"{fb.ref_no} closed: {CLOSE_TEXT[ending]}")
     await notifications.notify_submitters(
@@ -731,6 +761,12 @@ FIXED_BY_TEXT = {
     "system": "Closed as fixed: no reply in {days} days",
     "admin": "Closed as fixed by {name}",
 }
+# The same moves as facts for Sig (D105); the admin's reason stays in the console.
+FIXED_WHAT = {
+    "submitter": "{name}, who raised it, confirmed it is fixed, so it is closed",
+    "system": "It was closed as fixed because nobody replied in {days} days after it was resolved",
+    "admin": "{name} closed it as fixed",
+}
 FIXED_OWNER_TITLE = {
     "submitter": "{ref}: {name} confirmed it's fixed",
     "system": "{ref} closed as fixed: no reply in {days} days",
@@ -746,7 +782,8 @@ async def close_fixed(db: AsyncSession, fb: Feedback, actor: Actor, by: str, rea
     words = {"name": actor.name or "", "days": settings.resolved_auto_close_days, "ref": fb.ref_no}
     fb.ending, fb.close_reason = "fixed", reason[:1000] or None
     detail: dict[str, Any] = {"ending": "fixed", "by": by} | ({"reason": reason[:500]} if reason else {})
-    _set_status(db, fb, actor, "closed", FIXED_BY_TEXT[by].format(**words), detail)
+    text = await _told(db, fb, FIXED_BY_TEXT[by].format(**words), FIXED_WHAT[by].format(**words), {})
+    _set_status(db, fb, actor, "closed", text, detail)
     await _ended(db, fb, f"{fb.ref_no} closed: Fixed")
     until = day_text((_now() + timedelta(days=settings.reopen_days)).date())
     await notifications.notify_submitters(
@@ -771,8 +808,10 @@ async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedbac
     if not body.strip():
         raise ServiceError("empty", "Write a reply first.")
     fb = await load(db, ref_no=ref_no)
+    message_id = uuid.uuid4()
     db.add(
         FeedbackMessage(
+            id=message_id,
             feedback_id=fb.id,
             author_type="digital",
             author_email=user.email,
@@ -792,6 +831,17 @@ async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedbac
         body=body.strip(),
         actor_email=user.email,
         latest=True,
+    )
+    # The others on the item hear it too, so the holder and the approver follow each other's replies (D105).
+    await notifications.notify(
+        db,
+        await notifications.in_conversation(db, fb, internal=False),
+        type="team_reply",
+        title=f"{fb.ref_no}: {user.name} replied to {fb.submitter_name.split(' ')[0]}",
+        body=body.strip(),
+        link=notifications.console_link(fb, message_id),
+        feedback_id=fb.id,
+        actor_email=user.email,
     )
     return await load(db, feedback_id=fb.id)
 
@@ -985,7 +1035,18 @@ async def approve(
     if note:
         events.log(db, fb.id, user.actor, "instructions", after={"instructions": note})
     # Staff see stage 2 as Planned (D43); the console keeps Approved.
-    _set_status(db, fb, user, "approved", f"Planned ({user.name} accepted it)")
+    text = await _told(
+        db,
+        fb,
+        f"Planned ({user.name} accepted it)",
+        "It was approved and planned; the team will start on it",
+        {
+            "Approved by": user.name,
+            "Who will work on it": fb.assignee.name if fb.assignee else None,
+            "Expected by": day_text(fb.expected_by) if fb.expected_by else None,
+        },
+    )
+    _set_status(db, fb, user, "approved", text)
     _first_response(fb)
     await notifications.settle(db, fb.id, notifications.DECIDE, f"{fb.ref_no} approved by {user.name}")
     await notifications.refresh_approvals(db)
@@ -994,7 +1055,7 @@ async def approve(
         fb,
         type="stage",
         title=f"{fb.ref_no} is planned",
-        body="The team will start on it.",
+        body=text,
         actor_email=user.email,
         step="Planned",
     )
@@ -1017,7 +1078,14 @@ async def decline(db: AsyncSession, user: User, ref_no: str, reason: str) -> Fee
     if fb.status not in ("awaiting_approval", "needs_review"):
         raise Conflict("decided", "That item has already been decided.")
     fb.ending, fb.close_reason = "declined", reason.strip()[:1000]
-    _set_status(db, fb, user, "declined", f"Declined: {reason.strip()[:140]}")
+    text = await _told(
+        db,
+        fb,
+        f"Declined: {reason.strip()[:140]}",
+        "It was declined",
+        {"Declined by": user.name, "Reason": reason.strip()},
+    )
+    _set_status(db, fb, user, "declined", text)
     _first_response(fb)
     await _ended(db, fb, f"{fb.ref_no} declined by {user.name}")
     await notifications.notify_submitters(
@@ -1029,61 +1097,6 @@ async def decline(db: AsyncSession, user: User, ref_no: str, reason: str) -> Fee
         actor_email=user.email,
         step="Declined",
     )
-    return await load(db, feedback_id=fb.id)
-
-
-async def ask_info(db: AsyncSession, user: User, ref_no: str, question: str, ask: str) -> Feedback:
-    """Ask the submitter (a public reply) or the owner (an internal note); the item keeps waiting."""
-    require_admin(user)
-    if not question.strip():
-        raise ServiceError("empty", "Write the question first.")
-    fb = await load(db, ref_no=ref_no)
-    message_id = uuid.uuid4()
-    if ask == "submitter":
-        db.add(
-            FeedbackMessage(
-                id=message_id,
-                feedback_id=fb.id,
-                author_type="digital",
-                author_email=user.email,
-                author_name=user.name,
-                message_type="reply",
-                body=question.strip()[:4000],
-            )
-        )
-        await notifications.notify_submitters(
-            db,
-            fb,
-            type="ask_info",
-            title=f"A question about {fb.ref_no}",
-            body=question.strip(),
-            actor_email=user.email,
-            latest=True,
-        )
-    else:
-        db.add(
-            FeedbackMessage(
-                id=message_id,
-                feedback_id=fb.id,
-                author_type="digital",
-                author_email=user.email,
-                author_name=user.name,
-                message_type="note",
-                body=f"Question for the owner: {question.strip()[:4000]}",
-                is_internal=True,
-            )
-        )
-        await notifications.notify_assignee(
-            db,
-            fb,
-            type="ask_info",
-            title=f"{user.name} asked about {fb.ref_no}",
-            body=question.strip(),
-            actor_email=user.email,
-            message_id=message_id,
-        )
-    events.log(db, fb.id, user.actor, "asked_for_info", after={"ask": ask})
-    fb.updated_at = _now()
     return await load(db, feedback_id=fb.id)
 
 

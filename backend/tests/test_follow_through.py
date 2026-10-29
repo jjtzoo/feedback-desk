@@ -190,7 +190,7 @@ async def test_an_update_just_before_resolve_keeps_its_own_entry(
     await darlene.post(f"/api/console/items/{ref}/update", json={"body": "Found the cause"})
     await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fix deployed"})
     history = (await staff.get(f"/api/feedback/{ref}/tracker")).json()["history"]
-    assert [(h["text"], h["detail"]) for h in history[:2]] == [
-        ("Resolved by Darlene", "Fix deployed"),
+    assert [(h["text"], h["detail"]) for h in history[-2:]] == [
         ("Update from Darlene", "Found the cause"),
+        ("Resolved by Darlene", "Fix deployed"),
     ]

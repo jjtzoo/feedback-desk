@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
+import { ActivityThread, ThreadPeople, type ThreadEntry } from "@/components/activity-thread";
 import { ACCEPT, FileThumbs, PhotoButton, ScreenshotNote, isImage, pastedImages, preview, withinLimits, type Shown } from "@/components/attach";
 import { PriorityBadge } from "@/components/badges";
 import { GeneralView } from "@/components/general-view";
@@ -13,15 +14,12 @@ import { IsItFixed } from "@/components/is-it-fixed";
 import { useMe } from "@/components/me";
 import { StageStepper } from "@/components/stage-stepper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { api, ApiError, errorText, type Attachment, type GeneralItem, type TimelineEntry, type Tracker, type TrackerFile } from "@/lib/api";
-import { day, initials, isSettled, when } from "@/lib/format";
+import { api, ApiError, errorText, type Attachment, type GeneralItem, type Tracker, type TrackerFile } from "@/lib/api";
+import { day, isSettled } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-const PREVIEW_ENTRIES = 5;
 
 /** Files already on the item, with images as thumbnails that open the full file (D95). */
 function shownFiles(files: TrackerFile[]): Shown[] {
@@ -31,19 +29,17 @@ function shownFiles(files: TrackerFile[]): Shown[] {
   });
 }
 
-/** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, who has it, the latest
- *  update, and one Activity feed, newest first, where the conversation with whoever has it and the
- *  approver sits with the stage changes, the comment box at its top (D100, after the JSM portal request).
- *  A resolved item asks the person who raised it Is it fixed? (D92); an update asks nothing (D102). A
- *  notification about news opens it at #latest (D81). Anyone else, followers included, gets general
- *  information about it instead (D97). */
+/** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, then the conversation with
+ *  whoever has it and the approver: one Activity thread, oldest first, Sig's words on each move among the
+ *  messages, the message box at the bottom, straight on the page (D105). A resolved item asks the person
+ *  who raised it Is it fixed? (D92). A notification about news opens it at the newest entry (#latest,
+ *  D81). Anyone else, followers included, gets general information about it instead (D97). */
 export default function TrackerPage() {
   const { ref } = useParams<{ ref: string }>();
   const me = useMe();
   const [t, setT] = useState<Tracker | null>(null);
   const [general, setGeneral] = useState<GeneralItem | null>(null);
   const [error, setError] = useState<{ notFound: boolean; text: string } | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -95,7 +91,7 @@ export default function TrackerPage() {
     setAdding((a) => a.filter((_, i) => String(i) !== key));
   }
 
-  // Opened from a notification about news: bring Latest update into view once it has loaded, marked for a moment.
+  // Opened from a notification about news: bring the newest entry into view once it has loaded, marked for a moment.
   const loaded = t !== null;
   useEffect(() => {
     if (!loaded || window.location.hash !== "#latest") return;
@@ -183,7 +179,24 @@ export default function TrackerPage() {
     );
   }
 
-  const history = showAll ? t.history : t.history.slice(0, PREVIEW_ENTRIES);
+  // A person's words are messages, named with what they are on the item; Sig's words on each move and the
+  // other changes are small lines between them (D105).
+  const entries: ThreadEntry[] = t.history.map((h, i) => {
+    const newest = i === t.history.length - 1;
+    const said = h.said_by
+      ? {
+          who: h.said_by === "You" ? me.name : h.said_by,
+          role: h.said_by === "You" ? "You" : h.said_by === t.assignee?.name ? "has it" : h.said_by === t.approver?.name ? "approved it" : "Digital team",
+          text: h.detail ?? "",
+        }
+      : { text: h.detail && h.detail !== h.text ? `${h.text}: ${h.detail}` : h.text };
+    return { key: `${h.at}-${i}`, at: h.at, ...said, domId: newest ? "latest" : undefined, ring: newest && pointed };
+  });
+  const people = [
+    { name: me.name, role: "You" },
+    ...(t.assignee ? [{ name: t.assignee.name, role: "has it" }] : []),
+    ...(t.approver && t.approver.name !== t.assignee?.name ? [{ name: t.approver.name, role: "approved it" }] : []),
+  ];
   const sentFiles = shownFiles(t.attachments.filter((a) => !a.from_team));
   const teamFiles = shownFiles(t.attachments.filter((a) => a.from_team));
   const toAdd: Shown[] = adding.map((a, i) => ({ key: String(i), name: a.file.name, size: a.file.size, src: a.src }));
@@ -232,78 +245,20 @@ export default function TrackerPage() {
           )}
         </section>
 
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
-          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
-            <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="who">
-              <h2 id="who" className="text-sm font-semibold text-muted-foreground">
-                Who has it
-              </h2>
-              {t.assignee ? (
-                <div className="mt-3 flex items-center gap-3">
-                  <Avatar className="size-11">
-                    <AvatarFallback className="bg-muted font-bold">{initials(t.assignee.name)}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{t.assignee.name}</p>
-                    <p className="truncate text-sm text-muted-foreground">{t.assignee.role}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="mt-3 text-sm text-muted-foreground">The Digital team is checking who it belongs to.</p>
-              )}
-            </section>
-
-            <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="what">
-              <h2 id="what" className="text-sm font-semibold text-muted-foreground">
-                What you sent
-              </h2>
-              <p className="mt-2 font-semibold">{t.title}</p>
-              {t.summary !== t.title && <p className="mt-1 text-sm text-muted-foreground">{t.summary}</p>}
-              <PriorityBadge priority={t.priority} quiet={isSettled(t.status)} className="mt-3 flex w-fit" />
-              <FileThumbs files={sentFiles} className="mt-4" />
-            </section>
-
-            <Button variant="ghost" className="h-auto min-h-11 justify-start rounded-xl text-left whitespace-normal" onClick={() => void toggleMute()}>
-              {t.muted ? <BellOff /> : <Bell />}
-              {t.muted ? "Unmute this item" : "Mute notifications for this item"}
-            </Button>
-            {muteError && (
-              <p className="text-sm text-destructive" role="alert">
-                {muteError}
-              </p>
-            )}
-          </div>
-
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[16rem_minmax(0,1fr)]">
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
             <IsItFixed tracker={t} onChange={setT} />
 
-            {t.latest_update && (
-              <section id="latest" className={cn("rounded-3xl border bg-card p-5 shadow-card transition-shadow", pointed && "ring-2 ring-ring")} aria-labelledby="latest-heading">
-                <h2 id="latest-heading" className="text-sm font-semibold text-muted-foreground">
-                  Latest update
-                </h2>
-                <p className="mt-2 whitespace-pre-wrap">{t.latest_update.body}</p>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {t.latest_update.author} · {when(t.latest_update.at)}
-                </p>
-              </section>
-            )}
-
-            {teamFiles.length > 0 && (
-              <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="team-files">
-                <h2 id="team-files" className="text-sm font-semibold text-muted-foreground">
-                  From the team
-                </h2>
-                <FileThumbs files={teamFiles} className="mt-3" />
-              </section>
-            )}
-
-            <section id="activity" className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="activity-heading">
-              <h2 id="activity-heading" className="text-sm font-semibold text-muted-foreground">
+            {/* The conversation sits straight on the page, not in a card (D105). */}
+            <section id="activity" className="grid gap-4" aria-labelledby="activity-heading">
+              <h2 id="activity-heading" className="text-lg font-bold">
                 Activity
               </h2>
+              <ThreadPeople people={people} />
+              {!t.assignee && <p className="text-sm text-muted-foreground">The Digital team is checking who it belongs to.</p>}
+              <ActivityThread entries={entries} empty="Nothing yet." />
               {t.can_reply && (
-                <form onSubmit={sendReply} className="mt-3 grid gap-2">
+                <form onSubmit={sendReply} className="grid gap-2 rounded-2xl border bg-card p-3">
                   <label htmlFor="reply" className="text-sm text-muted-foreground">
                     {readers.length > 0 ? `Your messages go to ${readers.join(" and ")}.` : "Your messages go to the Digital team."}
                   </label>
@@ -312,7 +267,7 @@ export default function TrackerPage() {
                     rows={1}
                     value={reply}
                     maxLength={4000}
-                    placeholder="Add a comment or more details"
+                    placeholder="Write a message or add details"
                     onFocus={() => setWriting(true)}
                     onChange={(e) => setReply(e.target.value)}
                     onPaste={(e) => {
@@ -365,60 +320,41 @@ export default function TrackerPage() {
                   )}
                 </form>
               )}
-              <ol className="mt-5 grid gap-4">
-                {history.map((h, i) => (
-                  <ActivityEntry key={`${h.at}-${i}`} entry={h} tracker={t} me={me.name} />
-                ))}
-              </ol>
-              {t.history.length > PREVIEW_ENTRIES && (
-                <Button variant="link" className="mt-2 h-auto min-h-11 px-0" onClick={() => setShowAll((s) => !s)}>
-                  {showAll ? "Show less" : `See all activity (${t.history.length})`}
-                </Button>
-              )}
             </section>
+          </div>
+
+          <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6 md:order-first">
+            <section className="grid gap-2" aria-labelledby="what">
+              <h2 id="what" className="text-sm font-semibold text-muted-foreground">
+                What you sent
+              </h2>
+              <p className="font-semibold">{t.title}</p>
+              {t.summary !== t.title && <p className="text-sm text-muted-foreground">{t.summary}</p>}
+              <PriorityBadge priority={t.priority} quiet={isSettled(t.status)} className="flex w-fit" />
+              <FileThumbs files={sentFiles} className="mt-2" />
+            </section>
+
+            {teamFiles.length > 0 && (
+              <section className="grid gap-2" aria-labelledby="team-files">
+                <h2 id="team-files" className="text-sm font-semibold text-muted-foreground">
+                  From the team
+                </h2>
+                <FileThumbs files={teamFiles} />
+              </section>
+            )}
+
+            <Button variant="ghost" className="h-auto min-h-11 justify-start rounded-xl px-0 text-left whitespace-normal" onClick={() => void toggleMute()}>
+              {t.muted ? <BellOff /> : <Bell />}
+              {t.muted ? "Unmute this item" : "Mute notifications for this item"}
+            </Button>
+            {muteError && (
+              <p className="text-sm text-destructive" role="alert">
+                {muteError}
+              </p>
+            )}
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-/** One Activity entry: something a person wrote, with who they are on the item, or a stage change (D100). */
-function ActivityEntry({ entry: h, tracker: t, me }: { entry: TimelineEntry; tracker: Tracker; me: string }) {
-  if (!h.said_by) {
-    return (
-      <li className="grid grid-cols-[2rem_1fr] gap-3 text-sm text-muted-foreground">
-        <span className="flex justify-center pt-1.5" aria-hidden="true">
-          <span className="size-2 rounded-full bg-muted-foreground/40" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-foreground">{h.text}</p>
-          {h.detail && h.detail !== h.text && <p className="mt-1 whitespace-pre-wrap">{h.detail}</p>}
-          <time dateTime={h.at} className="font-mono text-xs tabular">
-            {when(h.at)}
-          </time>
-        </div>
-      </li>
-    );
-  }
-  const role =
-    h.said_by === "You" ? null : h.said_by === t.assignee?.name ? "has it" : h.said_by === t.approver?.name ? "approved it" : "Digital team";
-  return (
-    <li className="grid grid-cols-[2rem_1fr] gap-3">
-      <Avatar className="size-8">
-        <AvatarFallback className="bg-muted text-xs font-bold">{initials(h.said_by === "You" ? me : h.said_by)}</AvatarFallback>
-      </Avatar>
-      <div className="min-w-0">
-        <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-          <span className="font-semibold">{h.said_by}</span>
-          {role && <span className="text-muted-foreground">{role}</span>}
-          {h.update && <span className="text-xs font-semibold text-muted-foreground">· Update</span>}
-        </p>
-        <p className="mt-1 rounded-2xl bg-muted/60 px-3 py-2 whitespace-pre-wrap">{h.detail}</p>
-        <time dateTime={h.at} className="mt-1 block font-mono text-xs text-muted-foreground tabular">
-          {when(h.at)}
-        </time>
-      </div>
-    </li>
   );
 }

@@ -72,7 +72,7 @@ async def test_yes_close_it_closes_as_fixed_by_the_submitter(
     ref = await resolved(staff, marc, darlene)
     t = (await staff.post(f"/api/feedback/{ref}/fixed")).json()
     assert t["status"] == "closed" and t["ending"] == "fixed" and t["status_text"] == "Fixed"
-    assert t["history"][0]["text"] == "Sam Lee confirmed it's fixed"
+    assert t["history"][-1]["text"] == "Sam Lee confirmed it's fixed"
     # The question becomes I still have an issue, for REOPEN_DAYS.
     until = datetime.fromisoformat(t["is_it_fixed"]["reopen_until"])
     assert t["is_it_fixed"]["state"] == "closed" and timedelta(days=13) < until - datetime.now(UTC) <= timedelta(
@@ -109,7 +109,7 @@ async def test_a_reply_on_a_resolved_item_no_longer_reopens_it(
 ) -> None:
     ref = await resolved(staff, marc, darlene)
     t = (await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Thanks, I'll try it tomorrow"})).json()
-    assert t["status"] == "resolved" and t["history"][0]["text"] == "You added details"
+    assert t["status"] == "resolved" and t["history"][-1]["text"] == "You added details"
     assert [e.after["status"] for e in await status_events(ref)][-1] == "resolved"
 
 
@@ -122,7 +122,7 @@ async def test_i_still_have_an_issue_reopens_with_the_same_owner(
     assert (await staff.post(issue, json={"body": "  "})).status_code == 400
     t = (await staff.post(issue, json={"body": "Still blank on my phone"})).json()
     assert t["status"] == "in_progress" and t["assignee"]["name"] == "Darlene" and t["is_it_fixed"] is None
-    assert [h["text"] for h in t["history"][:2]] == ["Reopened: Sam Lee still has an issue", "You added details"]
+    assert [h["text"] for h in t["history"][-2:]] == ["You added details", "Reopened: Sam Lee still has an issue"]
     last = (await status_events(ref))[-1]
     assert last.actor_type == "staff" and last.after == {"status": "in_progress", "by": "submitter", "reopened": True}
     told = (await rows(DARLENE, "reopened"))[-1]
@@ -165,7 +165,7 @@ async def test_the_worker_reminds_once_then_closes_as_fixed_by_system(
     assert await run_clock() == (1, 0)
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
     assert t["status"] == "closed" and t["ending"] == "fixed"
-    assert t["history"][0]["text"] == "Closed as fixed: no reply in 7 days"
+    assert t["history"][-1]["text"] == "Closed as fixed: no reply in 7 days"
     assert t["is_it_fixed"]["state"] == "closed"
     last = (await status_events(ref))[-1]
     assert last.actor_type == "system" and last.after["by"] == "system"
@@ -230,6 +230,6 @@ async def test_digital_staff_cant_close_a_resolved_item_and_an_admin_needs_a_rea
     }
     # Staff see who closed it, not the Admin's note.
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
-    assert t["history"][0]["text"] == "Closed as fixed by Marc" and t["close_reason"] is None
+    assert t["history"][-1]["text"] == "Closed as fixed by Marc" and t["close_reason"] is None
     assert "Confirmed by phone" not in str(t)
     assert (await rows(DARLENE, "closed"))[-1].title == f"{ref}: Marc closed it as fixed"

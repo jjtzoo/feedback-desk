@@ -74,8 +74,8 @@ async def test_full_lifecycle_end_to_end(
     assert t["latest_update"]["body"] == "Found the cause; the fix is in testing."
     history = [h["text"] for h in t["history"]]
     # An update shows once: who it's from, then its words (D80).
-    assert history[0] == "Update from Darlene"
-    assert t["history"][0]["detail"] == "Found the cause; the fix is in testing."
+    assert history[-1] == "Update from Darlene"
+    assert t["history"][-1]["detail"] == "Found the cause; the fix is in testing."
     for line in (
         "Expected by Fri 23 Oct",
         "Darlene started work",
@@ -99,14 +99,14 @@ async def test_full_lifecycle_end_to_end(
     assert (await darlene.get("/api/console/counts")).json()["overdue"] == 0
     resolved = (await staff.get(f"/api/feedback/{ref}/tracker")).json()["history"]
     # The Resolve note and the status change are one entry, so the words show once (D80).
-    assert resolved[0] == {
-        "at": resolved[0]["at"],
+    assert resolved[-1] == {
+        "at": resolved[-1]["at"],
         "text": "Resolved by Darlene",
         "detail": "Fix deployed",
         "said_by": None,
         "update": False,
     }
-    assert resolved[1]["text"] != "Update from Darlene" or resolved[1]["detail"] != "Fix deployed"
+    assert resolved[-2]["text"] != "Update from Darlene" or resolved[-2]["detail"] != "Fix deployed"
     # The Windows clock ticks every ~16 ms; the reply must land after the assignee last read it.
     await asyncio.sleep(0.05)
     t = (await staff.post(f"/api/feedback/{ref}/replies", json={"body": "Is it on the app too?"})).json()
@@ -199,15 +199,15 @@ async def test_close_follows_the_state_and_endings_go_to_the_archive(
     assert (await darlene.get("/api/console/items", params={"inbox": "archive", "ending": "x"})).status_code == 400
 
 
-async def test_ask_for_info_keeps_the_item_waiting(staff: httpx.AsyncClient, marc: httpx.AsyncClient) -> None:
+async def test_asking_for_info_is_a_reply_and_keeps_the_item_waiting(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient
+) -> None:
     ref = await raise_bug(staff)
-    r = await marc.post(
-        f"/api/console/items/{ref}/ask-info", json={"question": "Which browser were you using?", "ask": "submitter"}
-    )
+    r = await marc.post(f"/api/console/items/{ref}/reply", json={"body": "Which browser were you using?"})
     assert r.json()["status"] == "awaiting_approval"
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
     assert t["latest_update"]["body"] == "Which browser were you using?"
-    assert "ask_info" in await notes_for(STAFF)
+    assert "reply" in await notes_for(STAFF)
 
 
 async def test_corrections_are_logged_and_reassignment_notifies(

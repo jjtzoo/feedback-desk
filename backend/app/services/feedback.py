@@ -394,7 +394,8 @@ class GeneralView:
 
 def _public_text(e: FeedbackEvent) -> str:
     # Approvals logged before D43 read "Approved by Chris"; staff see "Planned (Chris accepted it)".
-    if e.event_type == "status" and e.after.get("status") == "approved" and e.actor_name:
+    approved_before_d43 = (e.public_text or "").startswith("Approved by")
+    if e.event_type == "status" and e.after.get("status") == "approved" and e.actor_name and approved_before_d43:
         return f"Planned ({e.actor_name} accepted it)"
     # Items classified before D76 read "Classified: Bug, P1, ..."; staff see the word.
     if e.event_type == "classified" and e.public_text:
@@ -494,7 +495,7 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
             history.append(TimelineEntry(e.created_at, f"Resolved by {note.author_name}", note.body))
         else:
             history.append(TimelineEntry(e.created_at, _public_text(e)))
-    history.sort(key=lambda h: h.at, reverse=True)
+    history.sort(key=lambda h: h.at)  # a conversation: oldest first, the newest at the bottom (D105)
     question = None
     if fb.submitter_email == user.email:
         until = reopen_until(fb, status_events)

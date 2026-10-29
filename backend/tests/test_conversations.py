@@ -2,10 +2,13 @@
 holder and the approver, and the team's internal one; an update asks nothing of the person who raised it."""
 
 import httpx
+import pytest
 from sqlalchemy import select
 
+from agent.model import ModelChoice
 from app.db import session_scope
-from app.models import Notification
+from app.models import ModelUsage, Notification
+from app.services import sig_updates, usage
 from tests.conftest import CHRIS, DARLENE, MARC, STAFF, signed_in, submit_via_chat
 
 BUG = "RAKE gives a blank answer about leave, it's annoying"
@@ -38,9 +41,9 @@ async def test_the_tracker_names_the_approver_and_who_said_each_message(
     assert t["approver"] == {"name": "Marc"} and t["assignee"]["name"] == "Darlene"
     said = [(h["said_by"], h["detail"], h["update"]) for h in t["history"] if h["said_by"]]
     assert said == [
-        ("You", "Annual leave", False),
-        ("Darlene", "Which leave type were you asking about?", False),
         ("Darlene", "Reproducing it now", True),
+        ("Darlene", "Which leave type were you asking about?", False),
+        ("You", "Annual leave", False),
     ]
     # Stage changes are not messages, and the team's note never reaches the tracker.
     assert any(h["said_by"] is None for h in t["history"]) and "Index is stale" not in str(t)
@@ -91,3 +94,63 @@ async def test_an_update_asks_nothing_of_the_person_who_raised_it(
     assert told.title == f"Update on {ref}" and told.step == "Update"
     # It's fixed and Still happening are gone; only Resolved asks Is it fixed? (D92).
     assert (await staff.post(f"/api/feedback/{ref}/check", json={"fixed": True})).status_code in (404, 405)
+
+
+async def test_a_reply_to_the_person_who_raised_it_reaches_the_others_on_the_item(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    ref = await started(staff, marc, darlene)
+    assert (await darlene.post(f"/api/console/items/{ref}/reply", json={"body": "Which page?"})).is_success
+    detail = (await marc.get(f"/api/console/items/{ref}")).json()
+    message = next(m for m in detail["messages"] if m["body"] == "Which page?")
+    told = (await rows(MARC, "team_reply"))[-1]
+    assert told.title == f"{ref}: Darlene replied to Sam" and told.link == f"/console?item={ref}&msg={message['id']}"
+    assert await rows(DARLENE, "team_reply") == []  # never about your own reply
+    assert await rows(STAFF, "team_reply") == []  # they get the reply itself
+
+
+async def test_sig_writes_what_the_person_who_raised_it_reads_when_it_moves(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    facts: list[str] = []
+
+    async def generate(model: str, text: str) -> tuple[str, int, int]:
+        facts.append(text)
+        return "Darlene has started on it.", 40, 8
+
+    async def under(_db: object) -> bool:
+        return False
+
+    ref = str((await submit_via_chat(staff, BUG, BUG_ANSWERS))["reference"])
+    # The model is switched on after the chat, which still runs on the stub.
+    monkeypatch.setattr("app.agent_runtime.model_choice", lambda: ModelChoice("gemini", "gemini-test", True, ""))
+    monkeypatch.setattr(sig_updates, "_generate", generate)
+    monkeypatch.setattr(usage, "over_budget", under)
+    await marc.post(f"/api/console/items/{ref}/approve")
+    await darlene.post(f"/api/console/items/{ref}/start")
+
+    t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    assert "Darlene has started on it." in [h["text"] for h in t["history"]]
+    assert "What happened: Work started on it" in facts[-1] and "Working on it: Darlene" in facts[-1]
+    async with session_scope() as db:
+        assert await db.scalar(select(ModelUsage).where(ModelUsage.model == "gemini-test")) is not None
+
+
+async def test_a_failed_or_missing_model_leaves_the_template(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def broken(model: str, text: str) -> tuple[str, int, int]:
+        raise TimeoutError
+
+    async def under(_db: object) -> bool:
+        return False
+
+    ref = str((await submit_via_chat(staff, BUG, BUG_ANSWERS))["reference"])
+    monkeypatch.setattr("app.agent_runtime.model_choice", lambda: ModelChoice("gemini", "gemini-test", True, ""))
+    monkeypatch.setattr(sig_updates, "_generate", broken)
+    monkeypatch.setattr(usage, "over_budget", under)
+    await marc.post(f"/api/console/items/{ref}/approve")
+    await darlene.post(f"/api/console/items/{ref}/start")
+
+    t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    assert "Darlene started work" in [h["text"] for h in t["history"]]
