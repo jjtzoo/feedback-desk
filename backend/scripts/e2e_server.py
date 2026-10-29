@@ -2,12 +2,14 @@
 
     uv run python -m scripts.e2e_server
 
-Playwright starts this itself (web/playwright.config.ts). It recreates the `fd_e2e` database once, so
-the data you click through by hand (database "feedback", port 8001) is never touched, then runs the API
-as a child process. A control port on 127.0.0.1:8012 restarts that process the way a person restarts
-the API (checklist S06.01, S06.07): POST /model {"provider": "none" | "stub"} ends it and starts a new
-one with that MODEL_PROVIDER on the same database; GET /model says which is running. Only stub and none
-are accepted, so a test never reaches Gemini. Port 8000 belongs to another local app; this never uses it.
+Playwright starts this itself (web/playwright.config.ts). It recreates the `fd_e2e` database once (E2E_DATABASE
+names another, one per shard of web/e2e/shards.mjs), so the data you click through by hand (database "feedback",
+port 8001) is never touched, then runs the API as a child process. A control port on 127.0.0.1:8012 restarts
+that process the way a person restarts the API (checklist S06.01, S06.07): POST /model {"provider": "none" |
+"stub"} ends it and starts a new one with that MODEL_PROVIDER on the same database; GET /model says which is
+running. Only stub and none are accepted, so a test never reaches Gemini. POST /reset {"args": [...]} runs
+scripts/e2e_reset.py with those arguments in this process, already started and connected, so the reset before
+each spec file takes a fraction of a second. Port 8000 belongs to another local app; this never uses it.
 """
 
 import asyncio
@@ -25,8 +27,9 @@ from pathlib import Path
 
 from scripts.local_db import start
 
-E2E_DATABASE = "fd_e2e"
-# The defaults; E2E_API_PORT and E2E_CONTROL_PORT move them, so a second worktree can run its own servers.
+# The defaults; E2E_DATABASE, E2E_API_PORT and E2E_CONTROL_PORT move them, so a second worktree or a shard
+# can run its own servers.
+E2E_DATABASE = os.environ.get("E2E_DATABASE", "fd_e2e")
 E2E_PORT = int(os.environ.get("E2E_API_PORT", "8002"))
 CONTROL_PORT = int(os.environ.get("E2E_CONTROL_PORT", "8012"))
 PROVIDERS = ("stub", "none")
@@ -113,6 +116,10 @@ class Api:
 
 
 def _control(api: Api) -> ThreadingHTTPServer:
+    from scripts import e2e_reset
+
+    resetting = threading.Lock()
+
     class Handler(BaseHTTPRequestHandler):
         def _send(self, status: int, data: object) -> None:
             body = json.dumps(data).encode()
@@ -128,16 +135,29 @@ def _control(api: Api) -> ThreadingHTTPServer:
             self._send(200, api.state())
 
         def do_POST(self) -> None:
+            size = int(self.headers.get("Content-Length") or 0)
+            body = json.loads(self.rfile.read(size) or b"{}")
+            if self.path == "/reset":
+                return self._reset([str(a) for a in body.get("args", [])])
             if self.path != "/model":
                 return self._send(404, {})
-            size = int(self.headers.get("Content-Length") or 0)
-            provider = json.loads(self.rfile.read(size) or b"{}").get("provider")
+            provider = body.get("provider")
             if provider not in PROVIDERS:
                 return self._send(400, {"error": f"provider must be one of {PROVIDERS}"})
             try:
                 self._send(200, api.restart(provider))
             except RuntimeError as exc:
                 self._send(500, {"error": str(exc)})
+
+        def _reset(self, args: list[str]) -> None:
+            with resetting:
+                try:
+                    e2e_reset.run(args)
+                except SystemExit:  # argparse refused the arguments
+                    return self._send(400, {"error": f"not e2e_reset arguments: {args}"})
+                except Exception as exc:
+                    return self._send(500, {"error": repr(exc)})
+            self._send(200, {})
 
         def log_message(self, format: str, *args: object) -> None:  # the API's own log is enough
             pass
@@ -165,7 +185,7 @@ def main() -> None:
             "EMAIL_BACKEND": "off",
             # Tests open many chats as the same person; the hourly limit has its own backend test.
             "CHAT_SESSIONS_PER_USER_PER_HOUR": "1000",
-            "STORAGE_DIR": os.path.join(tempfile.gettempdir(), "feedback-e2e-files"),
+            "STORAGE_DIR": os.path.join(tempfile.gettempdir(), f"feedback-e2e-files-{E2E_DATABASE}"),
         }
     )
 

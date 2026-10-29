@@ -4,7 +4,9 @@
     uv run python -m scripts.e2e_reset usage [--email E] [--tokens N] [--cost AUD] [--month-start] | --clear
 
 Each Playwright spec file runs this first (web/e2e/fixtures.ts), so files never depend on each
-other. Only the `fd_e2e` database is touched. Sign-in sessions are kept, so windows a spec has
+other. The tests ask the running test API's supervisor (scripts/e2e_server.py) to do it, which skips
+starting Python and the database each time; the command line above does the same by itself. Only the
+test database is touched (`fd_e2e`, or E2E_DATABASE). Sign-in sessions are kept, so windows a spec has
 already opened stay signed in. `usage` adds the model usage the stub model never records, so the
 spend-limit tests (checklist S22) can reach a limit; `--clear` removes only the rows it added.
 """
@@ -12,6 +14,7 @@ spend-limit tests (checklist S22) can reach a limit; `--clear` removes only the 
 import argparse
 import asyncio
 import os
+import sys
 import uuid
 
 from scripts.e2e_server import E2E_DATABASE
@@ -93,8 +96,8 @@ async def clear_usage() -> None:
     await dispose_engine()
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
+def _arguments() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="scripts.e2e_reset")
     commands = parser.add_subparsers(dest="command")
     usage = commands.add_parser("usage", help="add a chat usage row, or --clear the ones added")
     usage.add_argument("--email")
@@ -102,15 +105,23 @@ def main() -> None:
     usage.add_argument("--cost", type=float, default=0)
     usage.add_argument("--month-start", action="store_true", help="dated at the start of this month, not now")
     usage.add_argument("--clear", action="store_true")
-    args = parser.parse_args()
+    return parser
 
-    os.environ["DATABASE_URL"] = start(database=E2E_DATABASE)
+
+def run(argv: list[str]) -> None:
+    """The command these arguments name, on the database DATABASE_URL points at."""
+    args = _arguments().parse_args(argv)
     if args.command != "usage":
         asyncio.run(reset())
     elif args.clear:
         asyncio.run(clear_usage())
     else:
         asyncio.run(add_usage(args.email, args.tokens, args.cost, args.month_start))
+
+
+def main() -> None:
+    os.environ["DATABASE_URL"] = start(database=E2E_DATABASE)
+    run(sys.argv[1:])
 
 
 if __name__ == "__main__":

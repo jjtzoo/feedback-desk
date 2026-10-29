@@ -1,6 +1,7 @@
 /**
  * Where the browser tests run; shared by playwright.config.ts and the fixtures. E2E_API_PORT,
- * E2E_WEB_PORT and E2E_CONTROL_PORT move them, so a second worktree can run its own servers.
+ * E2E_WEB_PORT and E2E_CONTROL_PORT move them (with E2E_DATABASE for the API), so a second worktree
+ * or a shard (e2e/shards.mjs) runs its own servers.
  */
 export const API_PORT = process.env.E2E_API_PORT ?? "8002";
 export const WEB_PORT = process.env.E2E_WEB_PORT ?? "3100";

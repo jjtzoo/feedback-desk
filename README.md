@@ -94,14 +94,15 @@ cd backend && uv run ruff check . && uv run mypy && uv run pytest
 cd backend && uv run python -m evals.run_routing      # 40-item routing set in its own fresh local database; the gate is judged on Gemini
 cd backend && uv run python -m evals.run_conversations  # 98 conversation cases judged turn by turn, in their own fresh local database (Gemini)
 cd web && npm run lint && npm run build
-cd web && npm run test:e2e                            # browser tests (Playwright) of the manual checklist
+cd web && npm run test:e2e:full                       # browser tests (Playwright) of the manual checklist, in shards at the same time
+cd web && npx playwright test e2e/03-chat.spec.ts     # one spec file
 cd web && npm run test:e2e:coverage                   # which checklist items have a test -> web/e2e/COVERAGE.md, docs/testing/feature-evidence.md
 cd web && npm run test:e2e:mutation -- 04              # shows each test of section 4 fails when its key assertion is broken
 ```
 
 Backend tests need no Docker: they start a throwaway Postgres 16 + pgvector, or use `TEST_DATABASE_URL`.
 
-Browser tests start their own API (port 8002, `backend/scripts/e2e_server.py`, with a supervisor on 8012 that restarts it without a model for S06) and web build (port 3100) on a separate `fd_e2e` database with the scripted stub model, so they never touch the servers on 8001 and 3000. First time only: `cd web && npx playwright install chromium`. Rules for writing them, and the bugs they found: `web/e2e/CLAUDE.md`, `web/e2e/FINDINGS.md`.
+Browser tests start their own API (port 8002, `backend/scripts/e2e_server.py`, with a supervisor on 8012 that restarts it without a model for S06) and web build (port 3100) on a separate `fd_e2e` database with the scripted stub model, so they never touch the servers on 8001 and 3000. The full run (`web/e2e/shards.mjs`) builds the web app once and splits the spec files into shards (2 by default, `E2E_SHARDS` changes it), each with its own API, web server and `fd_e2e_<n>` database on ports 87n2, 37n0 and 87n9, then merges their reports so the coverage step reads one result. First time only: `cd web && npx playwright install chromium`. Rules for writing them, and the bugs they found: `web/e2e/CLAUDE.md`, `web/e2e/FINDINGS.md`.
 
 ## Build and deploy
 
