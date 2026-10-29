@@ -27,7 +27,7 @@ from app.models import (
     ReleaseItem,
     ReleaseItemThanks,
 )
-from app.services import events, notifications
+from app.services import events, notifications, sig_updates
 from app.services.actors import SYSTEM, User
 from app.services.console import require_digital
 from app.services.drafts import first_sentence
@@ -92,10 +92,12 @@ async def _sources(db: AsyncSession, project: Project, start: datetime, end: dat
         )
     )
     for fb in resolved:
+        # Sig words it for staff ("Big PDFs no longer time out"); the item's own words when the model is off (D111).
+        facts = f"Tool: {project.name}\nWork type: {fb.work_type}\nTitle: {fb.title}\nSummary: {fb.summary}"
         out.append(
             {
-                "title": fb.title,
-                "body": first_sentence(fb.summary, 200),
+                "title": (await sig_updates.say(db, fb.title, facts, sig_updates.RELEASE_TITLE))[:200],
+                "body": await sig_updates.say(db, first_sentence(fb.summary, 200), facts, sig_updates.RELEASE_BODY),
                 "work_type": fb.work_type,
                 "source_type": "feedback",
                 "source_id": fb.id,

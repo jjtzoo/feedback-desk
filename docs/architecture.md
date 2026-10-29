@@ -102,7 +102,7 @@ Cloud Run, Artifact Registry, Cloud SQL Admin, Secret Manager, Cloud Storage, Cl
 | --- | --- | --- | --- |
 | Email sending | Cloud Scheduler, every minute | `feedback-worker-<env>` job | Due notification emails |
 | Daily digest | the same job, first run after 8:00 weekdays (Australia/Sydney) | `jobs.run_digest` | Needs review over 24 h to the triage lead; approvals summary to Admins |
-| Friday release drafter | the same job, first run after 9:00 Friday | `jobs.run_release_drafter` | A draft per active project, owner notified |
+| Friday release drafter | the same job, first run after 9:00 Friday | `jobs.run_release_drafter` | A draft per active project, Sig wording each feedback item for staff (the item's own words when the model is off, D111), owner notified |
 | Resolved items (D92) | the same job, every run | `lifecycle.run_clock` | One Is it fixed? reminder after `RESOLVED_REMINDER_DAYS` (3), marked by a `reminded` event; closes as Fixed by System after `RESOLVED_AUTO_CLOSE_DAYS` (7); 100 a run |
 | Embedding backfill | the same job, every run | `embeddings.backfill` | Up to 20 open items whose embedding is missing or from another model; skipped when the chosen model is unreachable |
 
