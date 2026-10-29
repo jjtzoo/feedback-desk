@@ -52,8 +52,8 @@ async function openDueDialog(page: Page, panel: Locator) {
   return dialog;
 }
 
-/** Pick a day on the due date calendar (D79), moving month by month to the one it is in. */
-async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
+/** A day's button on the due date calendar (D79), opening it and moving month by month to the one it is in. */
+async function calendarDay(page: Page, dialog: Locator, iso: string) {
   await dialog.locator("#expected-by").click();
   const d = new Date(`${iso}T00:00:00`);
   const month = d.toLocaleDateString("en-AU", { month: "long" });
@@ -63,8 +63,13 @@ async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
     await page.getByRole("button", { name: back ? /previous month/i : /next month/i }).click();
   }
   // Day buttons are labelled "Monday, 26 October 2026" (with "Today, " in front for today).
-  await grid.getByRole("button", { name: new RegExp(`, ${d.getDate()} ${month} ${d.getFullYear()}$`) }).click();
-  await expect(grid).toHaveCount(0);
+  return grid.getByRole("button", { name: new RegExp(`, ${d.getDate()} ${month} ${d.getFullYear()}$`) });
+}
+
+/** Pick a day on the due date calendar. */
+async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
+  await (await calendarDay(page, dialog, iso)).click();
+  await expect(page.getByRole("grid")).toHaveCount(0);
 }
 
 /** The dialog an action opens over the panel; the panel itself is hidden from the page while it is open. */
@@ -167,12 +172,14 @@ test("S14.04 Expected by yesterday: the card says Overdue in red, the column hea
   const ref = await inProgress(page, team, "afss-portal", "AFSS Portal booking calendar");
   const yesterday = isoDay(-1);
 
+  // The calendar offers no day already gone, so yesterday is set through the API, after the screen shows it can't be picked.
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
   const dialog = await openDueDialog(darlene, panel);
-  await pickExpectedBy(darlene, dialog, yesterday);
-  await submit(dialog).click();
-  await expect(dialog).toHaveCount(0);
+  await expect(await calendarDay(darlene, dialog, yesterday)).toBeDisabled();
+  await darlene.keyboard.press("Escape");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await postJson(darlene, `/console/items/${ref}/update`, { body: "", expected_by: yesterday, due_reason: "Overdue on purpose" });
 
   // Board view, Assigned to me: the In progress column.
   await darlene.request.put("/api/console/view", { data: { view: "board" } });

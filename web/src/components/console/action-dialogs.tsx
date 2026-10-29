@@ -335,6 +335,8 @@ function DuePicker({ id, label, hint, value, onChange }: { id: string; label: st
               mode="single"
               locale={enAU}
               selected={value ? new Date(`${value}T00:00:00`) : undefined}
+              // A due date is still to come: days already gone can't be picked (one already past still shows).
+              disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
               onSelect={(d) => {
                 onChange(d ? isoDay(d) : "");
                 setPicking(false);
