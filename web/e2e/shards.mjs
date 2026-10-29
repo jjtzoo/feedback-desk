@@ -1,7 +1,7 @@
 /**
  * The whole browser suite, split into shards that run at the same time.
  *
- *   npm run test:e2e:full                 E2E_SHARDS shards (default 2)
+ *   npm run test:e2e:full                 E2E_SHARDS shards (default 2, the fastest reliable count measured; e2e/CLAUDE.md)
  *   E2E_SHARDS=3 npm run test:e2e:full
  *
  * The specs share one database and reset it, so they cannot run in parallel inside one Playwright
