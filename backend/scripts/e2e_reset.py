@@ -16,6 +16,9 @@ import asyncio
 import os
 import sys
 import uuid
+from collections.abc import Callable, Coroutine
+from functools import partial
+from typing import Any
 
 from scripts.e2e_server import E2E_DATABASE
 from scripts.local_db import start
@@ -34,7 +37,7 @@ SEEDED = "e2e-seeded"
 async def reset() -> None:
     from sqlalchemy import text
 
-    from app.db import dispose_engine, session_scope
+    from app.db import session_scope
     from app.seed import seed_all
 
     async with session_scope() as db:
@@ -52,7 +55,6 @@ async def reset() -> None:
         await db.execute(text(f"TRUNCATE {tables} CASCADE"))
         await db.execute(text("ALTER SEQUENCE app.feedback_ref_seq RESTART WITH 1"))
         await seed_all(db)
-    await dispose_engine()
 
 
 async def add_usage(email: str | None, tokens: int, cost: float, month_start: bool) -> None:
@@ -61,7 +63,7 @@ async def add_usage(email: str | None, tokens: int, cost: float, month_start: bo
     from zoneinfo import ZoneInfo
 
     from app.config import get_settings
-    from app.db import dispose_engine, session_scope
+    from app.db import session_scope
     from app.models.entities import ModelUsage
 
     row = ModelUsage(
@@ -81,19 +83,17 @@ async def add_usage(email: str | None, tokens: int, cost: float, month_start: bo
         row.created_at = (month + timedelta(minutes=1)).astimezone(UTC)
     async with session_scope() as db:
         db.add(row)
-    await dispose_engine()
 
 
 async def clear_usage() -> None:
     # DELETE, not TRUNCATE, so it never waits on an open notification stream.
     from sqlalchemy import delete
 
-    from app.db import dispose_engine, session_scope
+    from app.db import session_scope
     from app.models.entities import ModelUsage
 
     async with session_scope() as db:
         await db.execute(delete(ModelUsage).where(ModelUsage.session_id == SEEDED))
-    await dispose_engine()
 
 
 def _arguments() -> argparse.ArgumentParser:
@@ -110,13 +110,37 @@ def _arguments() -> argparse.ArgumentParser:
 
 def run(argv: list[str]) -> None:
     """The command these arguments name, on the database DATABASE_URL points at."""
+    from sqlalchemy.exc import DBAPIError
+
     args = _arguments().parse_args(argv)
+    command: Callable[[], Coroutine[Any, Any, None]]
     if args.command != "usage":
-        asyncio.run(reset())
+        command = reset
     elif args.clear:
-        asyncio.run(clear_usage())
+        command = clear_usage
     else:
-        asyncio.run(add_usage(args.email, args.tokens, args.cost, args.month_start))
+        command = partial(add_usage, args.email, args.tokens, args.cost, args.month_start)
+    # A write still in flight from the last spec can deadlock with TRUNCATE, and Postgres cancels one
+    # side; if it is this one, the second try finds the tables free.
+    for attempt in (1, 2):
+        try:
+            asyncio.run(_released(command()))
+            return
+        except DBAPIError as exc:
+            if attempt == 2 or "deadlock detected" not in str(exc):
+                raise
+
+
+async def _released(work: Coroutine[Any, Any, None]) -> None:
+    """Run one command, then let go of the engine even if it failed: the supervisor keeps this process,
+    and a pool left over from a failed run holds connections of a closed event loop, which failed every
+    later reset of that shard."""
+    from app.db import dispose_engine
+
+    try:
+        await work
+    finally:
+        await dispose_engine()
 
 
 def main() -> None:
