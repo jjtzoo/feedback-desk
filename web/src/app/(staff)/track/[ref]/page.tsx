@@ -30,7 +30,7 @@ function shownFiles(files: TrackerFile[]): Shown[] {
 }
 
 /** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, then the conversation with
- *  whoever has it and the approver: one Activity thread, oldest first, Sig's words on each move among the
+ *  whoever has it and the approver: one Conversation, oldest first, Sig's words on each move among the
  *  messages, the message box at the bottom, straight on the page (D105). A resolved item asks the person
  *  who raised it Is it fixed? (D92). A notification about news opens it at the newest entry (#latest,
  *  D81). Anyone else, followers included, gets general information about it instead (D97). */
@@ -195,7 +195,7 @@ export default function TrackerPage() {
   const people = [
     { name: me.name, role: "You" },
     ...(t.assignee ? [{ name: t.assignee.name, role: "has it" }] : []),
-    ...(t.approver && t.approver.name !== t.assignee?.name ? [{ name: t.approver.name, role: "approved it" }] : []),
+    ...(t.approver ? [{ name: t.approver.name, role: "approved it" }] : []),
   ];
   const sentFiles = shownFiles(t.attachments.filter((a) => !a.from_team));
   const teamFiles = shownFiles(t.attachments.filter((a) => a.from_team));
@@ -252,7 +252,7 @@ export default function TrackerPage() {
             {/* The conversation sits straight on the page, not in a card (D105). */}
             <section id="activity" className="grid gap-4" aria-labelledby="activity-heading">
               <h2 id="activity-heading" className="text-lg font-bold">
-                Activity
+                Conversation
               </h2>
               <ThreadPeople people={people} />
               {!t.assignee && <p className="text-sm text-muted-foreground">The Digital team is checking who it belongs to.</p>}

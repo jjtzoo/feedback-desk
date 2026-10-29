@@ -61,7 +61,7 @@ function percent(n: number | undefined) {
   return n === undefined ? "–" : `${Math.round(n * 100)}%`;
 }
 
-/** The detail panel beside the board (brief §4.4): developer brief first, then Activity, the one
+/** The detail panel beside the board (brief §4.4): developer brief first, then Conversation, the one
  *  conversation with the person who raised it, the holder and the approver, internal notes and changes
  *  included (D105), then Files. A notification opens it at its message, briefly highlighted (D81). */
 export function ItemPanel({
@@ -279,7 +279,7 @@ export function ItemPanel({
     ? [
         { name: item.submitter_name, role: "Reporter" },
         ...(holder ? [{ name: holder, role: "Developer · has it" }] : []),
-        ...(approverName && approverName !== holder ? [{ name: approverName, role: "Admin · approved it" }] : []),
+        ...(approverName ? [{ name: approverName, role: "Admin · approved it" }] : []),
       ]
     : [];
   const reply = side === "reply";
@@ -490,7 +490,7 @@ export function ItemPanel({
               <Tabs value={tab} onValueChange={setTab} className="min-w-0">
                 <TabsList className="w-full">
                   <TabsTrigger value="brief">Brief</TabsTrigger>
-                  <TabsTrigger value="activity">Activity ({talk.length})</TabsTrigger>
+                  <TabsTrigger value="activity">Conversation ({talk.length})</TabsTrigger>
                   <TabsTrigger value="files">Files ({item.attachments.length})</TabsTrigger>
                 </TabsList>
 

@@ -633,3 +633,22 @@ test("S13.21 A message to the submitter can carry an image, which shows on their
   await expect(aisha.getByRole("region", { name: "From the team" }).getByRole("img", { name: "fixed.png" })).toBeVisible();
   await expect(aisha.getByRole("region", { name: "What you sent" }).getByRole("img", { name: "fixed.png" })).toHaveCount(0);
 });
+
+test("S13.22 In this conversation names someone with two parts once, with both: the reporter who approved it", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const marc = await team.as("Marc");
+  const ref = await raiseBug(marc, "rake-agent", "RAKE Agent answers stop loading after the first page");
+  await postJson(marc, `/console/items/${ref}/approve`);
+
+  const panel = await openItem(page, ref);
+  await panel.getByRole("tab", { name: "Conversation" }).click();
+  const inPanel = panel.locator("p").filter({ hasText: /^In this conversation/ });
+  await expect(inPanel.getByText("Marc", { exact: true })).toHaveCount(1);
+  await expect(inPanel).toContainText("Reporter · Admin · approved it");
+  await expect(inPanel).toContainText("Developer · has it");
+
+  await marc.goto(`/track/${ref}`);
+  const onTracker = marc.locator("p").filter({ hasText: /^In this conversation/ });
+  await expect(onTracker.getByText("Marc", { exact: true })).toHaveCount(1);
+  await expect(onTracker).toContainText("You · approved it");
+});

@@ -294,7 +294,7 @@ test("S14.08 On a Resolved item Darlene's Status menu has no Close; as Chris, Cl
   await submit(dialog).click();
   await expect(chris.getByText("Saved", { exact: true })).toBeVisible();
   await expect(panel.locator("header").getByText("Fixed", { exact: true })).toBeVisible();
-  await panel.getByRole("tab", { name: "Activity" }).click();
+  await panel.getByRole("tab", { name: "Conversation" }).click();
   await expect(panel.getByRole("region", { name: "History" })).toContainText("Chris · Closed as fixed for them: Tom confirmed it on the phone");
 
   await openTracker(page, ref);

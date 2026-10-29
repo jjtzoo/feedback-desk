@@ -68,18 +68,21 @@ export function ActivityThread({ entries, empty }: { entries: ThreadEntry[]; emp
   );
 }
 
-/** Who is in the conversation, with what they are on the item, above the thread. */
+/** Who is in the conversation, with what they are on the item, above the thread. Someone with two parts,
+ *  such as the person who raised it and approved it, shows once with both. */
 export function ThreadPeople({ people }: { people: { name: string; role?: string }[] }) {
+  const once = new Map<string, string[]>();
+  for (const p of people) once.set(p.name, [...(once.get(p.name) ?? []), ...(p.role ? [p.role] : [])]);
   return (
     <p className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b pb-3 text-sm">
       <span className="text-muted-foreground">In this conversation</span>
-      {people.map((p) => (
-        <span key={p.name} className="inline-flex items-center gap-2">
+      {[...once].map(([name, roles]) => (
+        <span key={name} className="inline-flex items-center gap-2">
           <Avatar className="size-6">
-            <AvatarFallback className="bg-muted text-[10px] font-bold">{initials(p.name)}</AvatarFallback>
+            <AvatarFallback className="bg-muted text-[10px] font-bold">{initials(name)}</AvatarFallback>
           </Avatar>
-          <span className="font-medium">{p.name}</span>
-          {p.role && <span className="text-xs text-muted-foreground">{p.role}</span>}
+          <span className="font-medium">{name}</span>
+          {roles.length > 0 && <span className="text-xs text-muted-foreground">{roles.join(" · ")}</span>}
         </span>
       ))}
     </p>
