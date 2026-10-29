@@ -386,6 +386,9 @@ async def test_needs_review_column_is_for_the_triage_lead(
     assert keys[:2] == ["needs_review", "awaiting_approval"]
     col = (await marc.get("/api/console/board", params={"inbox": "needs_review"})).json()["columns"][0]
     assert col["count"] == 1
+    # Darlene has no Needs review column, so her Triage neither counts nor lists the item.
+    assert (await darlene.get("/api/console/counts")).json()["needs_review"] == 0
+    assert (await darlene.get("/api/console/items", params={"inbox": "needs_review"})).json()["total"] == 0
 
 
 async def test_mute_stops_notifications_for_one_item(staff: httpx.AsyncClient, marc: httpx.AsyncClient) -> None:
