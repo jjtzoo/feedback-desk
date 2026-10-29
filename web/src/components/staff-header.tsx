@@ -33,7 +33,7 @@ export function StaffHeader() {
       <div className="border-b">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
           <Brand />
-          <nav aria-label="Main" className="ml-4 hidden items-center gap-1 md:flex">
+          <nav aria-label="Main" className="ml-4 hidden items-center gap-1 xl:flex">
             {NAV.map((n) => {
               const active = isActive(n.href, path);
               return (
@@ -43,7 +43,7 @@ export function StaffHeader() {
                   data-tour={n.tour}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "rounded-full px-3.5 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                    "rounded-full px-3.5 py-2 text-sm font-semibold whitespace-nowrap text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
                     active && "bg-muted text-foreground",
                   )}
                 >
@@ -70,7 +70,8 @@ export function StaffHeader() {
             </div>
           </div>
         </div>
-        <nav aria-label="Main" className="grid grid-cols-3 gap-1 px-3 pb-2 md:hidden">
+        {/* Below 1280 px the links take their own row, so they never squeeze between the logo and the menus. */}
+        <nav aria-label="Main" className="mx-auto grid max-w-6xl grid-cols-3 gap-1 px-3 pb-2 md:flex md:px-6 xl:hidden">
           {NAV.map((n) => {
             const active = isActive(n.href, path);
             return (
@@ -80,7 +81,7 @@ export function StaffHeader() {
                 data-tour={n.tour}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "grid min-h-11 place-items-center rounded-full px-2 text-center text-[13px] font-semibold whitespace-nowrap text-muted-foreground",
+                  "grid min-h-11 place-items-center rounded-full px-2 text-center text-[13px] font-semibold whitespace-nowrap text-muted-foreground md:px-3.5 md:text-sm",
                   active && "bg-muted text-foreground",
                 )}
               >
