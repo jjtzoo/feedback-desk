@@ -1,11 +1,11 @@
 import type { Locator, Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { openActivity, raiseBug } from "./helpers";
+import { messageBox, openActivity, openTab, raiseBug, trackerConversation } from "./helpers";
 
 // Manual checklist section 26: passwords, card numbers and TFNs are masked before anything is stored.
 // People raise through the API (the backend does the masking) and the results are read on screen: the
-// console's Brief and Conversation tabs and the staff tracker.
+// console's Brief (with the intake transcript) and With <name> tabs, and the staff tracker.
 
 test.beforeAll(resetDatabase);
 
@@ -69,7 +69,15 @@ async function openPanel(page: Page, ref: string) {
   return panel;
 }
 
-/** The Conversation tab's lines. */
+/** The intake transcript, unfolded at the foot of Brief. */
+async function transcript(panel: Locator) {
+  await openTab(panel, "Brief");
+  const region = panel.getByRole("region", { name: "Intake transcript" });
+  await region.locator("summary").click();
+  return region;
+}
+
+/** The Conversation tab's lines (D105). */
 async function conversation(panel: Locator) {
   await openActivity(panel);
   return panel.getByRole("tabpanel");
@@ -78,14 +86,12 @@ async function conversation(panel: Locator) {
 /** Reply on the tracker as the signed-in submitter, then reload so what shows is what was stored. */
 async function replyOnTracker(page: Page, ref: string, text: string) {
   await page.goto(`/track/${ref}`);
-  await page.getByLabel("Reply or add details").fill(text);
-  await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("Added. The owner has been told.")).toBeVisible();
+  await messageBox(page).fill(text);
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByText("Sent", { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const more = page.getByRole("button", { name: /See full history/ });
-  if (await more.count()) await more.click();
-  return page.getByRole("region", { name: "Tracking history" });
+  return trackerConversation(page);
 }
 
 test("S26.01 A chat with a password, card number and TFN shows [password removed], [card number removed] and [TFN removed] in the console transcript and brief", async ({ page, signIn, team }) => {
@@ -99,20 +105,20 @@ test("S26.01 A chat with a password, card number and TFN shows [password removed
   await expectMasked(problem);
   await expectMasked(panel.getByRole("tabpanel"));
 
-  const lines = await conversation(panel);
+  const lines = await transcript(panel);
   const first = lines.getByRole("listitem").filter({ hasText: "The Flipbook login is broken." }).first();
   await expect(first).toContainText("Mei Lin");
   await expectMasked(first);
   await expectMasked(lines);
 });
 
-test("S26.02 The same text in a tracker reply is masked in the console Conversation tab and on the tracker after reload", async ({ page, signIn, team }) => {
+test("S26.02 The same text in a tracker message is masked in the console's Conversation tab and on the tracker after reload", async ({ page, signIn, team }) => {
   await signIn("Grace");
   const ref = await raiseBug(page, "flipbook", "The Flipbook login page shows an error when I sign in");
   const history = await replyOnTracker(page, ref, DESCRIPTION);
 
-  const entry = history.getByRole("listitem").filter({ hasText: "You added details" });
-  await expect(entry).toContainText("The Flipbook login is broken.");
+  const entry = history.getByRole("listitem").filter({ hasText: "The Flipbook login is broken." });
+  await expect(entry).toContainText("You");
   await expectMasked(entry);
   await expectMasked(history);
 
@@ -138,14 +144,14 @@ test("S26.03 An ordinary number such as invoice 20231015 is kept as typed", asyn
 
   // ... in the console transcript ...
   const panel = await openPanel(await team.as("Marc"), ref);
-  const lines = await conversation(panel);
+  const lines = await transcript(panel);
   const typed = lines.getByRole("listitem").filter({ hasText: message });
   await expect(typed).toBeVisible();
   await expect(lines).not.toContainText("removed]");
 
   // ... and in a reply on the tracker, after reload.
   const history = await replyOnTracker(page, ref, "It is the same for invoice 20231015 and 20231016");
-  const entry = history.getByRole("listitem").filter({ hasText: "You added details" });
-  await expect(entry).toContainText("It is the same for invoice 20231015 and 20231016");
+  const entry = history.getByRole("listitem").filter({ hasText: "It is the same for invoice 20231015 and 20231016" });
+  await expect(entry).toContainText("You");
   await expect(entry).not.toContainText("removed]");
 });

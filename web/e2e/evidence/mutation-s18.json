@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-28T03:04:22.927Z",
-  "commit": "a350eec",
+  "ran": "2026-10-29T00:34:19.481Z",
+  "commit": "48ed427",
   "uncommitted": true,
   "spec": "18-approvals.spec.ts",
-  "fingerprint": "502933228a215606",
+  "fingerprint": "a7f180459b995a88",
   "caught": {
     "S18.01": true,
     "S18.02": true,

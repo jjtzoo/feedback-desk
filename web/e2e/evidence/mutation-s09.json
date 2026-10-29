@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-28T00:59:24.472Z",
-  "commit": "ca2e9a8",
+  "ran": "2026-10-29T00:40:28.553Z",
+  "commit": "48ed427",
   "uncommitted": true,
   "spec": "09-reply-reopen.spec.ts",
-  "fingerprint": "21123cd411cb582d",
+  "fingerprint": "a94557822ba92426",
   "caught": {
     "S09.01": true,
     "S09.02": true,
