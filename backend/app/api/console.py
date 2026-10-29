@@ -240,7 +240,7 @@ async def hand_over(ref: str, body: HandOverIn, db: Db, user: DigitalUser) -> De
 
 @router.post("/items/{ref}/update", response_model=DetailOut)
 async def post_update(ref: str, body: UpdateIn, db: Db, user: DigitalUser) -> DetailOut:
-    await console.post_update(db, user, ref, body.body, body.expected_by, body.asks_check, body.due_reason)
+    await console.post_update(db, user, ref, body.body, body.expected_by, body.due_reason)
     return await _detail(db, user, ref)
 
 

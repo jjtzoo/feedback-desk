@@ -99,7 +99,13 @@ async def test_full_lifecycle_end_to_end(
     assert (await darlene.get("/api/console/counts")).json()["overdue"] == 0
     resolved = (await staff.get(f"/api/feedback/{ref}/tracker")).json()["history"]
     # The Resolve note and the status change are one entry, so the words show once (D80).
-    assert resolved[0] == {"at": resolved[0]["at"], "text": "Resolved by Darlene", "detail": "Fix deployed"}
+    assert resolved[0] == {
+        "at": resolved[0]["at"],
+        "text": "Resolved by Darlene",
+        "detail": "Fix deployed",
+        "said_by": None,
+        "update": False,
+    }
     assert resolved[1]["text"] != "Update from Darlene" or resolved[1]["detail"] != "Fix deployed"
     # The Windows clock ticks every ~16 ms; the reply must land after the assignee last read it.
     await asyncio.sleep(0.05)

@@ -165,7 +165,7 @@ async def test_a_follower_hears_the_stages_and_updates_without_names_or_messages
         fb = await db.scalar(select(Feedback).where(Feedback.ref_no == ref))
         assert fb is not None
         first = fb.submitter_name.split()[0]
-    check = {"body": f"Hi {first}, please try it now.", "asks_check": True}
+    check = {"body": f"Hi {first}, please try it now."}
     assert (await darlene.post(f"/api/console/items/{ref}/start")).is_success
     assert (await darlene.post(f"/api/console/items/{ref}/update", json=check)).is_success
     assert (await darlene.post(f"/api/console/items/{ref}/reply", json={"body": "Which leave type?"})).is_success

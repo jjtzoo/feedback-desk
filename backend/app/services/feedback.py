@@ -14,7 +14,6 @@ from sqlalchemy.orm import selectinload
 from app.config import get_settings
 from app.errors import Conflict, Forbidden, NotFound
 from app.models import Attachment, DigitalStaff, Feedback, FeedbackEvent, FeedbackFollower, FeedbackMessage, Project
-from app.models.entities import stamp
 from app.models.enums import CLOSED_STATUSES, OPEN_STATUSES, STAGE_OF, STAGES
 from app.services import embeddings, events, notifications
 from app.services.actors import AGENT, SYSTEM, User
@@ -354,6 +353,10 @@ class TimelineEntry:
     at: datetime
     text: str
     detail: str | None = None
+    # Set on something a person wrote in the conversation: "You" or their name (D100). update marks the
+    # owner's progress updates among the messages.
+    said_by: str | None = None
+    update: bool = False
 
 
 @dataclass
@@ -369,7 +372,7 @@ class TrackerView:
     attachments: list[Attachment]
     can_reply: bool
     muted: bool
-    check: dict[str, Any] | None = None
+    approver: dict[str, str] | None = None
     is_it_fixed: dict[str, Any] | None = None
 
 
@@ -397,17 +400,6 @@ def _public_text(e: FeedbackEvent) -> str:
     if e.event_type == "classified" and e.public_text:
         return re.sub(r"\bP[1-4]\b", lambda m: PRIORITY_WORD[m.group()], e.public_text)
     return e.public_text or ""
-
-
-def open_check(fb: Feedback, messages: list[FeedbackMessage], evs: list[FeedbackEvent]) -> FeedbackMessage | None:
-    """The latest update that asked the person to try it, while the work is in progress and they haven't
-    said whether it's fixed (D80). A resolved item asks Is it fixed? instead (D92). Oldest first."""
-    if fb.status != "in_progress":
-        return None
-    ask = next((m for m in reversed(messages) if m.asks_check), None)
-    if ask is None or any(e.event_type == "checked" and e.created_at > ask.created_at for e in evs):
-        return None
-    return ask
 
 
 async def _status_events(db: AsyncSession, fb: Feedback) -> list[FeedbackEvent]:
@@ -489,11 +481,11 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         if m.message_type == "progress" and note_of is not None:
             notes[note_of] = m
         elif m.message_type == "progress":
-            history.append(TimelineEntry(m.created_at, f"Update from {m.author_name}", m.body))
+            history.append(TimelineEntry(m.created_at, f"Update from {m.author_name}", m.body, m.author_name, True))
         elif m.message_type == "reply":
-            history.append(TimelineEntry(m.created_at, f"Reply from {m.author_name}", m.body))
+            history.append(TimelineEntry(m.created_at, f"Reply from {m.author_name}", m.body, m.author_name))
         elif m.author_email == user.email:
-            history.append(TimelineEntry(m.created_at, "You added details", m.body))
+            history.append(TimelineEntry(m.created_at, "You added details", m.body, "You"))
         else:
             history.append(TimelineEntry(m.created_at, "Another staff member added details"))
     for e in public_events:
@@ -503,7 +495,6 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         else:
             history.append(TimelineEntry(e.created_at, _public_text(e)))
     history.sort(key=lambda h: h.at, reverse=True)
-    ask = open_check(fb, messages, public_events)
     question = None
     if fb.submitter_email == user.email:
         until = reopen_until(fb, status_events)
@@ -523,6 +514,11 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
             "name": fb.assignee.name,
             "role": f"{role} · {fb.project.name} owner" if owns and fb.project else role,
         }
+    # The approver is in the conversation with the holder (D101); name only, as for the holder (D75).
+    approver = None
+    if fb.approved_by:
+        name = await db.scalar(select(DigitalStaff.name).where(DigitalStaff.google_email == fb.approved_by))
+        approver = {"name": name} if name else None
     merged = None
     if fb.duplicate_of:
         target = await db.get(Feedback, fb.duplicate_of)
@@ -544,7 +540,7 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         attachments=files,
         can_reply=fb.status not in CLOSED_STATUSES,
         muted=await notifications.is_muted(db, user.email, fb.id),
-        check={"by": ask.author_name, "body": ask.body, "at": ask.created_at.isoformat()} if ask else None,
+        approver=approver,
         is_it_fixed=question,
     )
 
@@ -602,8 +598,9 @@ def reopen_until(fb: Feedback, status_events: list[FeedbackEvent]) -> datetime |
 
 
 async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedback:
-    """Reply or add details from the tracker. A reply on a Resolved item leaves it Resolved: only
-    I still have an issue reopens it (D92, which changes brief §4.2.7)."""
+    """A comment from the tracker's conversation, told to the holder, the approver and the Digital Staff
+    who wrote to them (D101). A comment on a Resolved item leaves it Resolved: only I still have an issue
+    reopens it (D92, which changes brief §4.2.7)."""
     fb = await _load_for_reporter(db, user, ref_no)
     message_id = uuid.uuid4()
     db.add(
@@ -620,14 +617,15 @@ async def submitter_reply(db: AsyncSession, user: User, ref_no: str, body: str) 
     fb.submitter_replied_at = _now()
     fb.updated_at = _now()
     await notifications.settle(db, fb.id, notifications.ANSWER, f"{fb.ref_no}: you replied", recipient=user.email)
-    await notifications.notify_assignee(
+    await notifications.notify(
         db,
-        fb,
+        await notifications.in_conversation(db, fb, internal=False),
         type="submitter_reply",
-        title=f"{fb.ref_no}: {user.name} added details",
+        title=f"{fb.ref_no}: {user.name} replied",
         body=body.strip(),
+        link=notifications.console_link(fb, message_id),
+        feedback_id=fb.id,
         actor_email=user.email,
-        message_id=message_id,
     )
     await db.flush()
     return await load(db, feedback_id=fb.id)
@@ -644,60 +642,6 @@ async def _load_for_reporter(db: AsyncSession, user: User, ref_no: str) -> Feedb
     if fb.status in CLOSED_STATUSES:
         raise Conflict("closed", "This item is closed. Send a new piece of feedback instead.")
     return fb
-
-
-async def answer_check(db: AsyncSession, user: User, ref_no: str, fixed: bool, comment: str = "") -> Feedback:
-    """The person asked to try an in-progress fix says whether it works (D80): recorded and told to the
-    owner, who resolves it. A resolved item is answered with Is it fixed? instead (D92, lifecycle)."""
-    fb = await _load_for_reporter(db, user, ref_no)
-    messages = list(
-        await db.scalars(
-            select(FeedbackMessage)
-            .where(FeedbackMessage.feedback_id == fb.id)
-            .order_by(FeedbackMessage.created_at, FeedbackMessage.id)
-        )
-    )
-    evs = list(
-        await db.scalars(
-            select(FeedbackEvent).where(FeedbackEvent.feedback_id == fb.id, FeedbackEvent.event_type == "checked")
-        )
-    )
-    if open_check(fb, messages, evs) is None:
-        raise Conflict("no_check", "Nobody has asked you to check this. Reply instead.")
-    message_id = None
-    if comment.strip():
-        message_id = uuid.uuid4()
-        db.add(
-            FeedbackMessage(
-                id=message_id,
-                feedback_id=fb.id,
-                author_type="staff",
-                author_email=user.email,
-                author_name=user.name,
-                message_type="follow_up",
-                body=mask(comment.strip())[:4000],
-                # Stamped now, so their comment sits just before "said it's fixed" in the history.
-                created_at=stamp(),
-            )
-        )
-    said = "it's fixed" if fixed else "it's still happening"
-    events.log(db, fb.id, user.actor, "checked", after={"fixed": fixed}, public_text=f"{user.name} said {said}")
-    fb.submitter_replied_at = _now()
-    fb.updated_at = _now()
-    await notifications.settle(db, fb.id, notifications.ANSWER, f"{fb.ref_no}: you replied", recipient=user.email)
-    await notifications.notify_assignee(
-        db,
-        fb,
-        type="check",
-        title=f"{fb.ref_no}: {user.name} says {said}",
-        body=comment.strip(),
-        actor_email=user.email,
-        message_id=message_id,
-        tab=None if message_id else "activity",
-        step="Confirmed fixed" if fixed else "Still happening",
-    )
-    await db.flush()
-    return await load(db, feedback_id=fb.id)
 
 
 async def project_owner_name(db: AsyncSession, project: Project | None) -> str | None:

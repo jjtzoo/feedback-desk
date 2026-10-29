@@ -15,7 +15,6 @@ from app.models.enums import STAGE_OF
 from app.schemas import (
     AllowanceOut,
     AttachmentOut,
-    CheckIn,
     GeneralOut,
     MuteIn,
     MyItemOut,
@@ -90,7 +89,9 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         expected_by=fb.expected_by,
         assignee=v.assignee,
         latest_update=v.latest_update,
-        history=[TimelineOut(at=h.at, text=h.text, detail=h.detail) for h in v.history],
+        history=[
+            TimelineOut(at=h.at, text=h.text, detail=h.detail, said_by=h.said_by, update=h.update) for h in v.history
+        ],
         close_reason=feedback_service.shown_reason(fb),
         merged_into=v.merged_into,
         attachments=[
@@ -99,7 +100,7 @@ async def _tracker(db: Db, user: CurrentUser, ref: str) -> TrackerOut:
         ],
         can_reply=v.can_reply,
         muted=v.muted,
-        check=v.check,
+        approver=v.approver,
         is_it_fixed=v.is_it_fixed,
     )
 
@@ -148,13 +149,6 @@ async def _general(db: Db, user: CurrentUser, ref: str) -> GeneralOut:
 @router.post("/feedback/{ref}/replies", response_model=TrackerOut)
 async def add_details(ref: str, body: ReplyIn, db: Db, user: CurrentUser) -> TrackerOut:
     await feedback_service.submitter_reply(db, user, ref, body.body)
-    return await _tracker(db, user, ref)
-
-
-@router.post("/feedback/{ref}/check", response_model=TrackerOut)
-async def answer_check(ref: str, body: CheckIn, db: Db, user: CurrentUser) -> TrackerOut:
-    """It's fixed or Still happening, when an update or the Resolve note asked them to check (D80)."""
-    await feedback_service.answer_check(db, user, ref, body.fixed, body.comment)
     return await _tracker(db, user, ref)
 
 

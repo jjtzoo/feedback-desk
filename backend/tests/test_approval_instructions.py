@@ -87,7 +87,7 @@ async def test_moving_the_due_date_after_approval_needs_a_reason_and_tells_the_a
     told = (await rows(MARC, "due_moved"))[-1]
     assert told.title.startswith(f"{ref}: due date moved from ")
     assert told.body == "Darlene: Waiting on the vendor's index fix"
-    assert told.link == f"/console?item={ref}&tab=activity"
+    assert told.link == f"/console?item={ref}&tab=history"
 
     # Staff see the new date, never the reason.
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()

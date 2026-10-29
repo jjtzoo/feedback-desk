@@ -6,7 +6,6 @@ import { enAU } from "react-day-picker/locale";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -111,8 +110,6 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
 export interface ActionResult {
   text: string;
   expectedBy?: string;
-  /** Update: ask them to try it, so their tracker asks whether it's fixed (D80). */
-  asksCheck?: boolean;
   /** Approve: the priority, confirmed or changed (D93). */
   priority?: string;
   /** Update: why the due date moved, for the Digital team only (D94). */
@@ -154,7 +151,6 @@ export function ActionDialog({
   const [expectedBy, setExpectedBy] = useState(kind === "approve" ? (due ?? "") : "");
   const [newPriority, setNewPriority] = useState(priority ?? "");
   const [dueReason, setDueReason] = useState("");
-  const [asksCheck, setAsksCheck] = useState(false);
   const [ending, setEnding] = useState<CloseEnding | null>(null);
   const [ask, setAsk] = useState<"submitter" | "owner">("submitter");
   const [to, setTo] = useState("");
@@ -191,15 +187,10 @@ export function ActionDialog({
       setError("Say why the due date moved.");
       return;
     }
-    if (kind === "update" && asksCheck && !text.trim()) {
-      setError("Say what to check.");
-      return;
-    }
     setBusy(true);
     const ok = await onSubmit(kind, {
       text: text.trim(),
       expectedBy: expectedBy || undefined,
-      asksCheck,
       priority: newPriority || undefined,
       dueReason: moving ? dueReason.trim() : undefined,
       ending: ending ?? undefined,
@@ -211,7 +202,6 @@ export function ActionDialog({
       setText("");
       setExpectedBy("");
       setDueReason("");
-      setAsksCheck(false);
       setEnding(null);
       setError(null);
       onClose();
@@ -256,13 +246,6 @@ export function ActionDialog({
             <Input id="due-reason" value={dueReason} maxLength={500} onChange={(e) => setDueReason(e.target.value)} className="h-11 rounded-xl" />
           </div>
         )}
-        <Label className="mt-2 flex items-start gap-2 font-normal">
-          <Checkbox checked={asksCheck} onCheckedChange={(v) => setAsksCheck(v === true)} className="mt-0.5" />
-          <span>
-            Ask them to check it
-            <span className="block text-muted-foreground">Their tracker asks whether it&apos;s fixed, with It&apos;s fixed and Still happening.</span>
-          </span>
-        </Label>
       </div>
     );
   } else if (kind === "close") {

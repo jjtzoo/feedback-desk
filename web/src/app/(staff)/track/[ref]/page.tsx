@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, BellOff, Check, Loader2, Paperclip, Send } from "lucide-react";
+import { Bell, BellOff, Loader2, Paperclip, Send } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -10,17 +10,18 @@ import { ACCEPT, FileThumbs, PhotoButton, ScreenshotNote, isImage, pastedImages,
 import { PriorityBadge } from "@/components/badges";
 import { GeneralView } from "@/components/general-view";
 import { IsItFixed } from "@/components/is-it-fixed";
+import { useMe } from "@/components/me";
 import { StageStepper } from "@/components/stage-stepper";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { api, ApiError, errorText, type Attachment, type GeneralItem, type Tracker, type TrackerFile } from "@/lib/api";
+import { api, ApiError, errorText, type Attachment, type GeneralItem, type TimelineEntry, type Tracker, type TrackerFile } from "@/lib/api";
 import { day, initials, isSettled, when } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const PREVIEW_ENTRIES = 4;
+const PREVIEW_ENTRIES = 5;
 
 /** Files already on the item, with images as thumbnails that open the full file (D95). */
 function shownFiles(files: TrackerFile[]): Shown[] {
@@ -30,13 +31,15 @@ function shownFiles(files: TrackerFile[]): Shown[] {
   });
 }
 
-/** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, who has it,
- *  the latest update, and the full history newest first. A resolved item asks the person who
- *  raised it Is it fixed? (D92); an update asking them to try a fix in progress comes first with
- *  It's fixed and Still happening (D80). A notification about news opens it at #latest (D81). Anyone else,
- *  followers included, gets general information about it instead (D97). */
+/** The parcel-style tracker (brief §4.2): status up top, a five-stage stepper, who has it, the latest
+ *  update, and one Activity feed, newest first, where the conversation with whoever has it and the
+ *  approver sits with the stage changes, the comment box at its top (D100, after the JSM portal request).
+ *  A resolved item asks the person who raised it Is it fixed? (D92); an update asks nothing (D102). A
+ *  notification about news opens it at #latest (D81). Anyone else, followers included, gets general
+ *  information about it instead (D97). */
 export default function TrackerPage() {
   const { ref } = useParams<{ ref: string }>();
+  const me = useMe();
   const [t, setT] = useState<Tracker | null>(null);
   const [general, setGeneral] = useState<GeneralItem | null>(null);
   const [error, setError] = useState<{ notFound: boolean; text: string } | null>(null);
@@ -45,9 +48,8 @@ export default function TrackerPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [muteError, setMuteError] = useState<string | null>(null);
-  const [comment, setComment] = useState("");
-  const [answering, setAnswering] = useState<"fixed" | "still" | null>(null);
-  const [answerError, setAnswerError] = useState<string | null>(null);
+  // The comment box is one line until they use it.
+  const [writing, setWriting] = useState(false);
   // Only the skeleton renders before the item loads, so reading the address here can't upset hydration.
   const [pointed, setPointed] = useState(() => typeof window !== "undefined" && window.location.hash === "#latest");
   // Files to send with the reply, each with a local preview if it's an image.
@@ -102,20 +104,6 @@ export default function TrackerPage() {
     return () => clearTimeout(timer);
   }, [loaded]);
 
-  async function answer(fixed: boolean) {
-    setAnswering(fixed ? "fixed" : "still");
-    setAnswerError(null);
-    try {
-      setT(await api.post<Tracker>(`/feedback/${ref}/check`, { fixed, comment }));
-      setComment("");
-      toast.success(fixed ? "Thanks. The owner has been told it's fixed." : "Thanks. It's back with the owner.");
-    } catch (err) {
-      setAnswerError(errorText(err, "We couldn't send that. Please try again."));
-    } finally {
-      setAnswering(null);
-    }
-  }
-
   async function sendReply(e: FormEvent) {
     e.preventDefault();
     if (!reply.trim() && adding.length === 0) return;
@@ -132,7 +120,8 @@ export default function TrackerPage() {
       }
       setT(reply.trim() ? await api.post<Tracker>(`/feedback/${ref}/replies`, { body: reply }) : await api.get<Tracker>(`/feedback/${ref}/tracker`));
       setReply("");
-      toast.success("Added. The owner has been told.");
+      setWriting(false);
+      toast.success("Sent");
     } catch (err) {
       setSendError(errorText(err, "We couldn't send that. Your reply is still here, so you can try again."));
     } finally {
@@ -198,6 +187,11 @@ export default function TrackerPage() {
   const sentFiles = shownFiles(t.attachments.filter((a) => !a.from_team));
   const teamFiles = shownFiles(t.attachments.filter((a) => a.from_team));
   const toAdd: Shown[] = adding.map((a, i) => ({ key: String(i), name: a.file.name, size: a.file.size, src: a.src }));
+  // Who reads what they write: whoever has it and the approver (D101).
+  const readers = [
+    t.assignee && `${t.assignee.name}, who has it`,
+    t.approver && t.approver.name !== t.assignee?.name && `${t.approver.name}, who approved it`,
+  ].filter((r): r is string => Boolean(r));
   return (
     <div className="pb-12">
       {/* Mockup E: charcoal status band with red highlights. */}
@@ -282,35 +276,9 @@ export default function TrackerPage() {
 
           <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-6">
             <IsItFixed tracker={t} onChange={setT} />
-            {t.check && (
-              <section id="latest" className={cn("rounded-3xl border-2 border-foreground bg-card p-5 shadow-card transition-shadow", pointed && "ring-2 ring-ring")} aria-labelledby="check">
-                <h2 id="check" className="font-semibold">
-                  {t.check.by ?? "The team"} asked you to check this
-                </h2>
-                <p className="mt-2 whitespace-pre-wrap">{t.check.body}</p>
-                <p className="mt-2 text-sm text-muted-foreground">{when(t.check.at)}</p>
-                <label htmlFor="check-comment" className="mt-4 block text-sm font-medium">
-                  Comment (optional)
-                </label>
-                <Textarea id="check-comment" rows={2} value={comment} maxLength={4000} onChange={(e) => setComment(e.target.value)} className="mt-1 rounded-xl text-base" />
-                {answerError && (
-                  <p className="mt-2 text-sm text-destructive" role="alert">
-                    {answerError}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Button className="h-11 rounded-xl px-5" disabled={answering !== null} onClick={() => void answer(true)}>
-                    {answering === "fixed" ? <Loader2 className="animate-spin" /> : <Check />} It&apos;s fixed
-                  </Button>
-                  <Button variant="outline" className="h-11 rounded-xl px-5" disabled={answering !== null} onClick={() => void answer(false)}>
-                    {answering === "still" && <Loader2 className="animate-spin" />} Still happening
-                  </Button>
-                </div>
-              </section>
-            )}
 
-            {t.latest_update && t.latest_update.at !== t.check?.at && (
-              <section id={t.check ? undefined : "latest"} className={cn("rounded-3xl border bg-card p-5 shadow-card transition-shadow", pointed && !t.check && "ring-2 ring-ring")} aria-labelledby="latest-heading">
+            {t.latest_update && (
+              <section id="latest" className={cn("rounded-3xl border bg-card p-5 shadow-card transition-shadow", pointed && "ring-2 ring-ring")} aria-labelledby="latest-heading">
                 <h2 id="latest-heading" className="text-sm font-semibold text-muted-foreground">
                   Latest update
                 </h2>
@@ -330,97 +298,127 @@ export default function TrackerPage() {
               </section>
             )}
 
-            <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="history">
-              <h2 id="history" className="text-sm font-semibold text-muted-foreground">
-                Tracking history
+            <section id="activity" className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="activity-heading">
+              <h2 id="activity-heading" className="text-sm font-semibold text-muted-foreground">
+                Activity
               </h2>
-              <ol className="mt-4">
-                {history.map((h, i) => (
-                  <li key={`${h.at}-${i}`} className="relative grid grid-cols-[1.25rem_1fr] gap-3 pb-5 last:pb-0">
-                    {i < history.length - 1 && <span className="absolute top-4 left-[9px] h-full w-0.5 bg-border" aria-hidden="true" />}
-                    <span
-                      className={cn("relative mt-1 size-[18px] rounded-full border-4 border-card", i === 0 ? "bg-foreground" : "bg-muted-foreground/40")}
-                      aria-hidden="true"
-                    />
-                    <div className={cn(i > 0 && "text-muted-foreground")}>
-                      <p className={cn(i === 0 && "font-semibold")}>{h.text}</p>
-                      {h.detail && h.detail !== h.text && <p className="mt-1 text-sm whitespace-pre-wrap">{h.detail}</p>}
-                      <time dateTime={h.at} className="font-mono text-xs tabular">
-                        {when(h.at)}
-                      </time>
+              {t.can_reply && (
+                <form onSubmit={sendReply} className="mt-3 grid gap-2">
+                  <label htmlFor="reply" className="text-sm text-muted-foreground">
+                    {readers.length > 0 ? `Your messages go to ${readers.join(" and ")}.` : "Your messages go to the Digital team."}
+                  </label>
+                  <Textarea
+                    id="reply"
+                    rows={1}
+                    value={reply}
+                    maxLength={4000}
+                    placeholder="Add a comment or more details"
+                    onFocus={() => setWriting(true)}
+                    onChange={(e) => setReply(e.target.value)}
+                    onPaste={(e) => {
+                      const images = pastedImages(e);
+                      if (images.length === 0) return;
+                      e.preventDefault();
+                      setWriting(true);
+                      pick(images);
+                    }}
+                    className={cn("rounded-xl text-base", writing ? "min-h-24" : "min-h-11")}
+                  />
+                  {toAdd.length > 0 && (
+                    <div className="grid gap-2">
+                      <FileThumbs files={toAdd} onRemove={unpick} />
+                      <ScreenshotNote files={toAdd} />
                     </div>
-                  </li>
+                  )}
+                  {sendError && (
+                    <p className="text-sm text-destructive" role="alert">
+                      {sendError}
+                    </p>
+                  )}
+                  {writing && (
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button type="submit" className="h-11 rounded-xl px-5" disabled={sending || (!reply.trim() && adding.length === 0)}>
+                          {sending ? <Loader2 className="animate-spin" /> : <Send />} Send
+                        </Button>
+                        <input
+                          ref={fileInput}
+                          type="file"
+                          accept={ACCEPT}
+                          multiple
+                          className="sr-only"
+                          tabIndex={-1}
+                          aria-hidden="true"
+                          data-testid="reply-files"
+                          onChange={(e) => {
+                            pick(Array.from(e.target.files ?? []));
+                            e.target.value = "";
+                          }}
+                        />
+                        <Button type="button" variant="ghost" className="h-11 rounded-xl" disabled={sending} onClick={() => fileInput.current?.click()}>
+                          <Paperclip /> Attach a file
+                        </Button>
+                        <PhotoButton className="h-11 rounded-xl" disabled={sending} onFiles={pick} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">You can also paste a screenshot into the box.</p>
+                    </>
+                  )}
+                </form>
+              )}
+              <ol className="mt-5 grid gap-4">
+                {history.map((h, i) => (
+                  <ActivityEntry key={`${h.at}-${i}`} entry={h} tracker={t} me={me.name} />
                 ))}
               </ol>
               {t.history.length > PREVIEW_ENTRIES && (
                 <Button variant="link" className="mt-2 h-auto min-h-11 px-0" onClick={() => setShowAll((s) => !s)}>
-                  {showAll ? "Show less" : `See full history (${t.history.length})`}
+                  {showAll ? "Show less" : `See all activity (${t.history.length})`}
                 </Button>
               )}
             </section>
-
-            {t.can_reply && (
-              <form onSubmit={sendReply} className="rounded-3xl border bg-card p-5 shadow-card">
-                <label htmlFor="reply" className="text-sm font-semibold">
-                  Reply or add details
-                </label>
-                <p className="text-sm text-muted-foreground">
-                  The owner is notified straight away.
-                </p>
-                <Textarea
-                  id="reply"
-                  rows={3}
-                  value={reply}
-                  maxLength={4000}
-                  onChange={(e) => setReply(e.target.value)}
-                  onPaste={(e) => {
-                    const images = pastedImages(e);
-                    if (images.length === 0) return;
-                    e.preventDefault();
-                    pick(images);
-                  }}
-                  className="mt-3 rounded-xl text-base"
-                />
-                {toAdd.length > 0 && (
-                  <div className="mt-3 grid gap-2">
-                    <FileThumbs files={toAdd} onRemove={unpick} />
-                    <ScreenshotNote files={toAdd} />
-                  </div>
-                )}
-                {sendError && (
-                  <p className="mt-2 text-sm text-destructive" role="alert">
-                    {sendError}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button type="submit" className="h-11 rounded-xl px-5" disabled={sending || (!reply.trim() && adding.length === 0)}>
-                    {sending ? <Loader2 className="animate-spin" /> : <Send />} Send
-                  </Button>
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    accept={ACCEPT}
-                    multiple
-                    className="sr-only"
-                    tabIndex={-1}
-                    aria-hidden="true"
-                    data-testid="reply-files"
-                    onChange={(e) => {
-                      pick(Array.from(e.target.files ?? []));
-                      e.target.value = "";
-                    }}
-                  />
-                  <Button type="button" variant="ghost" className="h-11 rounded-xl" disabled={sending} onClick={() => fileInput.current?.click()}>
-                    <Paperclip /> Attach a file
-                  </Button>
-                  <PhotoButton className="h-11 rounded-xl" disabled={sending} onFiles={pick} />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">You can also paste a screenshot into the box.</p>
-              </form>
-            )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** One Activity entry: something a person wrote, with who they are on the item, or a stage change (D100). */
+function ActivityEntry({ entry: h, tracker: t, me }: { entry: TimelineEntry; tracker: Tracker; me: string }) {
+  if (!h.said_by) {
+    return (
+      <li className="grid grid-cols-[2rem_1fr] gap-3 text-sm text-muted-foreground">
+        <span className="flex justify-center pt-1.5" aria-hidden="true">
+          <span className="size-2 rounded-full bg-muted-foreground/40" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-foreground">{h.text}</p>
+          {h.detail && h.detail !== h.text && <p className="mt-1 whitespace-pre-wrap">{h.detail}</p>}
+          <time dateTime={h.at} className="font-mono text-xs tabular">
+            {when(h.at)}
+          </time>
+        </div>
+      </li>
+    );
+  }
+  const role =
+    h.said_by === "You" ? null : h.said_by === t.assignee?.name ? "has it" : h.said_by === t.approver?.name ? "approved it" : "Digital team";
+  return (
+    <li className="grid grid-cols-[2rem_1fr] gap-3">
+      <Avatar className="size-8">
+        <AvatarFallback className="bg-muted text-xs font-bold">{initials(h.said_by === "You" ? me : h.said_by)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
+          <span className="font-semibold">{h.said_by}</span>
+          {role && <span className="text-muted-foreground">{role}</span>}
+          {h.update && <span className="text-xs font-semibold text-muted-foreground">· Update</span>}
+        </p>
+        <p className="mt-1 rounded-2xl bg-muted/60 px-3 py-2 whitespace-pre-wrap">{h.detail}</p>
+        <time dateTime={h.at} className="mt-1 block font-mono text-xs text-muted-foreground tabular">
+          {when(h.at)}
+        </time>
+      </div>
+    </li>
   );
 }

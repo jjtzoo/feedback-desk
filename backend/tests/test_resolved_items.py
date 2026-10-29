@@ -56,7 +56,7 @@ async def test_resolve_asks_the_person_who_raised_it_and_the_email_carries_both_
 ) -> None:
     ref = await resolved(staff, marc, darlene)
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
-    assert t["is_it_fixed"]["state"] == "resolved" and t["is_it_fixed"]["reopen_until"] is None and t["check"] is None
+    assert t["is_it_fixed"]["state"] == "resolved" and t["is_it_fixed"]["reopen_until"] is None
     closes = datetime.fromisoformat(t["is_it_fixed"]["closes_at"])
     assert timedelta(days=6, hours=23) < closes - datetime.now(UTC) <= timedelta(days=7)
     asked = (await rows(STAFF, "is_it_fixed"))[-1]
@@ -127,7 +127,7 @@ async def test_i_still_have_an_issue_reopens_with_the_same_owner(
     assert last.actor_type == "staff" and last.after == {"status": "in_progress", "by": "submitter", "reopened": True}
     told = (await rows(DARLENE, "reopened"))[-1]
     assert told.title == f"{ref} reopened: Sam Lee still has an issue" and told.body == "Still blank on my phone"
-    assert "&tab=activity&msg=" in told.link and told.step == "Reopened"
+    assert "&msg=" in told.link and told.step == "Reopened"
     # Not resolved any more: nothing to answer, and the file goes through the usual upload.
     assert (await staff.post(issue, json={"body": "again"})).status_code == 409
     up = await staff.post(
