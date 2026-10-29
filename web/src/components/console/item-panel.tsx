@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, CircleHelp, FileText, ImagePlus, Lock, TrendingUp, Users } from "lucide-react";
+import { ChevronDown, ChevronUp, CircleHelp, Copy, FileText, ImagePlus, Lock, TrendingUp, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 
@@ -457,6 +457,40 @@ export function ItemPanel({
             </header>
 
             <div className="grid gap-5 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_17rem]">
+              {/* A likely duplicate decides what happens to the whole item, so it sits above the tabs, marked while
+                  the item is open; merging is still always a person's choice (F8). */}
+              {(item.duplicates.length > 0 || item.linked.length > 0 || item.merged_into) && (
+                <section
+                  aria-label="Duplicates"
+                  className={cn("order-first grid gap-2 rounded-2xl border p-4 lg:col-span-2", open && item.duplicates.length > 0 && "border-warning bg-warning-tint")}
+                >
+                  {item.duplicates.length > 0 && (
+                    <p className="flex items-center gap-2 text-sm font-semibold">
+                      <Copy className="size-4" aria-hidden="true" /> Possible duplicates
+                    </p>
+                  )}
+                  {item.merged_into && <p className="text-sm">Merged into {item.merged_into}.</p>}
+                  {item.linked.length > 0 && <p className="text-sm text-muted-foreground">Merged here: {item.linked.join(", ")}</p>}
+                  {item.duplicates.map((d) => (
+                    <div key={d.reference} className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                      <span>
+                        <span className="font-mono font-semibold">{d.reference}</span> · {d.title} · <strong>{Math.round(d.similarity * 100)}% similar</strong>
+                      </span>
+                      {/* From either item: the server always closes the newer one into the first report. */}
+                      {open && (
+                        <Button className="h-10 rounded-xl px-5" disabled={busy} onClick={() => setDialog({ kind: "merge", text: d.reference })}>
+                          Merge
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  {open && (
+                    <Button variant="link" className="justify-self-start px-0" onClick={() => setDialog({ kind: "merge" })}>
+                      Merge with another reference…
+                    </Button>
+                  )}
+                </section>
+              )}
               <aside aria-label="Properties" className="order-first grid content-start gap-3 lg:sticky lg:top-44 lg:order-last lg:self-start">
                 <p className="text-sm font-semibold">Properties (corrections are logged)</p>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
@@ -503,31 +537,6 @@ export function ItemPanel({
                 </TabsList>
 
                 <TabsContent value="brief" className="grid gap-5 pt-3">
-                {(item.duplicates.length > 0 || item.linked.length > 0 || item.merged_into) && (
-                  <section className="grid gap-2 rounded-2xl border p-4" aria-label="Duplicates">
-                    <p className="text-sm font-semibold">Possible duplicates</p>
-                    {item.merged_into && <p className="text-sm">Merged into {item.merged_into}.</p>}
-                    {item.linked.length > 0 && <p className="text-sm text-muted-foreground">Merged here: {item.linked.join(", ")}</p>}
-                    {item.duplicates.map((d) => (
-                      <div key={d.reference} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                        <span>
-                          <span className="font-mono font-semibold">{d.reference}</span> · {d.title} · {Math.round(d.similarity * 100)}% similar
-                        </span>
-                        {/* From either item: the server always closes the newer one into the first report. */}
-                        {open && (
-                          <Button variant="outline" size="sm" disabled={busy} onClick={() => setDialog({ kind: "merge", text: d.reference })}>
-                            Merge
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    {open && (
-                      <Button variant="link" className="justify-self-start px-0" onClick={() => setDialog({ kind: "merge" })}>
-                        Merge with another reference…
-                      </Button>
-                    )}
-                  </section>
-                )}
                 {item.ai_recommendation?.decision && (
                   <p className="rounded-2xl bg-muted p-3 text-sm">
                     <strong>Recommendation: {recommendationText(item.ai_recommendation, item.effort, item.impact).head}.</strong>{" "}
