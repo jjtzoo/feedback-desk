@@ -583,6 +583,9 @@ class ReleaseItemOut(Out):
     source_id: uuid.UUID | None
     visible_to_staff: bool
     yours: bool = False
+    # 👍 Thanks: how many, and whether this person gave one (D110).
+    thanks: int = 0
+    thanked: bool = False
 
 
 class ReleaseOut(Out):

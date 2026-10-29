@@ -44,7 +44,7 @@ TABLES = {
 
 async def test_health(anon: httpx.AsyncClient) -> None:
     body = (await anon.get("/api/health")).json()
-    assert body["database"] == "ok" and body["migration"] == "0007"
+    assert body["database"] == "ok" and body["migration"] == "0008"
     assert body["model"]["provider"] == "stub" and body["environment"] == "test"
 
 

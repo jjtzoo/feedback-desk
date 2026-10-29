@@ -247,7 +247,9 @@ async def whats_new(db: Db, user: CurrentUser) -> list[ReleaseOut]:
     mine = set(await db.scalars(select(Feedback.id).where(Feedback.submitter_email == user.email)))
     mine |= set(await db.scalars(select(FeedbackFollower.feedback_id).where(FeedbackFollower.email == user.email)))
     out = []
-    for release, project, items in await releases.whats_new(db):
+    published = await releases.whats_new(db)
+    counts, thanked = await releases.thanks_for(db, [i.id for _, _, items in published for i in items], user.email)
+    for release, project, items in published:
         out.append(
             ReleaseOut(
                 id=release.id,
@@ -265,9 +267,23 @@ async def whats_new(db: Db, user: CurrentUser) -> list[ReleaseOut]:
                         source_id=None,
                         visible_to_staff=True,
                         yours=i.source_type == "feedback" and i.source_id in mine,
+                        thanks=counts.get(i.id, 0),
+                        thanked=i.id in thanked,
                     )
                     for i in items
                 ],
             )
         )
     return out
+
+
+@router.put("/whats-new/items/{item_id}/thanks", status_code=204)
+async def thank(item_id: uuid.UUID, db: Db, user: CurrentUser) -> Response:
+    await releases.set_thanks(db, item_id, user.email, True)
+    return Response(status_code=204)
+
+
+@router.delete("/whats-new/items/{item_id}/thanks", status_code=204)
+async def unthank(item_id: uuid.UUID, db: Db, user: CurrentUser) -> Response:
+    await releases.set_thanks(db, item_id, user.email, False)
+    return Response(status_code=204)

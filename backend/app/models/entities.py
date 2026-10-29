@@ -393,6 +393,17 @@ class ReleaseItem(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
+class ReleaseItemThanks(Base):
+    """A 👍 Thanks on a published Fixes and updates item: one per person, shown as a count only (D110)."""
+
+    __tablename__ = "release_item_thanks"
+    __table_args__ = (PrimaryKeyConstraint("release_item_id", "email"),)
+
+    release_item_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("release_items.id"))
+    email: Mapped[str] = mapped_column(String(320))
+    created_at: Mapped[datetime] = _now()
+
+
 class UserSession(Base):
     """Sign-in session for anyone (Staff, Digital Staff, Admin). The cookie holds the id."""
 

@@ -1,6 +1,9 @@
 "use client";
 
+import { ThumbsUp } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, errorText, type Release, type ReleaseItem } from "@/lib/api";
@@ -28,6 +31,25 @@ export default function WhatsNewPage() {
 
   const projects = useMemo(() => [...new Map((releases ?? []).map((r) => [r.project.slug, r.project.name])).entries()], [releases]);
   const shown = (releases ?? []).filter((r) => project === "all" || r.project.slug === project);
+
+  /** Give or take back a 👍 Thanks; the count moves at once and goes back if the call fails (D110). */
+  async function thank(item: ReleaseItem) {
+    const on = !item.thanked;
+    const set = (thanked: boolean, by: number) =>
+      setReleases((all) =>
+        (all ?? []).map((r) => ({
+          ...r,
+          items: r.items.map((i) => (i.id === item.id ? { ...i, thanked, thanks: Math.max(0, (i.thanks ?? 0) + by) } : i)),
+        })),
+      );
+    set(on, on ? 1 : -1);
+    try {
+      await (on ? api.put(`/whats-new/items/${item.id}/thanks`, {}) : api.del(`/whats-new/items/${item.id}/thanks`));
+    } catch (e) {
+      set(!on, on ? -1 : 1);
+      toast.error(errorText(e));
+    }
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
@@ -81,6 +103,23 @@ export default function WhatsNewPage() {
                           )}
                         </p>
                         {i.body && <p className="text-sm text-muted-foreground">{i.body}</p>}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1 text-sm">
+                          <button
+                            type="button"
+                            aria-pressed={!!i.thanked}
+                            onClick={() => void thank(i)}
+                            className={`inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 font-medium ${i.thanked ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted"}`}
+                          >
+                            <ThumbsUp className="size-4" aria-hidden="true" />
+                            Thanks{i.thanks ? <span className="font-mono text-xs tabular"> · {i.thanks}</span> : null}
+                          </button>
+                          {key === "fix" && (
+                            // A fix that hasn't worked for someone becomes new feedback, with the tool already picked.
+                            <Link href={`/chat?project=${r.project.slug}`} className="inline-flex min-h-9 items-center rounded-full px-2.5 text-muted-foreground underline-offset-4 hover:underline">
+                              Still happening?
+                            </Link>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
