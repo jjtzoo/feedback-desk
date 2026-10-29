@@ -249,8 +249,18 @@ export async function answerUntilCard(page: Page) {
   await expect(page.getByRole("button", { name: "Confirm" })).toBeVisible();
 }
 
-/** Open the console panel's Conversation tab, showing everything, only messages or only history. */
-export async function openActivity(panel: Locator, show: "All" | "Messages" | "History" = "All") {
+/** Open the console panel's Conversation tab: one thread, oldest first, messages and changes together (D105). */
+export async function openActivity(panel: Locator) {
   await panel.getByRole("tab", { name: "Conversation" }).click();
-  await panel.getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: show, exact: true }).click();
 }
+
+/** Open the console panel's Brief or Files tab; the intake transcript is folded at the foot of Brief. */
+export async function openTab(panel: Locator, tab: "Brief" | "Files") {
+  await panel.getByRole("tab", { name: tab === "Brief" ? /^Brief$/ : /^Files \(/ }).click();
+}
+
+/** The tracker's message box, at the bottom of the Conversation (D105). */
+export const messageBox = (page: Page) => page.getByPlaceholder("Write a message or add details");
+
+/** The tracker's Conversation: one thread, oldest first, every entry on the page. */
+export const trackerConversation = (page: Page) => page.locator("section#activity");

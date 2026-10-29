@@ -1,7 +1,7 @@
 {
   "S15.01": ["not.toContainText(\"cache key is wrong\")", "toContainText(\"cache key is wrong\")"],
-  "S15.02": ["\"Reply from Darlene\"", "\"Reply from Darlenex\""],
-  "S15.03": ["`Update from Darlene${update}`", "`Update: ${update}`"],
+  "S15.02": ["has it/)", "has itx/)"],
+  "S15.03": ["has it/)", "has itx/)"],
   "S15.04": ["not.toContainText(\"same cache fault\")", "toContainText(\"same cache fault\")"],
-  "S15.05": ["expect(internal).not.toContainText(\"Which filters\")", "expect(internal).toContainText(\"Which filters\")"]
+  "S15.05": ["await expect(message).not.toContainText(\"Internal\")", "await expect(message).toContainText(\"Internal\")"]
 }

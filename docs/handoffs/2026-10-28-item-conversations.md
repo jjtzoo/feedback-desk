@@ -12,8 +12,8 @@ Branch `feat/item-conversations` (worktree `C:\Apps\Feedback\.claude\worktrees\i
 ## Checks
 - Backend: ruff, mypy, 179 tests pass. Web: tsc and eslint pass. `npm run build` has not been run yet.
 
-## Next steps
-1. Browser tests: run the affected specs on their own ports, then update them to the new UI: `08, 09, 10, 11, 13, 14, 15, 18, 26, 27, 28` (`E2E_API_PORT=8132 E2E_WEB_PORT=3230 E2E_CONTROL_PORT=8142`). Refresh the mutation records for the specs that changed.
-2. Spec: add D100 to D104 (check numbers are still free), update F13, the API list (remove /check), and record that D103 departs from D39's single feed (IA consensus) by the product owner's choice, consistent with D96. Sync the master copy in Documents.
-3. Update README, docs/architecture.md and `Documents\Feedback test checklist.txt` (keep the [x] ticks).
-4. Check both screens in a browser at desktop and 375 px.
+## Finished (2026-10-29)
+- Browser tests: the 11 affected specs updated to the new UI; 106 pass, 1 skipped; mutation checks for 08, 09, 10, 13, 14, 15, 18, 26 and 28 caught every broken test.
+- Spec: D100 to D104 added, F13, D80 and the staff API list updated; master copy in Documents synced. README, `docs/architecture.md` and the checklist updated.
+- Web build passes. Checked in a browser: the tracker at 1280 and 375 px; the panel's five tabs now scroll sideways on a phone instead of clipping the last one.
+- Left: the full browser suite on this branch before it merges into `main`.

@@ -64,7 +64,9 @@ async function openTracker(page: Page, ref: string) {
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 }
 
-const historyOf = (page: Page) => page.getByRole("region", { name: "Tracking history" });
+/** The Conversation: one thread straight on the page, oldest first (D105). */
+const conversationOf = (page: Page) => page.locator("section#activity");
+const entriesOf = (page: Page) => conversationOf(page).getByRole("listitem");
 
 test.describe("8. Staff: tracker", () => {
   test("S08.01 the tracker shows the status as the heading, the FB reference, tool and category, and Expected by once set", async ({
@@ -126,7 +128,7 @@ test.describe("8. Staff: tracker", () => {
     for (const i of [3, 4]) await expect(stages.nth(i)).not.toContainText(SHORT_DATE);
   });
 
-  test("S08.03 Who has it names the assignee and role, with no email button or other way to contact them directly", async ({
+  test("S08.03 In this conversation names the person who has it and their part, with no email button or other way to contact them directly", async ({
     page,
     signIn,
     team,
@@ -135,12 +137,17 @@ test.describe("8. Staff: tracker", () => {
     const ref = await approvedBug(page, team, "RAKE Agent crashes when I check who has it");
     await openTracker(page, ref);
 
-    const who = page.getByRole("region", { name: "Who has it" });
-    await expect(who).toContainText("Darlene");
-    await expect(who).toContainText("Digital Staff · RAKE Agent owner");
+    // The people line names you, whoever has it and whoever approved it, each once with their part.
+    const people = conversationOf(page).getByText("In this conversation").locator("..");
+    await expect(people).toContainText("Liam Carter");
+    await expect(people).toContainText("You");
+    await expect(people).toContainText("Darlene");
+    await expect(people).toContainText("has it");
+    await expect(people).toContainText("Marc");
+    await expect(people).toContainText("approved it");
     // No way to contact her directly: follow-ups go through the item (D75).
-    await expect(who.getByRole("link")).toHaveCount(0);
-    await expect(who.getByRole("button")).toHaveCount(0);
+    await expect(people.getByRole("link")).toHaveCount(0);
+    await expect(people.getByRole("button")).toHaveCount(0);
     await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
   });
 
@@ -150,24 +157,32 @@ test.describe("8. Staff: tracker", () => {
     await openTracker(page, ref);
 
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Under review");
-    await expect(page.getByRole("region", { name: "Who has it" })).toContainText("The Digital team is checking who it belongs to.");
+    await expect(conversationOf(page)).toContainText("The Digital team is checking who it belongs to.");
   });
 
-  test("S08.05 after Darlene posts an update, Latest update shows the text, Darlene and the time", async ({ page, signIn, team }) => {
+  test("S08.05 after Darlene posts an update, it is a message in the Conversation with her name, her part and the time", async ({
+    page,
+    signIn,
+    team,
+  }) => {
     await signIn("Liam");
     const ref = await approvedBug(page, team, "RAKE Agent crashes when I wait for an update");
     await openTracker(page, ref);
-    const latest = page.getByRole("region", { name: "Latest update" });
-    await expect(latest).toHaveCount(0);
+    await expect(conversationOf(page)).not.toContainText("Found the cause");
 
     await postJson(await team.as("Darlene"), `/console/items/${ref}/update`, { body: "Found the cause; the fix is in testing." });
     await page.reload();
-    await expect(latest).toContainText("Found the cause; the fix is in testing.");
-    await expect(latest).toContainText("Darlene");
-    await expect(latest).toContainText(TIME);
+    const update = entriesOf(page).filter({ hasText: "Found the cause; the fix is in testing." });
+    await expect(update).toHaveCount(1);
+    await expect(update).toContainText("Darlene");
+    await expect(update).toContainText("has it");
+    await expect(update.locator("time")).toHaveText(TIME);
+    // The old Latest update and Who has it cards are gone: the Conversation is the one place.
+    await expect(page.getByRole("region", { name: "Latest update" })).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Who has it" })).toHaveCount(0);
   });
 
-  test("S08.06 the history runs newest first, newest highlighted and older greyed, each with date and time", async ({
+  test("S08.06 the Conversation runs oldest first, with what people wrote in full and the stage changes small and grey, each with its time", async ({
     page,
     signIn,
     team,
@@ -193,42 +208,46 @@ test.describe("8. Staff: tracker", () => {
     await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fix deployed" });
 
     await openTracker(page, ref);
-    await page.getByRole("button", { name: /See full history/ }).click();
-    const items = historyOf(page).getByRole("listitem");
+    const items = entriesOf(page);
     const texts = await items.allInnerTexts();
     const at = (start: string) => {
-      const i = texts.findIndex((t) => t.startsWith(start));
-      expect(i, `no history entry starting "${start}"`).toBeGreaterThanOrEqual(0);
+      const i = texts.findIndex((t) => t.includes(start));
+      expect(i, `no conversation entry with "${start}"`).toBeGreaterThanOrEqual(0);
       return i;
     };
 
-    // Newest first. Resolving's note and its stage show as one entry, with the note once (D80).
-    expect(at("Resolved by Darlene")).toBe(0);
-    expect(texts[0]).toContain("Fix deployed");
-    expect(texts.filter((t) => t.includes("Fix deployed"))).toHaveLength(1);
+    // Oldest first: what was written when it was raised, then each step in the order it happened, and
+    // Resolving's note and its stage as one entry, with the note once (D80).
     const order = [
-      at("You added details"),
-      at("Update from Darlene"),
-      at("Expected by"),
-      at("Darlene started work"),
-      at("Darlene opened your feedback"),
+      at("Received via chat, 1 file"),
+      at("Classified: Bug, Blocking, RAKE Agent"),
+      at("Assigned to Darlene"),
       at("Planned (Marc accepted it)"),
+      at("Darlene opened your feedback"),
+      at("Darlene started work"),
+      at("Expected by"),
+      at("Found the cause; the fix is in testing."),
+      at("It also fails on my phone"),
+      at("Resolved by Darlene: Fix deployed"),
     ];
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(order[0]).toBeGreaterThan(0);
-    // The three entries written when it was raised come last.
-    for (const first of ["Received via chat, 1 file", "Classified: Bug, Blocking, RAKE Agent", "Assigned to Darlene"]) {
-      expect(at(first)).toBeGreaterThan(order[order.length - 1]);
-    }
+    expect(new Set(order).size).toBe(order.length);
+    expect(order[order.length - 1]).toBe(texts.length - 1);
+    expect(texts.filter((t) => t.includes("Fix deployed"))).toHaveLength(1);
+    expect(texts.filter((t) => t.includes("Found the cause"))).toHaveLength(1);
 
-    // The newest is highlighted and the rest are greyed.
-    await expect(items.first().locator("p").first()).toHaveClass(/font-semibold/);
-    await expect(items.first().locator("div").first()).not.toHaveClass(/text-muted-foreground/);
-    await expect(items.nth(1).locator("p").first()).not.toHaveClass(/font-semibold/);
-    await expect(items.nth(1).locator("div").first()).toHaveClass(/text-muted-foreground/);
+    // Names and parts: Darlene's update is under her name as the one who has it, yours is under You.
+    await expect(items.nth(order[7])).toContainText("Darlene");
+    await expect(items.nth(order[7])).toContainText("has it");
+    await expect(items.nth(order[8])).toContainText("You");
+
+    // What people wrote is not greyed; the stage changes are small and grey.
+    await expect(items.nth(order[7])).not.toHaveClass(/text-muted-foreground/);
+    await expect(items.nth(order[8])).not.toHaveClass(/text-muted-foreground/);
+    for (const i of [order[0], order[3], order[5], order[9]]) await expect(items.nth(i)).toHaveClass(/text-muted-foreground/);
 
     // Every entry has its date and time.
-    const stamps = historyOf(page).locator("time");
+    const stamps = conversationOf(page).locator("time");
     await expect(stamps).toHaveCount(texts.length);
     for (const stamp of await stamps.all()) {
       await expect(stamp).toHaveAttribute("datetime", /\d{4}-\d{2}-\d{2}T/);
@@ -236,7 +255,7 @@ test.describe("8. Staff: tracker", () => {
     }
   });
 
-  test("S08.07 with more than four entries, See full history shows every entry and Show less collapses", async ({ page, signIn, team }) => {
+  test("S08.07 a long history shows every entry straight on the page, with no See full history or Show less", async ({ page, signIn, team }) => {
     await signIn("Liam");
     const ref = await approvedBug(page, team, "RAKE Agent crashes when I count the history");
     const darlene = await team.as("Darlene");
@@ -244,17 +263,12 @@ test.describe("8. Staff: tracker", () => {
     await postJson(darlene, `/console/items/${ref}/update`, { body: "One" });
     await openTracker(page, ref);
 
-    const items = historyOf(page).getByRole("listitem");
-    await expect(items).toHaveCount(4);
-    const seeAll = page.getByRole("button", { name: /^See full history \(\d+\)$/ });
-    const total = Number((await seeAll.innerText()).match(/\((\d+)\)/)![1]);
-    expect(total).toBeGreaterThan(4);
-
-    await seeAll.click();
-    await expect(items).toHaveCount(total);
-    await page.getByRole("button", { name: "Show less" }).click();
-    await expect(items).toHaveCount(4);
-    await expect(seeAll).toBeVisible();
+    const total = (await (await page.request.get(`/api/feedback/${ref}/tracker`)).json()).history.length as number;
+    expect(total).toBeGreaterThan(5);
+    await expect(entriesOf(page)).toHaveCount(total);
+    await expect(entriesOf(page).first()).toContainText("Received via chat");
+    await expect(entriesOf(page).last()).toContainText("One");
+    await expect(page.getByRole("button", { name: /See full history|Show less/ })).toHaveCount(0);
   });
 
   test("S08.08 an internal note and a corrected field never appear on the tracker", async ({ page, signIn, team }) => {
@@ -263,11 +277,10 @@ test.describe("8. Staff: tracker", () => {
     // Opening the item writes its own "opened your feedback" entry, so Darlene opens it before the history is read.
     const darlene = await team.as("Darlene");
     expect((await darlene.request.get(`/api/console/items/${ref}`)).ok()).toBeTruthy();
-    const items = historyOf(page).getByRole("listitem");
     const fullHistory = async () => {
       await openTracker(page, ref);
-      await page.getByRole("button", { name: /See full history/ }).click();
-      return items.allInnerTexts();
+      await expect(entriesOf(page).first()).toBeVisible();
+      return entriesOf(page).allInnerTexts();
     };
     const before = await fullHistory();
     expect(before.length).toBeGreaterThan(4);
@@ -279,9 +292,8 @@ test.describe("8. Staff: tracker", () => {
     // The correction did land (the category line changed), yet neither it nor the note is shown.
     expect(await fullHistory()).toEqual(before);
     await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("Usability");
-    await expect(page.getByRole("region", { name: "Latest update" })).toHaveCount(0);
     await expect(page.locator("body")).not.toContainText("cache key bug");
-    await expect(historyOf(page)).not.toContainText(/correct/i);
+    await expect(conversationOf(page)).not.toContainText(/correct/i);
   });
 
   test("S08.09 What you sent shows the title, summary, priority and attachments, and a file opens in a new tab", async ({ page, signIn }) => {
@@ -345,7 +357,7 @@ test.describe("8. Staff: tracker", () => {
     await expect(page).toHaveURL(/\/my$/);
   });
 
-  test("S08.12 staff opening someone else's item see general information: no names, no history, no reply box", async ({ page, signIn, team }) => {
+  test("S08.12 staff opening someone else's item see general information: no names, no Conversation, no message box", async ({ page, signIn, team }) => {
     await signIn("Liam");
     const marios = await raiseBug(await team.as("Mario"), "rake-agent", "RAKE Agent crashes for Mario only");
     await page.goto(`/track/${marios}`);
@@ -354,31 +366,29 @@ test.describe("8. Staff: tracker", () => {
     // The title names the person who raised it, so the name reads "someone" (D97).
     await expect(page.getByRole("region", { name: "What it's about" })).toContainText("RAKE Agent crashes for someone only");
     await expect(page.getByText("Mario")).toHaveCount(0);
-    for (const gone of ["Who has it", "Tracking history", "Reply or add details"]) await expect(page.getByText(gone)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Conversation" })).toHaveCount(0);
+    await expect(page.getByText("In this conversation")).toHaveCount(0);
+    await expect(page.getByPlaceholder("Write a message or add details")).toHaveCount(0);
   });
 });
 
-test("S08.13 When Darlene's update asks them to check, the tracker leads with It's fixed and Still happening; a Resolved item asks Is it fixed? instead", async ({ page, signIn, team }) => {
+test("S08.13 Darlene's update shows in the Conversation with no It's fixed or Still happening buttons; once it is Resolved the tracker asks Is it fixed?", async ({ page, signIn, team }) => {
   await signIn("Liam");
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I open my roster");
   const darlene = await team.as("Darlene");
   await postJson(darlene, `/console/items/${ref}/start`);
-  await postJson(darlene, `/console/items/${ref}/update`, { body: "Fix is live, please try your roster again.", asks_check: true });
+  await postJson(darlene, `/console/items/${ref}/update`, { body: "Fix is live, please try your roster again." });
   await openTracker(page, ref);
 
-  const check = page.getByRole("region", { name: "Darlene asked you to check this" });
-  await expect(check).toContainText("Fix is live, please try your roster again.");
-  await check.getByLabel("Comment (optional)").fill("Opens fine now");
-  await check.getByRole("button", { name: "It's fixed" }).click();
-  await expect(check).toHaveCount(0);
-  const history = page.getByRole("region", { name: "Tracking history" });
-  await expect(history).toContainText("Liam Carter said it's fixed");
+  await expect(entriesOf(page).last()).toContainText("Fix is live, please try your roster again.");
+  await expect(entriesOf(page).last()).toContainText("Darlene");
+  for (const name of ["It's fixed", "Still happening"]) await expect(page.getByRole("button", { name })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Is it fixed?" })).toHaveCount(0);
 
-  // Resolved asks the D92 question instead of a second check card.
+  // Resolved asks the D92 question.
   await postJson(darlene, `/console/items/${ref}/resolve`, { body: "Fixed: the roster opens again. Please try it." });
   await page.reload();
   await expect(page.getByRole("region", { name: "Is it fixed?" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Darlene asked you to check this" })).toHaveCount(0);
 });
 
 test("S08.15 On someone else's item the progress updates show, with the names of the people on it hidden", async ({ page, signIn, team }) => {

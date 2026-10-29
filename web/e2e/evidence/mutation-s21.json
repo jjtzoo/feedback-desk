@@ -1,9 +1,9 @@
 {
-  "ran": "2026-10-26T04:32:03.209Z",
-  "commit": "b8c10a7",
-  "uncommitted": false,
+  "ran": "2026-10-29T03:27:13.561Z",
+  "commit": "3c2b2e5",
+  "uncommitted": true,
   "spec": "21-dashboard.spec.ts",
-  "fingerprint": "314be736c0d38b53",
+  "fingerprint": "6b055e2bf5dee75a",
   "caught": {
     "S21.01": true,
     "S21.02": true,

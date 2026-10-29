@@ -98,7 +98,10 @@ test("S18.01 Approvals lists waiting items P1 first with a red outline, each wit
   await expect(card).toContainText("Auto-assigned to Marc · owner of Training Portal");
   await expect(card.locator("p").filter({ hasText: title }).first()).toBeVisible();
   await expect(card).toContainText("Implement: Raised by staff; see the brief. Effort: small. Affects one person.");
-  for (const name of ["Approve", "Decline", "Ask for info"]) await expect(card.getByRole("button", { name, exact: true })).toBeVisible();
+  for (const name of ["Approve", "Decline"]) await expect(card.getByRole("button", { name, exact: true })).toBeVisible();
+  // A question is a message in the item's Conversation, so it is a link there, not a button (D105).
+  await expect(card.getByRole("link", { name: "Ask a question", exact: true })).toHaveAttribute("href", `/console?item=${urgent}&tab=activity`);
+  await expect(card.getByRole("button", { name: "Ask for info" })).toHaveCount(0);
 });
 
 test("S18.02 Approve takes it off the list into Darlene's Approved column; the tracker shows Planned (Chris accepted it) and Darlene is told", async ({
@@ -128,7 +131,7 @@ test("S18.02 Approve takes it off the list into Darlene's Approved column; the t
   await expect(stages.nth(0)).toContainText(", done");
   await expect(stages.nth(1)).toContainText("Planned");
   await expect(stages.nth(1)).toContainText(", current stage");
-  await expect(liam.getByRole("region", { name: "Tracking history" }).getByRole("listitem").filter({ hasText: "Planned (Chris accepted it)" })).toBeVisible();
+  await expect(liam.locator("section#activity").getByRole("listitem").filter({ hasText: "Planned (Chris accepted it)" })).toBeVisible();
 
   await darlene.goto("/console");
   await bell(darlene).click();
@@ -180,50 +183,46 @@ test("S18.04 Decline needs a reason, then closes the item, shows the reason on t
   await expect(row(mario, new RegExp(`${ref} was declined`))).toBeVisible();
 });
 
-test("S18.05 Ask for info, to the person who raised it, sends the question and the item stays in Approvals", async ({ page, signIn, team }) => {
+test("S18.05 Ask a question opens the item's Conversation, and a reply there sends the question while the item stays in Approvals", async ({ page, signIn, team }) => {
   const ref = await raiseRake(await team.as("Tom"), "The RAKE Agent upload page shows an error when I open it");
   await signIn("Chris");
   await openApprovals(page);
-  await approval(page, ref).getByRole("button", { name: "Ask for info", exact: true }).click();
+  await approval(page, ref).getByRole("link", { name: "Ask a question", exact: true }).click();
 
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.getByRole("heading", { name: "Ask for more information" })).toBeVisible();
-  await dialog.getByLabel("The person who raised it").check();
-  await dialog.getByLabel("Question").fill("Which upload were you trying when the error showed?");
-  await dialog.getByRole("button", { name: "Send question", exact: true }).click();
+  // The panel opens on the Conversation tab; a message there starts as an internal note, so switch to the reply.
+  await expect(page).toHaveURL(new RegExp(`/console\\?item=${ref}&tab=activity`));
+  const panel = page.getByRole("dialog");
+  await expect(panel.getByRole("tab", { name: "Conversation" })).toHaveAttribute("aria-selected", "true");
+  await panel.getByRole("radio", { name: /^Reply to Tom/ }).click();
+  await panel.getByLabel("Message to Tom (they'll see it)").fill("Which upload were you trying when the error showed?");
+  await panel.getByRole("button", { name: "Send to Tom", exact: true }).click();
+  await expect(panel.getByRole("listitem").filter({ hasText: "Which upload were you trying when the error showed?" })).toBeVisible();
 
-  await expect(page.getByText("Question sent")).toBeVisible();
-  await expect(dialog).toHaveCount(0);
-  await expect(approval(page, ref)).toContainText("Awaiting approval");
-  await page.reload();
-  await expect(approval(page, ref)).toBeVisible();
+  await openApprovals(page);
   await expect(approval(page, ref)).toContainText("Awaiting approval");
 });
 
-test("S18.06 The person who raised it gets a bell notification with the question, and the tracker shows Reply from Chris", async ({ team }) => {
+test("S18.06 The person who raised it gets a bell notification with the question, and the tracker shows it from Chris in the Conversation", async ({ team }) => {
   // Under Docker the same question is also emailed (Mailpit); not checked here.
   const question = "Which certificate were you opening when the error showed?";
   const aisha = await team.as("Aisha");
   const ref = await raiseRake(aisha, "The RAKE Agent report page shows an error when I open it");
-  await postJson(await team.as("Chris"), `/console/items/${ref}/ask-info`, { question, ask: "submitter" });
+  await postJson(await team.as("Chris"), `/console/items/${ref}/reply`, { body: question });
 
   await aisha.goto("/my");
   await bell(aisha).click();
-  const notice = row(aisha, new RegExp(`A question about ${ref}`));
+  const notice = row(aisha, new RegExp(`Chris replied on ${ref}`));
   await expect(notice).toBeVisible();
   await expect(notice).toContainText(question.slice(0, 30));
 
   await notice.click();
-  await expect(aisha).toHaveURL(new RegExp(`/track/${ref}#latest$`)); // at Latest update (D81)
-  const latest = aisha.getByRole("region", { name: "Latest update" });
-  await expect(latest).toContainText(question);
-  await expect(latest).toContainText("Chris");
-  const history = aisha.getByRole("region", { name: "Tracking history" });
-  await expect(history.getByRole("listitem").first()).toContainText("Reply from Chris");
-  await expect(history.getByRole("listitem").first()).toContainText(question);
+  await expect(aisha).toHaveURL(new RegExp(`/track/${ref}#latest$`)); // at the newest entry (D81)
+  const entry = aisha.locator("section#activity").getByRole("listitem").filter({ hasText: question });
+  await expect(entry).toHaveCount(1);
+  await expect(entry).toContainText("Chris");
 });
 
-test("S18.07 The submitter's answer in Reply or add details toasts 'Added. The owner has been told.' and reaches Chris's Conversation tab", async ({
+test("S18.07 The submitter's answer in the message box toasts 'Sent' and reaches Chris's Conversation tab", async ({
   page,
   signIn,
   team,
@@ -231,17 +230,17 @@ test("S18.07 The submitter's answer in Reply or add details toasts 'Added. The o
   const answer = "It was the certificate for the fire warden course";
   const aisha = await team.as("Aisha");
   const ref = await raiseRake(aisha, "The RAKE Agent summary page shows an error when I open it");
-  await postJson(await team.as("Chris"), `/console/items/${ref}/ask-info`, { question: "Which course was it?", ask: "submitter" });
+  await postJson(await team.as("Chris"), `/console/items/${ref}/reply`, { body: "Which course was it?" });
 
   await aisha.goto(`/track/${ref}`);
-  await aisha.getByLabel("Reply or add details").fill(answer);
-  await aisha.getByRole("button", { name: "Send" }).click();
-  await expect(aisha.getByText("Added. The owner has been told.")).toBeVisible();
+  await aisha.getByPlaceholder("Write a message or add details").fill(answer);
+  await aisha.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(aisha.getByText("Sent", { exact: true })).toBeVisible();
 
   await signIn("Chris");
   await page.goto(`/console?inbox=open&item=${ref}`);
   const panel = page.getByRole("dialog");
-  await openActivity(panel, "Messages");
+  await openActivity(panel);
   const entry = panel.getByRole("listitem").filter({ hasText: answer });
   await expect(entry).toBeVisible();
   await expect(entry).toContainText("Aisha Rahman");
@@ -294,7 +293,7 @@ test("S18.09 The History tab of an approved and a declined item shows who, when 
   ]) {
     await page.goto(`/console?inbox=open&item=${ref}`);
     const panel = page.getByRole("dialog");
-    await openActivity(panel, "History");
+    await openActivity(panel);
     const entry = panel.getByRole("listitem").filter({ hasText: text });
     await expect(entry, ref).toBeVisible();
     await expect(entry).toContainText(`Chris · ${text}`);
@@ -435,12 +434,15 @@ test("S18.14 Approve opens a dialog with the priority, a due date and instructio
   const told = (await getJson<{ items: { title: string; body: string }[] }>(darlene, "/notifications")).items.find((n) => n.title.startsWith(`Approved, ready to start: ${ref}`));
   expect(told?.body).toBe(`Instructions from Chris: ${instructions}`);
   await darlene.goto(`/console?item=${ref}`);
-  const pinned = darlene.getByRole("region", { name: "Instructions at approval" });
-  await expect(pinned).toContainText("From Chris, at approval");
-  await expect(pinned).toContainText(instructions);
   const panel = darlene.getByRole("dialog");
-  await openActivity(panel, "History");
-  await expect(panel.getByRole("region", { name: "History" })).toContainText(`Instructions at approval: ${instructions}(internal)`);
+  await openActivity(panel);
+  // Pinned above the rest of the Conversation, internal, from Chris at approval; written there once.
+  const pinned = panel.getByRole("listitem").first();
+  await expect(pinned).toContainText("Chris");
+  await expect(pinned).toContainText("at approval");
+  await expect(pinned).toContainText("Internal · pinned");
+  await expect(pinned).toContainText(instructions);
+  await expect(panel.getByRole("listitem").filter({ hasText: instructions })).toHaveCount(1);
 
   // Liam sees the date as Expected by, and never the instructions.
   await liam.goto(`/track/${ref}`);
