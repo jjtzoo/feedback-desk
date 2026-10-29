@@ -27,7 +27,7 @@ async function bellTitles(page: Page) {
 /** The console panel for an item, open on its messages. */
 async function openPanel(page: Page, ref: string) {
   await page.goto(`/console?item=${ref}`);
-  await openActivity(page.getByRole("dialog"), "Messages");
+  await openActivity(page.getByRole("dialog"));
 }
 
 const historyOf = (page: Page) => page.getByRole("region", { name: "Tracking history" });
@@ -134,7 +134,7 @@ test("S15.04 Ask for info to 'The owner (internal)' becomes an internal note tha
   await expect(chris.getByText("Saved", { exact: true })).toBeVisible();
 
   // It landed in the conversation as an internal note, not as a reply.
-  await openActivity(chris.getByRole("dialog"), "Messages");
+  await openActivity(chris.getByRole("dialog"));
   const entry = chris.getByRole("listitem").filter({ hasText: question });
   await expect(entry).toContainText("Internal note");
   await expect(entry).toContainText(`Question for the owner: ${question}`);

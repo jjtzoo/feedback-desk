@@ -249,8 +249,7 @@ export async function answerUntilCard(page: Page) {
   await expect(page.getByRole("button", { name: "Confirm" })).toBeVisible();
 }
 
-/** Open the console panel's Conversation tab, showing everything, only messages or only history. */
-export async function openActivity(panel: Locator, show: "All" | "Messages" | "History" = "All") {
+/** Open the console panel's Conversation tab: one thread, oldest first, messages and changes together (D105). */
+export async function openActivity(panel: Locator) {
   await panel.getByRole("tab", { name: "Conversation" }).click();
-  await panel.getByRole("radiogroup", { name: "Show" }).getByRole("radio", { name: show, exact: true }).click();
 }

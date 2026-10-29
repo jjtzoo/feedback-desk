@@ -368,7 +368,7 @@ test("S14.10 Moving the due date after approval asks why, for the Digital team o
   await why.fill(reason);
   await submit(dialog).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
-  await openActivity(panel, "History");
+  await openActivity(panel);
   await expect(panel.getByRole("region", { name: "History" })).toContainText(`: ${reason}`);
 
   const told = (await getJson<{ items: { title: string; body: string }[] }>(chris, "/notifications")).items.find((n) => n.title.startsWith(`${ref}: due date moved from`));

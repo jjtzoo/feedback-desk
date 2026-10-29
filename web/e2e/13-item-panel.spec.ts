@@ -244,7 +244,7 @@ test("S13.05 Changing project, work type, category and priority saves each, and 
   await expect(classField(page, /^Category/)).toHaveText("Performance");
   await expect(classField(page, /^Priority/)).toHaveText("P1 · Blocking");
 
-  await openActivity(panelOf(page), "History");
+  await openActivity(panelOf(page));
   const entries = panelOf(page).getByRole("tabpanel").getByRole("listitem");
   for (const change of [
     "Changed the tool from RAKE Agent to Training Portal",
@@ -327,7 +327,7 @@ test("S13.08 The Conversation tab shows the whole chat, staff replies and dashed
   const { messages } = await getJson<Detail>(page, `/console/items/${ref}`);
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "Messages");
+  await openActivity(panel);
   const lines = panel.getByRole("tabpanel").getByRole("listitem");
   await expect(lines).toHaveCount(messages.length);
 
@@ -412,7 +412,7 @@ test("S13.10 The History tab lists every event in plain words with who and when,
   expect(events.some((e) => !e.is_public) && events.some((e) => e.is_public)).toBe(true);
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "History");
+  await openActivity(panel);
   const entries = panel.getByRole("tabpanel").getByRole("listitem");
   await expect(entries).toHaveCount(events.length);
   await expect(entries.filter({ hasText: "(internal)" })).toHaveCount(events.filter((e) => !e.is_public).length);
@@ -514,7 +514,7 @@ test("S13.15 On an item nobody has, Assign to me makes it yours and History read
   await expect(panel.getByRole("region", { name: "Who has it" })).toContainText("Nobody has it yet");
   await panel.getByRole("button", { name: "Assign to me", exact: true }).click();
   await expect(panel.getByRole("region", { name: "Who has it" })).toHaveText(/With Mario/);
-  await openActivity(panel, "History");
+  await openActivity(panel);
   await expect(panel.getByRole("tabpanel").getByRole("listitem").filter({ hasText: "Mario · Mario took this on" })).toHaveCount(1);
 });
 
@@ -569,13 +569,13 @@ test("S13.18 What came since you last looked shows as New reply on the list and 
   await expect(page.getByRole("row", { name: new RegExp(ref) })).toContainText("New reply");
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "Messages");
+  await openActivity(panel);
   for (const text of ["Please prioritise this one", "It crashes on the second chapter"]) {
     await expect(panel.getByRole("listitem").filter({ hasText: text }).getByText("New", { exact: true })).toBeVisible();
   }
   await page.keyboard.press("Escape");
   const again = await openItem(page, ref);
-  await openActivity(again, "Messages");
+  await openActivity(again);
   await expect(again.getByRole("listitem").filter({ hasText: "It crashes on the second chapter" })).toBeVisible();
   await expect(again.getByText("New", { exact: true })).toHaveCount(0);
   await page.request.put("/api/console/view", { data: { view: "board" } });
@@ -585,7 +585,7 @@ test("S13.19 History says Newest first and keeps the intake steps in the order t
   await signIn("Darlene");
   const ref = await raiseBug(await team.as("Liam"), "rake-agent", "RAKE Agent crashes when I search the forms list");
   const panel = await openItem(page, ref);
-  await openActivity(panel, "History");
+  await openActivity(panel);
   const history = panel.getByRole("region", { name: "History" });
   await expect(history.getByRole("heading")).toContainText("Newest first");
   const lines = await history.getByRole("listitem").allTextContents();
@@ -617,7 +617,7 @@ test("S13.21 A message to the submitter can carry an image, which shows on their
   await postJson(await team.as("Marc"), `/console/items/${ref}/approve`);
 
   const panel = await openItem(page, ref);
-  await openActivity(panel, "Messages");
+  await openActivity(panel);
   // The composer opens as an internal note (D96), which takes no image.
   await expect(panel.getByRole("radio", { name: "Internal note" })).toBeChecked();
   await expect(panel.getByRole("button", { name: "Add an image" })).toHaveCount(0);

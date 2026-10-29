@@ -71,7 +71,7 @@ async function openPanel(page: Page, ref: string) {
 
 /** The Conversation tab's lines. */
 async function conversation(panel: Locator) {
-  await openActivity(panel, "Messages");
+  await openActivity(panel);
   return panel.getByRole("tabpanel");
 }
 
