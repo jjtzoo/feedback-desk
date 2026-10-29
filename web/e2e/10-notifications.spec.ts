@@ -153,15 +153,15 @@ test("S10.07 A new item notifies the owner on assignment and again when the subm
   const ref = await raiseBug(page, "rake-agent", "RAKE Agent drops my session after ten minutes");
 
   await page.goto(`/track/${ref}`);
-  await page.getByLabel("Reply or add details").fill("It also happens on my phone");
-  await page.getByRole("button", { name: "Send" }).click();
-  await expect(page.getByText("Added. The owner has been told.")).toBeVisible();
+  await page.getByPlaceholder("Write a message or add details").fill("It also happens on my phone");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByText("Sent", { exact: true })).toBeVisible();
 
   await darlene.goto("/console");
   await expect(bell(darlene)).toHaveAccessibleName("Notifications, 2 unread");
   await openBell(darlene);
   // One row for the item (D78): the reply on top, the assignment before it.
-  const item = row(darlene, new RegExp(`${ref}: Liam Carter added details`));
+  const item = row(darlene, new RegExp(`${ref}: Liam Carter replied`));
   await expect(item).toBeVisible();
   await expect(item).toContainText("Steps so far: Assigned, then Reply");
 });
@@ -301,7 +301,7 @@ test("S10.13 One bell row per item: the latest step on top, the steps so far und
   await expect(page.getByRole("link", { name: new RegExp(ref) })).not.toHaveAccessibleName(/Unread/);
 });
 
-test("S10.14 A notification opens where the news is: the reply in the panel, the tracker at Latest update", async ({ page, signIn, team }) => {
+test("S10.14 A notification opens where the news is: the reply in the panel, the tracker at the newest entry", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const liam = await team.as("Liam");
   const ref = await raiseBug(liam, "rake-agent", "RAKE Agent crashes when I open the leave policy");
@@ -312,10 +312,10 @@ test("S10.14 A notification opens where the news is: the reply in the panel, the
 
   await page.goto("/console");
   await openBell(page);
-  await row(page, new RegExp(`${ref}: Liam Carter added details`)).click();
-  await expect(page).toHaveURL(/tab=activity&msg=/);
+  await row(page, new RegExp(`${ref}: Liam Carter replied`)).click();
+  await expect(page).toHaveURL(new RegExp(`item=${ref}&msg=`));
   const panel = page.getByRole("dialog");
-  await expect(panel.getByRole("tab", { name: "Activity" })).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByRole("tab", { name: "Conversation" })).toHaveAttribute("aria-selected", "true");
   const message = panel.locator("li[id^='msg-']").filter({ hasText: reply });
   // The ring fades after 2.5 s (D81), so it is checked before the wait for the scroll to settle.
   await expect(message).toHaveClass(/ring-2/);
@@ -326,7 +326,7 @@ test("S10.14 A notification opens where the news is: the reply in the panel, the
   await openBell(liam);
   await row(liam, new RegExp(`Update on ${ref}`)).click();
   await expect(liam).toHaveURL(new RegExp(`/track/${ref}#latest$`));
-  await expect(liam.getByRole("region", { name: "Latest update" })).toBeInViewport();
+  await expect(liam.locator("section#activity li#latest")).toBeInViewport();
 });
 
 test("S10.15 A fixed P1 is told to every Admin and the triage lead; a P2 is not", async ({ page, signIn, team }) => {

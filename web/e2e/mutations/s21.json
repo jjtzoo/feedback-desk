@@ -1,4 +1,5 @@
 {
+  "_each": true,
   "S21.01": ["Target: 10% or less", "Target: 10% or lessx"],
   "S21.02": ["[\"Week starting\", \"Received\", \"Resolved\"]", "[\"Week starting\", \"Received\", \"Resolvedx\"]"],
   "S21.03": ["{ Darlene: 3, Marc: 2 }", "{ Darlene: 3, Marc: 3 }"],

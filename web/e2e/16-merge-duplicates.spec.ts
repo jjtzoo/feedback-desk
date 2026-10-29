@@ -74,31 +74,34 @@ async function expectFollowsOriginal(aisha: Page, separate: string, original: st
   await expect(aisha.getByRole("link", { name: new RegExp(`${original}(?!\\d)`) })).toContainText("Following");
 }
 
-test("S16.01 'Merge into it' closes the item, its tracker says 'Duplicate of FB-…' with a link, and its submitter follows the original", async ({ team }) => {
+test("S16.01 'Merge' closes the newer item, its tracker says 'Duplicate of FB-…' with a link, and its submitter follows the original", async ({ team }) => {
   const { original, separate } = await pair(team, PAIRS.flipbook);
   const darlene = await team.as("Darlene");
 
   const panel = await openPanel(darlene, separate);
   const duplicates = panel.getByRole("region", { name: "Duplicates" });
   await expect(duplicates).toContainText(original);
-  await duplicates.getByRole("button", { name: "Merge into it" }).click();
+  await duplicates.getByRole("button", { name: "Merge", exact: true }).click();
 
   // The suggested merge goes through the same dialog as a typed one, pre-filled, and nothing happens until it is confirmed.
-  const dialog = darlene.getByRole("dialog", { name: "Merge into another item", exact: true });
-  await expect(dialog.getByLabel("Original reference")).toHaveValue(original);
+  // It says which one closes into which, before anything happens, and that there's no undo.
+  const dialog = darlene.getByRole("dialog", { name: `Merge ${separate} into ${original}?`, exact: true });
+  await expect(dialog).toContainText(`${separate} closes as a duplicate of ${original}`);
+  await expect(dialog).toContainText("There's no undo.");
+  await expect(dialog.getByLabel("Other reference")).toHaveValue(original);
   expect((await getJson<Item>(darlene, `/console/items/${separate}`)).merged_into, "nothing is merged before the dialog is confirmed").toBeNull();
   await dialog.locator('button[type="submit"]').click();
   await expect(dialog).toHaveCount(0);
   await expect(duplicates).toContainText(`Merged into ${original}.`);
   // Closed: nothing can be merged or closed from it any more.
-  await expect(duplicates.getByRole("button", { name: "Merge into it" })).toHaveCount(0);
+  await expect(duplicates.getByRole("button", { name: "Merge", exact: true })).toHaveCount(0);
   await expect(statusButton(panel)).toHaveCount(0);
 
   await merged(darlene, separate, original);
   await expectFollowsOriginal(await team.as("Aisha"), separate, original);
 });
 
-test("S16.02 'Merge into another reference…' with a typed FB number gives the same result", async ({ team }) => {
+test("S16.02 'Merge with another reference…' with a typed FB number gives the same result", async ({ team }) => {
   const { project, first, second } = PAIRS.training;
   const candidate = await raise(await team.as("Liam"), first, ["Slowing me down"], project);
   // The one typed in is not the listed candidate, so the result can only come from what was typed.
@@ -110,11 +113,11 @@ test("S16.02 'Merge into another reference…' with a typed FB number gives the 
   const duplicates = panel.getByRole("region", { name: "Duplicates" });
   await expect(duplicates).toContainText(candidate);
   await expect(duplicates).not.toContainText(typed);
-  await duplicates.getByRole("button", { name: /^Merge into another reference/ }).click();
+  await duplicates.getByRole("button", { name: /^Merge with another reference/ }).click();
 
-  const dialog = darlene.getByRole("dialog", { name: "Merge into another item", exact: true });
-  await dialog.getByLabel("Original reference").fill(typed.toLowerCase());
-  await expect(dialog.getByLabel("Original reference")).toHaveValue(typed);
+  const dialog = darlene.getByRole("dialog", { name: "Merge duplicates", exact: true });
+  await dialog.getByLabel("Other reference").fill(typed.toLowerCase());
+  await expect(dialog.getByLabel("Other reference")).toHaveValue(typed);
   await dialog.locator('button[type="submit"]').click();
   await expect(dialog).toHaveCount(0);
   await expect(duplicates).toContainText(`Merged into ${typed}.`);
@@ -132,10 +135,10 @@ test("S16.03 The original shows 'Merged here: FB-…'", async ({ team }) => {
   const duplicates = (await openPanel(darlene, original)).getByRole("region", { name: "Duplicates" });
   await expect(duplicates).toContainText(`Merged here: ${separate}`);
   // Merged, it is no longer offered as a duplicate.
-  await expect(duplicates.getByRole("button", { name: "Merge into it" })).toHaveCount(0);
+  await expect(duplicates.getByRole("button", { name: "Merge", exact: true })).toHaveCount(0);
 });
 
-test("S16.04 Two near-identical items sit side by side offering 'Merge into it', and none of the items is merged until someone clicks", async ({
+test("S16.04 Two near-identical items sit side by side offering 'Merge', and none of the items is merged until someone clicks", async ({
   page,
   signIn,
   team,
@@ -151,7 +154,7 @@ test("S16.04 Two near-identical items sit side by side offering 'Merge into it',
   const panel = darlene.getByRole("dialog");
   const duplicates = panel.getByRole("region", { name: "Duplicates" });
   await expect(duplicates).toContainText(original);
-  await expect(duplicates.getByRole("button", { name: "Merge into it" })).toBeVisible();
+  await expect(duplicates.getByRole("button", { name: "Merge", exact: true })).toBeVisible();
   await expect(panel).not.toContainText("Merged into");
   await darlene.goto(`/console?inbox=open&item=${original}`);
   await expect(duplicates).toContainText(separate);

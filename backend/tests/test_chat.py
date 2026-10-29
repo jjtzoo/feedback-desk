@@ -163,7 +163,7 @@ async def test_a_request_about_existing_feedback_is_pointed_to_it_not_turned_int
     events = await say(staff, sid, message)
     reply = texts(events)[-1]
     assert reply == EXISTING
-    assert "My feedback" in reply and "Reply or add details" in reply
+    assert "My feedback" in reply and "its link" in reply
     assert first(events, "draft") is None  # no card, no intake questions
     assert await count() == 0
 

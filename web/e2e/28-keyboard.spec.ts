@@ -143,8 +143,8 @@ test("S28.01 Tab through the landing page, chat, tracker and console: a visible 
     ...HEADER,
     "Account: Liam Carter",
     "My feedback",
+    /^Your messages go to /,
     /^Mute notifications for this item/,
-    "Reply or add details",
   ]);
   expectRings(tracker);
 

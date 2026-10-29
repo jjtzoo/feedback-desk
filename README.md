@@ -5,7 +5,7 @@
 A chat-style agent where any REDADAIR staff member gives feedback on the intranet's platforms and agents, plus a console where the Digital team approves, works and closes it. Staff track every item like a parcel.
 
 - **Project documents:** [Project Hub draft](docs/project-hub.md), [requirements reference](docs/requirements.md)
-- **Spec (source of truth):** [docs/feedback-build-spec-v3.md](docs/feedback-build-spec-v3.md) (decisions D1 to D99, sprints, gates, build status)
+- **Spec (source of truth):** [docs/feedback-build-spec-v3.md](docs/feedback-build-spec-v3.md) (decisions D1 to D104, sprints, gates, build status)
 - **How it fits together:** [docs/architecture.md](docs/architecture.md)
 - **Deploying:** [docs/deployment.md](docs/deployment.md) (checklists, rollback)
 - **Company standards it follows:** [docs/standards/](docs/standards/)

@@ -4,7 +4,7 @@
   "S13.03": ["Raised by staff; see the brief.", "Raised by staffx; see the brief."],
   "S13.04": ["Work type (${percent", "Work typex (${percent"],
   "S13.05": ["from P2 · Major to P1 · Blocking\"", "from P2 · Major to P3 · Minor\""],
-  "S13.06": ["toContainText(\"Now with Mario\")", "toContainText(\"Now with Mariox\")"],
+  "S13.06": ["hasText: \"Now with Mario\" })).toHaveCount(1)", "hasText: \"Now with Mario\" })).toHaveCount(2)"],
   "S13.07": ["toHaveCount(1)", "toHaveCount(2)"],
   "S13.08": ["lucide-lock\"]", "lucide-lockx\"]"],
   "S13.09": [".toBe(file.buffer.length)", ".toBe(file.buffer.length + 1)"],
@@ -13,11 +13,12 @@
   "S13.12": ["toEqual([\"Close…\"]);", "toEqual([\"Start work\", \"Close…\"]);"],
   "S13.13": ["Mario took over ${ref}", "Mario took overx ${ref}"],
   "S13.14": ["\"Mario has just taken this over.\"", "\"Mario has just taken this overx.\""],
-  "S13.15": ["Mario · Mario took this on", "Mario · Mario took this onx"],
+  "S13.15": ["Mario took this on\" })", "Mario took this onx\" })"],
   "S13.16": ["owner of RAKE Agent/", "owner of Flipbook/"],
   "S13.17": ["\"Needs detail: ask for info first\"", "\"Needs detail: ask for info firstx\""],
   "S13.18": ["toContainText(\"New reply\");", "not.toContainText(\"New reply\");"],
-  "S13.19": ["\"Sent for approval\", \"Classified: Bug\"", "\"Classified: Bug\", \"Sent for approval\""],
+  "S13.19": ["\"Received via chat\", \"Classified: Bug\"", "\"Classified: Bug\", \"Received via chat\""],
   "S13.20": ["not.toContainText(\"GMT\")", "toContainText(\"GMT\")"],
-  "S13.21": ["{ name: \"From the team\" }).getByRole(\"img\", { name: \"fixed.png\" })", "{ name: \"What you sent\" }).getByRole(\"img\", { name: \"fixed.png\" })"]
+  "S13.21": ["{ name: \"From the team\" }).getByRole(\"img\", { name: \"fixed.png\" })", "{ name: \"What you sent\" }).getByRole(\"img\", { name: \"fixed.png\" })"],
+  "S13.22": ["getByText(\"Marc\", { exact: true })).toHaveCount(1)", "getByText(\"Marc\", { exact: true })).toHaveCount(2)"]
 }

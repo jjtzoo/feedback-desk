@@ -151,11 +151,15 @@ export function GuideButton({ area, tone = "light" }: { area: Area; tone?: "ligh
     return () => markSeen(area);
   }, [open, area]);
 
+  // Only on the page the tour starts from: someone who came by a link (an item from an email, a colleague's
+  // link to their item) stays where they are, and gets the tour when they first reach that page.
+  const path = usePathname();
+  const startPath = steps[0]?.path;
   useEffect(() => {
-    if (hasSeen(area)) return;
+    if (hasSeen(area) || (startPath && startPath !== path)) return;
     const timer = window.setTimeout(() => setOpen(true), 400);
     return () => window.clearTimeout(timer);
-  }, [area]);
+  }, [area, startPath, path]);
 
   function start() {
     setIndex(0);

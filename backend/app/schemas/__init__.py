@@ -508,11 +508,6 @@ class DeclineIn(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
-class AskInfoIn(BaseModel):
-    question: str = Field(min_length=1, max_length=2000)
-    ask: Literal["submitter", "owner"] = "submitter"
-
-
 class ViewIn(BaseModel):
     view: Literal["board", "list", "cards"]
 

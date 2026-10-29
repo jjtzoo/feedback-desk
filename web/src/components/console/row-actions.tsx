@@ -28,7 +28,7 @@ export function RowActions({
   card,
   staff,
   onOpen,
-  onUpdate,
+  onChangeDue,
   onAssignToMe,
   onHandOver,
   moves,
@@ -37,7 +37,7 @@ export function RowActions({
   card: Card;
   staff: Staff[];
   onOpen: () => void;
-  onUpdate: () => void;
+  onChangeDue: () => void;
   onAssignToMe: () => void;
   onHandOver: (assigneeId: string) => void;
   moves: Move[];
@@ -57,7 +57,7 @@ export function RowActions({
         <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>
         {open && (
           <>
-            {can.holder && <DropdownMenuItem onSelect={onUpdate}>Post update</DropdownMenuItem>}
+            {can.holder && <DropdownMenuItem onSelect={onChangeDue}>Change due date</DropdownMenuItem>}
             {can.canAssignToMe && <DropdownMenuItem onSelect={onAssignToMe}>Assign to me</DropdownMenuItem>}
             {can.canHandOver && (
               <DropdownMenuSub>

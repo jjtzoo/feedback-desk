@@ -12,7 +12,6 @@ from app.models.enums import DUE_STATUSES, STAGE_OF
 from app.schemas import (
     ActivityOut,
     ApproveIn,
-    AskInfoIn,
     AttachmentOut,
     BoardOut,
     BulkIn,
@@ -309,12 +308,6 @@ async def approve(ref: str, db: Db, user: AdminUser, body: ApproveIn | None = No
 @router.post("/items/{ref}/decline", response_model=DetailOut)
 async def decline(ref: str, body: DeclineIn, db: Db, user: AdminUser) -> DetailOut:
     await console.decline(db, user, ref, body.reason)
-    return await _detail(db, user, ref)
-
-
-@router.post("/items/{ref}/ask-info", response_model=DetailOut)
-async def ask_info(ref: str, body: AskInfoIn, db: Db, user: AdminUser) -> DetailOut:
-    await console.ask_info(db, user, ref, body.question, body.ask)
     return await _detail(db, user, ref)
 
 

@@ -103,15 +103,23 @@ class Allowance:
         return min(100, round(self.used_tokens / self.limit_tokens * 100)) if self.limit_tokens else 0
 
 
+async def over_budget(db: AsyncSession) -> bool:
+    """Today's or this month's model spend has reached its budget (D36)."""
+    s = get_settings()
+    day, month = period_starts()
+    return bool(
+        (s.daily_budget_aud and await _cost_since(db, day) >= s.daily_budget_aud)
+        or (s.monthly_budget_aud and await _cost_since(db, month) >= s.monthly_budget_aud)
+    )
+
+
 async def allowance(db: AsyncSession, email: str) -> Allowance:
     """The user's chat tokens today, and whether a limit now sends them to the backup form."""
     s = get_settings()
-    day, month = period_starts()
+    day, _ = period_starts()
     used = await _user_tokens_since(db, email, day)
     blocked: Limit | None = None
-    if (s.daily_budget_aud and await _cost_since(db, day) >= s.daily_budget_aud) or (
-        s.monthly_budget_aud and await _cost_since(db, month) >= s.monthly_budget_aud
-    ):
+    if await over_budget(db):
         blocked = "budget"
     elif s.daily_tokens_per_user and used >= s.daily_tokens_per_user:
         blocked = "user"

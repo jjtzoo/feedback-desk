@@ -72,7 +72,7 @@ const ARCHIVE_GROUPS: Group[] = [
 ];
 
 /** due: the item's due date, so Update asks why when it moves (D94). */
-type Pending = { ref: string; kind: "resolve" | "update" | "close" | "fix"; due?: string | null };
+type Pending = { ref: string; kind: "resolve" | "due" | "close" | "fix"; due?: string | null };
 const MOVE_DIALOG: Partial<Record<MoveKey, Pending["kind"]>> = { resolve: "resolve", close: "close", close_fixed: "fix" };
 
 function Work() {
@@ -186,7 +186,7 @@ function Work() {
   async function finishPending(_kind: string, r: ActionResult): Promise<boolean> {
     if (!pending) return false;
     try {
-      if (pending.kind === "update") {
+      if (pending.kind === "due") {
         await api.post(`/console/items/${pending.ref}/update`, { body: r.text, expected_by: r.expectedBy ?? null, due_reason: r.dueReason ?? "" });
         toast.success("Saved");
       } else if (pending.kind === "close" || pending.kind === "fix") {
@@ -235,7 +235,7 @@ function Work() {
       card={c}
       staff={staff}
       onOpen={() => setParam("item", c.reference)}
-      onUpdate={() => setPending({ ref: c.reference, kind: "update", due: c.expected_by })}
+      onChangeDue={() => setPending({ ref: c.reference, kind: "due", due: c.expected_by })}
       onAssignToMe={() => void assign(c.reference, null)}
       onHandOver={(id) => void assign(c.reference, id)}
       moves={allowedMoves(c, me, staff)}

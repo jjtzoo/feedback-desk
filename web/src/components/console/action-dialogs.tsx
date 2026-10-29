@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Staff } from "@/lib/api";
 import { PRIORITIES, PRIORITY_LABEL, day } from "@/lib/format";
 
-export type ActionKind = "approve" | "update" | "resolve" | "fix" | "close" | "decline" | "ask" | "merge" | "take_over" | "hand_over";
+export type ActionKind = "approve" | "due" | "resolve" | "fix" | "close" | "decline" | "merge" | "take_over" | "hand_over";
 
 /** How an open item can end by hand (D45). Fixed comes from a resolved item; duplicate and declined have their own actions. */
 export type CloseEnding = "wont_fix" | "no_longer_needed";
@@ -35,19 +35,17 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
     required: false,
     placeholder: "Check the leave index first; don't change the prompt.",
   },
-  // Says when to use it, not only where it goes (D79); the panel names the person in the title.
-  update: {
-    title: "Update the person who raised it",
-    description:
-      "For news they'd want: you've reproduced it, there's a workaround, a new date, or a fix ready to try. They see it on their tracker, in the app and by email. Work notes for the team go in an internal note.",
-    field: "Update",
-    button: "Send update",
+  // News goes in the conversation; Sig tells them about moves (D105). Only the date has its own dialog.
+  due: {
+    title: "Change the due date",
+    description: "They see it as Expected by. If it moves, say why: only the Digital team sees the reason, and the approver is told.",
+    field: "Note for them (optional)",
+    button: "Save due date",
     required: false,
-    placeholder: "Reproduced it: the form clears when a submission fails. Working on a fix.",
   },
   resolve: {
     title: "Resolve",
-    description: "Write it for the person who raised it: they see it on their tracker and by email, with It's fixed and Still happening to answer. Close as fixed once it's confirmed.",
+    description: "Write it for the person who raised it: they see it on their tracker and by email, with Is it fixed? to answer. It closes once they confirm, or by itself.",
     field: "What was done",
     button: "Resolve",
     required: true,
@@ -76,18 +74,12 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
     button: "Decline",
     required: true,
   },
-  ask: {
-    title: "Ask for more information",
-    description: "The item keeps waiting for a decision.",
-    field: "Question",
-    button: "Send question",
-    required: true,
-  },
+  // Whichever item it starts from, the newer one closes into the first report (brief §4.2.6).
   merge: {
-    title: "Merge into another item",
-    description: "This item closes; everyone following it follows the original instead.",
-    field: "Original reference",
-    button: "Merge",
+    title: "Merge duplicates",
+    description: "The newer of the two closes into the first report, which keeps everything; everyone following it follows the first report instead. There's no undo.",
+    field: "Other reference",
+    button: "Yes, merge",
     required: true,
   },
   // The title and description come from the item: whose it is and what they last did (D53).
@@ -115,12 +107,11 @@ export interface ActionResult {
   /** Update: why the due date moved, for the Digital team only (D94). */
   dueReason?: string;
   ending?: CloseEnding;
-  ask?: "submitter" | "owner";
   /** Hand over: who takes it. */
   to?: string;
 }
 
-/** One dialog for every action that needs words or a choice (approve, update, resolve, close, decline, ask, merge, take over, hand over). */
+/** One dialog for every action that needs words or a choice (approve, due date, resolve, close, decline, merge, take over, hand over). */
 export function ActionDialog({
   kind,
   initialText = "",
@@ -142,17 +133,16 @@ export function ActionDialog({
   people?: Staff[];
   /** Approve: the item's priority, to confirm or change. */
   priority?: string | null;
-  /** The item's due date: Approve starts from it, and Update asks why when it moves (D94). */
+  /** The item's due date: Approve and Change the due date start from it, and a move needs a reason (D94). */
   due?: string | null;
   onClose: () => void;
   onSubmit: (kind: ActionKind, result: ActionResult) => Promise<boolean>;
 }) {
   const [text, setText] = useState(initialText);
-  const [expectedBy, setExpectedBy] = useState(kind === "approve" ? (due ?? "") : "");
+  const [expectedBy, setExpectedBy] = useState(kind === "approve" || kind === "due" ? (due ?? "") : "");
   const [newPriority, setNewPriority] = useState(priority ?? "");
   const [dueReason, setDueReason] = useState("");
   const [ending, setEnding] = useState<CloseEnding | null>(null);
-  const [ask, setAsk] = useState<"submitter" | "owner">("submitter");
   const [to, setTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,7 +152,7 @@ export function ActionDialog({
   if (!kind) return null;
   const copy = COPY[kind];
   // Moving a date already set needs a reason; setting the first one doesn't (D94).
-  const moving = kind === "update" && Boolean(due && expectedBy && expectedBy !== due);
+  const moving = kind === "due" && Boolean(due && expectedBy && expectedBy !== due);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -179,8 +169,8 @@ export function ActionDialog({
       setError(`${copy.field} is needed.`);
       return;
     }
-    if (kind === "update" && !text.trim() && !expectedBy) {
-      setError("Write an update or set a due date.");
+    if (kind === "due" && (!expectedBy || expectedBy === due)) {
+      setError("Choose a new due date.");
       return;
     }
     if (moving && !dueReason.trim()) {
@@ -194,7 +184,6 @@ export function ActionDialog({
       priority: newPriority || undefined,
       dueReason: moving ? dueReason.trim() : undefined,
       ending: ending ?? undefined,
-      ask,
       to: to || undefined,
     });
     setBusy(false);
@@ -230,12 +219,12 @@ export function ActionDialog({
         <DuePicker id="approve-due" label="Due date (optional)" value={expectedBy} onChange={setExpectedBy} />
       </div>
     );
-  } else if (kind === "update") {
+  } else if (kind === "due") {
     extra = (
       <div className="grid gap-2">
         <DuePicker
           id="expected-by"
-          label="Due date (optional)"
+          label="Due date"
           hint={due ? `Now due ${day(due)}. They see it as Expected by.` : "They see it as Expected by."}
           value={expectedBy}
           onChange={setExpectedBy}
@@ -282,18 +271,6 @@ export function ActionDialog({
         </Select>
       </div>
     );
-  } else if (kind === "ask") {
-    extra = (
-      <fieldset className="flex gap-4 text-sm">
-        <legend className="mb-2 font-medium">Ask</legend>
-        {(["submitter", "owner"] as const).map((who) => (
-          <Label key={who} className="flex items-center gap-2 font-normal">
-            <input type="radio" name="ask-who" checked={ask === who} onChange={() => setAsk(who)} className="size-4 accent-[var(--primary)]" />
-            {who === "submitter" ? "The person who raised it" : "The owner (internal)"}
-          </Label>
-        ))}
-      </fieldset>
-    );
   }
 
   return (
@@ -319,7 +296,7 @@ export function ActionDialog({
           <div className="grid gap-2">
             <Label htmlFor="action-text">{copy.field}</Label>
             {kind === "merge" ? (
-              <Input id="action-text" placeholder="FB-0138" value={text} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
+              <Input id="action-text" placeholder="FB-0138" value={text} readOnly={kind === "merge" && Boolean(initialText)} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
             ) : (
               <Textarea id="action-text" rows={4} value={text} maxLength={4000} placeholder={copy.placeholder} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
             )}
@@ -358,6 +335,8 @@ function DuePicker({ id, label, hint, value, onChange }: { id: string; label: st
               mode="single"
               locale={enAU}
               selected={value ? new Date(`${value}T00:00:00`) : undefined}
+              // A due date is still to come: days already gone can't be picked (one already past still shows).
+              disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
               onSelect={(d) => {
                 onChange(d ? isoDay(d) : "");
                 setPicking(false);

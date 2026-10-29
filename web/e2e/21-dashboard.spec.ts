@@ -204,7 +204,9 @@ test("S21.05 Correcting a project on one item moves the project reassignment rat
   await expect(project).toContainText("RAKE Agent");
   await project.click();
   await page.getByRole("option", { name: "Training Portal", exact: true }).click();
-  // The field follows the saved item, so this waits for the server's answer.
+  // The change waits for Save (D104); the field follows the saved item, so this waits for the server's answer.
+  await panel.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   await expect(project).toContainText("Training Portal");
 
   // One of the six items sent through the chat has had its project corrected: 1 of 6.

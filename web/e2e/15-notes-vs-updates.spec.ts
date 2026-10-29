@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, resetDatabase, test } from "./fixtures";
-import { getJson, openActivity, postJson, raiseBug } from "./helpers";
+import { getJson, openActivity, postJson, raiseBug, trackerConversation } from "./helpers";
 
 // Manual checklist section 15 (Digital Staff: internal notes vs public updates). The person giving
 // feedback is a seeded staff member (the checklist says Mario, who is Digital Staff), so "his tracker"
@@ -24,13 +24,13 @@ async function bellTitles(page: Page) {
   return (await getJson<{ items: { title: string }[] }>(page, "/notifications")).items.map((n) => n.title);
 }
 
-/** The console panel for an item, open on its messages. */
+/** The console panel for an item, open on its Conversation (D105). */
 async function openPanel(page: Page, ref: string) {
   await page.goto(`/console?item=${ref}`);
-  await openActivity(page.getByRole("dialog"), "Messages");
+  await openActivity(page.getByRole("dialog"));
 }
 
-const historyOf = (page: Page) => page.getByRole("region", { name: "Tracking history" });
+const NOTE_BOX = "Internal note (staff never see it)";
 
 async function openTracker(page: Page, ref: string) {
   await page.goto(`/track/${ref}`);
@@ -43,7 +43,7 @@ async function openBell(page: Page) {
   await expect(page.getByRole("dialog").getByText("Notifications", { exact: true })).toBeVisible();
 }
 
-test("S15.01 An internal note shows 'Note added' and is not on the submitter's tracker, with no notification to them", async ({ page, signIn, team }) => {
+test("S15.01 An internal note shows 'Internal note added' with a lock, is not on the submitter's tracker, and sends no notification to them", async ({ page, signIn, team }) => {
   await signIn("Liam");
   const note = "Internal only: the cache key is wrong, check with Marc before replying";
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I rename a saved search");
@@ -51,20 +51,20 @@ test("S15.01 An internal note shows 'Note added' and is not on the submitter's t
 
   const darlene = await team.as("Darlene");
   await openPanel(darlene, ref);
-  await darlene.getByRole("radio", { name: "Internal note", exact: true }).click();
-  await darlene.getByRole("textbox", { name: "Internal note (staff never see it)" }).fill(note);
-  await darlene.getByRole("button", { name: "Add note" }).click();
+  // The composer starts on Internal note (D96).
+  await expect(darlene.getByRole("radio", { name: "Internal note" })).toBeChecked();
+  await darlene.getByRole("textbox", { name: NOTE_BOX }).fill(note);
+  await darlene.getByRole("button", { name: "Add internal note" }).click();
 
-  await expect(darlene.getByText("Note added")).toBeVisible();
-  const entry = darlene.getByRole("listitem").filter({ hasText: note });
-  await expect(entry).toContainText("Internal note");
+  await expect(darlene.getByText("Internal note added", { exact: true })).toBeVisible();
+  const entry = darlene.getByRole("dialog").getByRole("listitem").filter({ hasText: note });
+  await expect(entry).toContainText("Internal");
   await expect(entry).toContainText("Darlene");
 
-  // The submitter's tracker has no trace of it, in the history or as a latest update.
+  // The submitter's tracker has no trace of it.
   await openTracker(page, ref);
-  await expect(page.getByRole("region", { name: "Latest update" })).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("cache key is wrong");
-  await expect(historyOf(page)).not.toContainText("Internal only");
+  await expect(trackerConversation(page)).not.toContainText("Internal only");
 
   // And the bell holds nothing new.
   await openBell(page);
@@ -72,109 +72,107 @@ test("S15.01 An internal note shows 'Note added' and is not on the submitter's t
   expect(await bellTitles(page)).toEqual(before);
 });
 
-test("S15.02 'Message Aisha' shows 'Reply from Darlene' on the tracker and in Latest update, and notifies the submitter", async ({ page, signIn, team }) => {
+test("S15.02 Replying to Aisha puts Darlene's words in the tracker's Conversation under her name with 'has it', and notifies the submitter", async ({ page, signIn, team }) => {
   await signIn("Aisha");
   const reply = "We have reproduced it and a fix is being tested";
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I export a saved search");
 
   const darlene = await team.as("Darlene");
   await openPanel(darlene, ref);
-  await darlene.getByRole("radio", { name: "Message Aisha (they'll see this)", exact: true }).click();
+  await darlene.getByRole("radio", { name: "Reply to Aisha" }).click();
   await darlene.getByRole("textbox", { name: "Message to Aisha (they'll see it)" }).fill(reply);
   await darlene.getByRole("button", { name: "Send to Aisha" }).click();
   await expect(darlene.getByText("Sent to Aisha", { exact: true })).toBeVisible();
-  // The new entry is marked, not just appended to the feed.
+  // The new entry is marked, not just appended to the thread.
   await expect(darlene.getByText("Sent just now")).toBeVisible();
 
   await openTracker(page, ref);
-  const latest = page.getByRole("region", { name: "Latest update" });
-  await expect(latest).toContainText(reply);
-  await expect(latest).toContainText("Darlene");
-  await expect(historyOf(page).getByRole("listitem").first()).toContainText("Reply from Darlene");
-  await expect(historyOf(page).getByRole("listitem").first()).toContainText(reply);
+  const entry = trackerConversation(page).getByRole("listitem").filter({ hasText: reply });
+  await expect(entry).toHaveCount(1);
+  await expect(entry).toContainText(/Darlene\s*has it/);
 
   await openBell(page);
   await expect(page.getByRole("dialog").getByText(`Darlene replied on ${ref}`)).toBeVisible();
 });
 
-test("S15.03 A progress update shows on the tracker as 'Update from Darlene' with its words, once", async ({ page, signIn, team }) => {
+test("S15.03 Changing the due date with a note shows Expected by on the tracker and the note in the Conversation under Darlene, once", async ({ page, signIn, team }) => {
   await signIn("Tom");
-  const update = "Found the cause and a fix goes out on Thursday";
+  const note = "Found the cause and a fix goes out on Thursday";
   const ref = await approvedBug(page, team, "RAKE Agent crashes when I share a saved search");
 
   const darlene = await team.as("Darlene");
   await openPanel(darlene, ref);
-  await darlene.getByRole("button", { name: /^Update [A-Z][a-z]+$/ }).click();
-  const dialog = darlene.getByRole("dialog", { name: /^Update [A-Z][a-z]+ on progress$/ });
-  await dialog.getByRole("textbox", { name: "Update", exact: true }).fill(update);
-  await dialog.getByRole("button", { name: "Send update", exact: true }).click();
+  await darlene.getByRole("button", { name: "Change", exact: true }).click();
+  const dialog = darlene.getByRole("dialog", { name: "Change the due date" });
+  await dialog.locator("#expected-by").click();
+  await darlene.getByRole("grid").locator("button:not([disabled])").last().click();
+  await dialog.getByRole("textbox", { name: "Note for them (optional)" }).fill(note);
+  await dialog.getByRole("button", { name: "Save due date", exact: true }).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
 
   await openTracker(page, ref);
-  const entry = historyOf(page).getByRole("listitem").first();
-  await expect(entry).toContainText(`Update from Darlene${update}`);
-  await expect(entry.getByText(update, { exact: true })).toHaveCount(1);
-  await expect(page.getByRole("region", { name: "Latest update" })).toContainText(update);
+  await expect(page.getByRole("heading", { level: 1 }).locator("..")).toContainText("Expected by");
+  const entry = trackerConversation(page).getByRole("listitem").filter({ hasText: note });
+  await expect(entry).toHaveCount(1);
+  await expect(entry).toContainText(/Darlene\s*has it/);
 });
 
-test("S15.04 Ask for info to 'The owner (internal)' becomes an internal note that staff never see", async ({ page, signIn, team }) => {
+test("S15.04 A question for the owner written as an internal note stays inside the team: staff never see it", async ({ page, signIn, team }) => {
   await signIn("Grace");
   const question = "Is this the same cache fault as last month";
-  // Not approved: Ask for info is for an item still waiting for a decision.
+  // Not approved: the note is for an item still waiting for a decision.
   const ref = await raiseBug(page, "rake-agent", "RAKE Agent crashes when I delete a saved search");
   const before = await bellTitles(page);
 
   const chris = await team.as("Chris");
   await openPanel(chris, ref);
-  await chris.getByRole("button", { name: "Ask for info", exact: true }).click();
-  const dialog = chris.getByRole("dialog", { name: "Ask for more information" });
-  await dialog.getByRole("radio", { name: "The owner (internal)" }).check();
-  await dialog.getByRole("textbox", { name: "Question" }).fill(question);
-  await dialog.getByRole("button", { name: "Send question" }).click();
-  await expect(chris.getByText("Saved", { exact: true })).toBeVisible();
+  await chris.getByRole("textbox", { name: NOTE_BOX }).fill(question);
+  await chris.getByRole("button", { name: "Add internal note" }).click();
+  await expect(chris.getByText("Internal note added", { exact: true })).toBeVisible();
 
-  // It landed in the conversation as an internal note, not as a reply.
-  await openActivity(chris.getByRole("dialog"), "Messages");
-  const entry = chris.getByRole("listitem").filter({ hasText: question });
-  await expect(entry).toContainText("Internal note");
-  await expect(entry).toContainText(`Question for the owner: ${question}`);
-  await expect(entry).not.toContainText("Reply");
+  const entry = chris.getByRole("dialog").getByRole("listitem").filter({ hasText: question });
+  await expect(entry).toContainText("Internal");
+  await expect(entry).toContainText("Chris");
 
   // The submitter's tracker and bell show nothing of it.
   await openTracker(page, ref);
-  await expect(page.getByRole("region", { name: "Latest update" })).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("same cache fault");
-  await expect(historyOf(page)).not.toContainText(/question|asked/i);
+  await expect(trackerConversation(page)).not.toContainText(/question|asked/i);
   await openBell(page);
   await expect(page.getByRole("dialog")).not.toContainText("same cache fault");
   expect(await bellTitles(page)).toEqual(before);
 });
 
-test("S15.05 The composer opens as Internal note; Message Aisha is a separate choice with its own send button and goes back to Internal note after sending; the two sides sit apart", async ({ page, signIn, team }) => {
+test("S15.05 Reply to Aisha and Internal note are two sides of one box in one Conversation: Internal note first, back to it after each reply, and only the note has a lock", async ({ page, signIn, team }) => {
   await signIn("Aisha");
   const ref = await approvedBug(page, team, "RAKE Agent loses my filters after a search");
   const darlene = await team.as("Darlene");
   await openPanel(darlene, ref);
   const panel = darlene.getByRole("dialog");
 
+  // Internal note side: its own box and button, nothing that goes to Aisha.
   await expect(panel.getByRole("radio", { name: "Internal note" })).toBeChecked();
-  await expect(panel.getByRole("button", { name: "Add note" })).toBeVisible();
-  await expect(panel.getByRole("button", { name: /^Send to / })).toHaveCount(0);
-  await panel.getByRole("radio", { name: "Message Aisha (they'll see this)", exact: true }).click();
+  await expect(panel.getByRole("textbox", { name: "Message to Aisha (they'll see it)" })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Send to Aisha" })).toHaveCount(0);
+  await panel.getByRole("textbox", { name: NOTE_BOX }).fill("Probably the session cache again");
+  await panel.getByRole("button", { name: "Add internal note" }).click();
+  await expect(darlene.getByText("Internal note added", { exact: true })).toBeVisible();
+
+  // Reply side: its own box and button; it falls back to Internal note after sending (D96).
+  await panel.getByRole("radio", { name: "Reply to Aisha" }).click();
+  await expect(panel.getByRole("textbox", { name: NOTE_BOX })).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Add internal note" })).toHaveCount(0);
   await panel.getByRole("textbox", { name: "Message to Aisha (they'll see it)" }).fill("Which filters did you have on?");
   await panel.getByRole("button", { name: "Send to Aisha" }).click();
   await expect(darlene.getByText("Sent to Aisha", { exact: true })).toBeVisible();
-
-  // Back to an internal note for whatever comes next.
   await expect(panel.getByRole("radio", { name: "Internal note" })).toBeChecked();
-  await panel.getByRole("textbox", { name: "Internal note (staff never see it)" }).fill("Probably the session cache again");
-  await panel.getByRole("button", { name: "Add note" }).click();
-  await expect(darlene.getByText("Note added")).toBeVisible();
 
-  const withAisha = panel.getByRole("region", { name: "With Aisha" });
-  const internal = panel.getByRole("region", { name: "Internal notes" });
-  await expect(withAisha).toContainText("Which filters did you have on?");
-  await expect(withAisha).not.toContainText("session cache");
-  await expect(internal).toContainText("Probably the session cache again");
-  await expect(internal).not.toContainText("Which filters");
+  // Both are in the one thread, oldest first; only the note carries the lock.
+  const items = panel.getByRole("listitem");
+  const note = items.filter({ hasText: "Probably the session cache again" });
+  const message = items.filter({ hasText: "Which filters did you have on?" });
+  await expect(note).toContainText("Internal");
+  await expect(message).not.toContainText("Internal");
+  const texts = await items.allInnerTexts();
+  expect(texts.findIndex((t) => t.includes("session cache"))).toBeLessThan(texts.findIndex((t) => t.includes("Which filters")));
 });

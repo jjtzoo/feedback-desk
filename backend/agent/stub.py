@@ -35,7 +35,7 @@ NOISE = (
 )
 EXISTING = (
     "Sounds like that one's already in. I can't look up or change existing items from here, but you "
-    "can follow it up yourself: open My feedback, pick the item and use Reply or add details. "
+    "can follow it up yourself: open it from its link or from My feedback, and add to its conversation there. "
     "If it's a new problem, tell me about it and I'll start a fresh report."
 )
 OFF_TOPIC = (

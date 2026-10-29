@@ -34,6 +34,12 @@ import {
 import { cn } from "@/lib/utils";
 
 type Turn = { role: "user" | "agent"; text: string; files?: Shown[] };
+
+/** The FB references someone typed ("FB-0001", "fb 12"), so the chat can link to them. Sig never looks
+ *  them up; the tracker decides what the person may see (their own in full, anyone else's in general). */
+function references(text: string) {
+  return [...new Set([...text.matchAll(/\bFB[-\s]?(\d{1,6})\b/gi)].map((m) => `FB-${m[1].padStart(4, "0")}`))].slice(0, 3);
+}
 type Mode = "starting" | "chat" | "fallback" | "done";
 
 /** The chat in progress in this tab, so a refresh picks it up again. The API only returns the
@@ -464,6 +470,17 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                       {t.files && <FileThumbs files={t.files} className="mt-2" />}
                     </div>
                   </li>
+                  {t.role === "agent" && i > 0 && turns[i - 1].role === "user" && references(turns[i - 1].text).length > 0 && (
+                    <li className="flex flex-wrap gap-2">
+                      {references(turns[i - 1].text).map((ref) => (
+                        <Button key={ref} asChild variant="outline" className="h-11 rounded-xl">
+                          <Link href={`/track/${ref}`}>
+                            <ExternalLink aria-hidden="true" /> Open {ref}
+                          </Link>
+                        </Button>
+                      ))}
+                    </li>
+                  )}
                   {i === 0 && cardsOpen && (
                     <li>
                       <AppCards projects={projects} usual={start?.usual ?? []} disabled={busy} onPick={(p) => void pickTool(p)} onElse={somethingElse} />
@@ -513,6 +530,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                       </li>
                     ))}
                   </ul>
+                  {card && <p className="mt-3 text-sm text-muted-foreground">Different problem? Press Confirm below to send yours as new.</p>}
                 </li>
               )}
               {card && (

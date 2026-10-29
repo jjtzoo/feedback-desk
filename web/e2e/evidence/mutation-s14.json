@@ -1,14 +1,15 @@
 {
-  "ran": "2026-10-28T03:18:21.394Z",
-  "commit": "a350eec",
+  "ran": "2026-10-29T03:20:29.212Z",
+  "commit": "3c2b2e5",
   "uncommitted": true,
   "spec": "14-status-changes.spec.ts",
-  "fingerprint": "0cedc3a65ade84c1",
+  "fingerprint": "9d92ba7ef2399e97",
   "caught": {
     "S14.01": true,
     "S14.02": true,
     "S14.03": true,
     "S14.04": true,
+    "S14.05": true,
     "S14.06": true,
     "S14.07": true,
     "S14.08": true,

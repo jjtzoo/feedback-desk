@@ -44,15 +44,16 @@ async function openPanel(page: Page, ref: string) {
   return panel;
 }
 
-/** A button in the panel's header, such as Update <name>; stage moves are in the Status menu (D91). */
-const headerButton = (panel: Locator, name: string) => panel.locator("header").getByRole("button", { name, exact: true });
+/** The Due row's Change link opens the due date dialog (D105); the panel itself is hidden while it is open. */
+async function openDueDialog(page: Page, panel: Locator) {
+  await panel.getByRole("button", { name: "Change", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Change the due date", exact: true });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
 
-/** The panel's update button and its dialog are named for the person who raised it (D79): "Update Aisha". */
-const updateButton = (panel: Locator) => panel.locator("header").getByRole("button", { name: /^Update [A-Z][a-z]+$/ });
-const updateDialog = (page: Page) => page.getByRole("dialog", { name: /^Update [A-Z][a-z]+ on progress$/ });
-
-/** Pick a day on the due date calendar (D79), moving month by month to the one it is in. */
-async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
+/** A day's button on the due date calendar (D79), opening it and moving month by month to the one it is in. */
+async function calendarDay(page: Page, dialog: Locator, iso: string) {
   await dialog.locator("#expected-by").click();
   const d = new Date(`${iso}T00:00:00`);
   const month = d.toLocaleDateString("en-AU", { month: "long" });
@@ -62,8 +63,13 @@ async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
     await page.getByRole("button", { name: back ? /previous month/i : /next month/i }).click();
   }
   // Day buttons are labelled "Monday, 26 October 2026" (with "Today, " in front for today).
-  await grid.getByRole("button", { name: new RegExp(`, ${d.getDate()} ${month} ${d.getFullYear()}$`) }).click();
-  await expect(grid).toHaveCount(0);
+  return grid.getByRole("button", { name: new RegExp(`, ${d.getDate()} ${month} ${d.getFullYear()}$`) });
+}
+
+/** Pick a day on the due date calendar. */
+async function pickExpectedBy(page: Page, dialog: Locator, iso: string) {
+  await (await calendarDay(page, dialog, iso)).click();
+  await expect(page.getByRole("grid")).toHaveCount(0);
 }
 
 /** The dialog an action opens over the panel; the panel itself is hidden from the page while it is open. */
@@ -79,7 +85,8 @@ async function openTracker(page: Page, ref: string) {
 }
 
 const band = (page: Page) => page.getByRole("heading", { level: 1 }).locator("..");
-const history = (page: Page) => page.getByRole("region", { name: "Tracking history" });
+/** The tracker's Conversation: one thread, oldest first (D105). */
+const conversation = (page: Page) => page.locator("section#activity");
 const bell = (page: Page) => page.getByRole("button", { name: /^Notifications/ });
 
 test("S14.01 Status, then Start work, on an Approved item gives In progress in one click, the tracker updates and the submitter is notified", async ({ page, signIn, team }) => {
@@ -98,13 +105,13 @@ test("S14.01 Status, then Start work, on an Approved item gives In progress in o
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Being worked on");
   const current = page.getByRole("region", { name: "Progress" }).getByRole("listitem").filter({ hasText: "In progress" });
   await expect(current).toContainText("current stage");
-  await expect(history(page)).toContainText("Darlene started work");
+  await expect(conversation(page)).toContainText("Darlene started work");
 
   await bell(page).click();
   await expect(page.getByRole("link", { name: new RegExp(`${ref} is being worked on`) })).toBeVisible();
 });
 
-test("S14.02 Post update with text and a due date shows both on the tracker and notifies the submitter", async ({ page, signIn, team }) => {
+test("S14.02 Changing the due date with a note shows both on the tracker and notifies the submitter", async ({ page, signIn, team }) => {
   await signIn("Aisha");
   const ref = await inProgress(page, team, "it-asset", "IT Asset barcode scanner");
   const update = "Waiting on the vendor for a patch";
@@ -112,9 +119,8 @@ test("S14.02 Post update with text and a due date shows both on the tracker and 
 
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
-  await updateButton(panel).click();
-  const dialog = updateDialog(darlene);
-  await dialog.getByLabel("Update", { exact: true }).fill(update);
+  const dialog = await openDueDialog(darlene, panel);
+  await dialog.getByLabel("Note for them (optional)").fill(update);
   await pickExpectedBy(darlene, dialog, expectedBy);
   await submit(dialog).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
@@ -123,15 +129,16 @@ test("S14.02 Post update with text and a due date shows both on the tracker and 
   await openTracker(page, ref);
   await expect(band(page)).toContainText(dayText(expectedBy));
   await expect(band(page)).toContainText("Expected by");
-  await expect(page.getByRole("region", { name: "Latest update" })).toContainText(update);
-  await expect(history(page).getByRole("listitem").filter({ hasText: "Update from Darlene" })).toContainText(update);
-  await expect(history(page)).toContainText(new RegExp(`Expected by ${dayText(expectedBy).source}`));
+  const note = conversation(page).getByRole("listitem").filter({ hasText: update });
+  await expect(note).toHaveCount(1);
+  await expect(note).toContainText("Darlene");
+  await expect(conversation(page)).toContainText(new RegExp(`Expected by ${dayText(expectedBy).source}`));
 
   await bell(page).click();
   await expect(page.getByRole("link", { name: new RegExp(`Update on ${ref}, expected by`) })).toBeVisible();
 });
 
-test("S14.03 An update with only a date is accepted; one with neither says 'Write an update or set a due date.'", async ({ page, signIn, team }) => {
+test("S14.03 A new due date with no note is accepted; no new date says 'Choose a new due date.'", async ({ page, signIn, team }) => {
   await signIn("Tom");
   const ref = await inProgress(page, team, "workflow-atlas", "Workflow Atlas process map");
   const expectedBy = isoDay(10);
@@ -139,31 +146,25 @@ test("S14.03 An update with only a date is accepted; one with neither says 'Writ
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
 
-  // A date and no words.
-  await updateButton(panel).click();
-  const dateOnly = updateDialog(darlene);
-  await pickExpectedBy(darlene, dateOnly, expectedBy);
-  await submit(dateOnly).click();
-  await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
-  await expect(dateOnly).toHaveCount(0);
-
-  // Neither: refused on the screen, and by the server for anyone who skips the screen.
-  await updateButton(panel).click();
-  const neither = updateDialog(darlene);
+  // No new date: refused on the screen, and by the server for anyone who skips the screen.
+  const neither = await openDueDialog(darlene, panel);
   await submit(neither).click();
-  await expect(neither.getByRole("alert")).toHaveText("Write an update or set a due date.");
+  await expect(neither.getByRole("alert")).toHaveText("Choose a new due date.");
   await expect(neither).toBeVisible();
   const refused = await darlene.request.post(`/api/console/items/${ref}/update`, { data: { body: "", expected_by: null } });
   expect(refused.ok()).toBe(false);
-  await neither.getByRole("button", { name: "Cancel" }).click();
+
+  // A date and no words.
+  await pickExpectedBy(darlene, neither, expectedBy);
+  await submit(neither).click();
+  await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
   await expect(neither).toHaveCount(0);
 
-  // The tracker has the date, and no written update.
+  // The tracker has the date, and no written message from Darlene.
   await openTracker(page, ref);
   await expect(band(page)).toContainText(dayText(expectedBy));
-  await expect(history(page)).toContainText("Expected by");
-  await expect(history(page)).not.toContainText("Update from");
-  await expect(page.getByRole("region", { name: "Latest update" })).toHaveCount(0);
+  await expect(conversation(page)).toContainText("Expected by");
+  await expect(conversation(page).getByRole("listitem").filter({ hasText: "has it" })).toHaveCount(0);
 });
 
 test("S14.04 Expected by yesterday: the card says Overdue in red, the column header counts it and the Overdue inbox lists it", async ({ page, signIn, team }) => {
@@ -171,13 +172,14 @@ test("S14.04 Expected by yesterday: the card says Overdue in red, the column hea
   const ref = await inProgress(page, team, "afss-portal", "AFSS Portal booking calendar");
   const yesterday = isoDay(-1);
 
+  // The calendar offers no day already gone, so yesterday is set through the API, after the screen shows it can't be picked.
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
-  await updateButton(panel).click();
-  const dialog = updateDialog(darlene);
-  await pickExpectedBy(darlene, dialog, yesterday);
-  await submit(dialog).click();
-  await expect(dialog).toHaveCount(0);
+  const dialog = await openDueDialog(darlene, panel);
+  await expect(await calendarDay(darlene, dialog, yesterday)).toBeDisabled();
+  await darlene.keyboard.press("Escape");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await postJson(darlene, `/console/items/${ref}/update`, { body: "", expected_by: yesterday, due_reason: "Overdue on purpose" });
 
   // Board view, Assigned to me: the In progress column.
   await darlene.request.put("/api/console/view", { data: { view: "board" } });
@@ -221,9 +223,8 @@ test("S14.05 Resolve needs a note; with a note it becomes the tracker's last ent
 
   await openTracker(page, ref);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Resolved");
-  await expect(history(page)).toContainText("Resolved by Darlene");
-
-  await expect(history(page).getByRole("listitem").first()).toContainText(`Resolved by Darlene${note}`);
+  await expect(conversation(page)).toContainText("Resolved by Darlene");
+  await expect(conversation(page).getByRole("listitem").last()).toContainText(`Resolved by Darlene: ${note}`);
 });
 
 test("S14.06 Close asks how it ends and shows the reason on the tracker; Won't fix without a reason is refused", async ({ page, signIn, team }) => {
@@ -294,14 +295,14 @@ test("S14.08 On a Resolved item Darlene's Status menu has no Close; as Chris, Cl
   await submit(dialog).click();
   await expect(chris.getByText("Saved", { exact: true })).toBeVisible();
   await expect(panel.locator("header").getByText("Fixed", { exact: true })).toBeVisible();
-  await panel.getByRole("tab", { name: "Activity" }).click();
-  await expect(panel.getByRole("region", { name: "History" })).toContainText("Chris · Closed as fixed for them: Tom confirmed it on the phone");
+  await panel.getByRole("tab", { name: "Conversation" }).click();
+  await expect(panel.getByRole("tabpanel")).toContainText("Chris · Closed as fixed for them: Tom confirmed it on the phone");
 
   await openTracker(page, ref);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Fixed");
   await expect(page.getByText("Reason:")).toHaveCount(0);
   await expect(page.getByText("Tom confirmed it on the phone")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Tracking history" }).getByRole("listitem").first()).toContainText("Closed as fixed by Chris");
+  await expect(conversation(page).getByRole("listitem").last()).toContainText("Closed as fixed by Chris");
   const last = page.getByRole("region", { name: "Progress" }).getByRole("listitem").filter({ hasText: "Fixed" });
   await expect(last).toContainText("current stage");
 });
@@ -326,20 +327,19 @@ test("S14.07 The dashboard's Avg time to first response changes after the first 
   await expect(average).toHaveText(/^\d+(\.\d+)? h$/);
 });
 
-test("S14.09 Update Liam says when to use it and picks the due date on a calendar in the app's date style; Resolve shows an example", async ({ page, signIn, team }) => {
+test("S14.09 Change the due date says what the date is for and picks it on a calendar in the app's date style, with no Ask them to check it; Resolve shows an example", async ({ page, signIn, team }) => {
   await signIn("Darlene");
   const ref = await inProgress(await team.as("Liam"), team, "rake-agent", "RAKE Agent training calendar");
   const panel = await openPanel(page, ref);
-  await headerButton(panel, "Update Liam").click();
-  const update = actionDialog(page, "Update Liam on progress");
-  await expect(update).toContainText("a fix ready to try");
+  const update = await openDueDialog(page, panel);
+  await expect(update).toContainText("They see it as Expected by");
   await expect(update.locator("#expected-by")).toHaveText("Pick a date");
   await update.locator("#expected-by").click();
   await page.getByRole("grid").locator("button:not([disabled])").last().click();
   const picked = update.locator("#expected-by");
   await expect(picked).toHaveText(/^[A-Z][a-z]{2},? \d{1,2} [A-Z][a-z]{2}$/);
   await expect(picked).not.toHaveText(/\d+\/\d+\/\d{4}/);
-  await expect(update.getByRole("checkbox", { name: /Ask them to check it/ })).toBeVisible();
+  await expect(update.getByRole("checkbox")).toHaveCount(0);
   await update.getByRole("button", { name: "Cancel" }).click();
 
   await moveTo(page, panel, "Resolve…");
@@ -357,8 +357,7 @@ test("S14.10 Moving the due date after approval asks why, for the Digital team o
 
   const darlene = await team.as("Darlene");
   const panel = await openPanel(darlene, ref);
-  await updateButton(panel).click();
-  const dialog = updateDialog(darlene);
+  const dialog = await openDueDialog(darlene, panel);
   await expect(dialog).toContainText("Now due");
   await pickExpectedBy(darlene, dialog, later);
   const why = dialog.getByRole("textbox", { name: "Why the date moved (only the Digital team sees it)" });
@@ -368,8 +367,8 @@ test("S14.10 Moving the due date after approval asks why, for the Digital team o
   await why.fill(reason);
   await submit(dialog).click();
   await expect(darlene.getByText("Saved", { exact: true })).toBeVisible();
-  await openActivity(panel, "History");
-  await expect(panel.getByRole("region", { name: "History" })).toContainText(`: ${reason}`);
+  await openActivity(panel);
+  await expect(panel.getByRole("tabpanel")).toContainText(`: ${reason}`);
 
   const told = (await getJson<{ items: { title: string; body: string }[] }>(chris, "/notifications")).items.find((n) => n.title.startsWith(`${ref}: due date moved from`));
   expect(told?.body).toBe(`Darlene: ${reason}`);
