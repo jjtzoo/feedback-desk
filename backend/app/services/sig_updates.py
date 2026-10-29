@@ -1,4 +1,5 @@
-"""Sig writes what the person who raised an item reads when it moves (D105).
+"""Sig writes what the person who raised an item reads when it moves (D105), and the first wording of
+each Friday release item (D111).
 
 The model gets the move's facts only and writes one or two plain sentences. The template, which says
 the same facts, is used when the model is the stub, isn't configured, is over budget (D36), fails or is
@@ -24,17 +25,31 @@ INSTRUCTION = (
     "Australian English. No greeting, no sign-off, no emoji, no markdown. Quote a reason given in the facts "
     "in full."
 )
+RELEASE_TITLE = (
+    "You are Sig, the assistant in REDADAIR's feedback app. Write the headline of one entry in this week's "
+    "Fixes and updates, read by all staff. The Digital team has finished this item. Say what is better now for "
+    "the people who use the tool, using only the facts given: never add a cause, a number, a date or a detail "
+    "that isn't in them. Under 10 words, sentence case, no full stop, no emoji, no markdown, Australian English."
+)
+RELEASE_BODY = (
+    "You are Sig, the assistant in REDADAIR's feedback app. Write the one-line description of an entry in this "
+    "week's Fixes and updates, read by all staff. The Digital team has finished this item. In one plain sentence "
+    "under 30 words, say what used to go wrong or was missing and what happens now, using only the facts given: "
+    "never add a cause, a number, a date or a detail that isn't in them. No emoji, no markdown, Australian English."
+)
 
 
-async def say(db: AsyncSession, template: str, facts: str) -> str:
-    """Sig's words for a move, or the template."""
+async def say(db: AsyncSession, template: str, facts: str, instruction: str = INSTRUCTION) -> str:
+    """Sig's words for a move (or, with another instruction, a release item), or the template."""
     from app.agent_runtime import model_choice
 
     choice = model_choice()
     if choice.provider not in ("gemini", "vertex") or not choice.configured or await usage.over_budget(db):
         return template
     try:
-        text, input_tokens, output_tokens = await asyncio.wait_for(_generate(choice.name, facts), TIMEOUT_SECONDS)
+        text, input_tokens, output_tokens = await asyncio.wait_for(
+            _generate(choice.name, facts, instruction), TIMEOUT_SECONDS
+        )
     except Exception:
         log.warning("Sig's update failed; the template is used", exc_info=True)
         return template
@@ -43,7 +58,7 @@ async def say(db: AsyncSession, template: str, facts: str) -> str:
     return text[:MAX_CHARS] if text else template
 
 
-async def _generate(model: str, facts: str) -> tuple[str, int, int]:
+async def _generate(model: str, facts: str, instruction: str) -> tuple[str, int, int]:
     def call() -> tuple[str, int, int]:
         from google import genai
         from google.genai import types
@@ -52,7 +67,7 @@ async def _generate(model: str, facts: str) -> tuple[str, int, int]:
             model=model,
             contents=facts,
             config=types.GenerateContentConfig(
-                system_instruction=INSTRUCTION, temperature=0.3, max_output_tokens=MAX_OUTPUT_TOKENS
+                system_instruction=instruction, temperature=0.3, max_output_tokens=MAX_OUTPUT_TOKENS
             ),
         )
         meta = result.usage_metadata
