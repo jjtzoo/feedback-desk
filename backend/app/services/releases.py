@@ -11,12 +11,22 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.errors import Conflict, Forbidden, NotFound, ServiceError
-from app.models import Feedback, FeedbackFollower, FeedbackMessage, Project, ProjectMessage, Release, ReleaseItem
+from app.models import (
+    Feedback,
+    FeedbackFollower,
+    FeedbackMessage,
+    Project,
+    ProjectMessage,
+    Release,
+    ReleaseItem,
+    ReleaseItemThanks,
+)
 from app.services import events, notifications
 from app.services.actors import SYSTEM, User
 from app.services.console import require_digital
@@ -272,3 +282,38 @@ async def whats_new(db: AsyncSession) -> list[tuple[Release, Project, list[Relea
         )
         out.append((release, project, items))
     return out
+
+
+async def thanks_for(db: AsyncSession, ids: list[uuid.UUID], email: str) -> tuple[dict[uuid.UUID, int], set[uuid.UUID]]:
+    """Each item's 👍 Thanks count, and the items this person thanked (D110)."""
+    if not ids:
+        return {}, set()
+    rows = await db.execute(
+        select(ReleaseItemThanks.release_item_id, func.count())
+        .where(ReleaseItemThanks.release_item_id.in_(ids))
+        .group_by(ReleaseItemThanks.release_item_id)
+    )
+    mine = await db.scalars(
+        select(ReleaseItemThanks.release_item_id).where(
+            ReleaseItemThanks.release_item_id.in_(ids), ReleaseItemThanks.email == email
+        )
+    )
+    return {i: int(n) for i, n in rows.all()}, set(mine)
+
+
+async def set_thanks(db: AsyncSession, item_id: uuid.UUID, email: str, on: bool) -> None:
+    """Give or take back a 👍 Thanks, only on an item staff can see in a published release (D110)."""
+    item = await db.get(ReleaseItem, item_id)
+    release = await db.get(Release, item.release_id) if item else None
+    if item is None or release is None or release.status != "published" or not item.visible_to_staff:
+        raise NotFound("We can't find that update.")
+    if on:
+        await db.execute(
+            insert(ReleaseItemThanks).values(release_item_id=item_id, email=email).on_conflict_do_nothing()
+        )
+    else:
+        await db.execute(
+            delete(ReleaseItemThanks).where(
+                ReleaseItemThanks.release_item_id == item_id, ReleaseItemThanks.email == email
+            )
+        )

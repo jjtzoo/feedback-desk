@@ -91,6 +91,19 @@ async def test_friday_release_draft_review_and_publish(
     t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
     assert any(h["text"].startswith("Included in the RAKE Agent release") for h in t["history"])
 
+    # A Thanks counts once per person, shows only as a number, and can be taken back (D110).
+    item = news[0]["items"][0]["id"]
+    for _ in range(2):
+        assert (await staff.put(f"/api/whats-new/items/{item}/thanks")).status_code == 204
+    assert (await darlene.put(f"/api/whats-new/items/{item}/thanks")).status_code == 204
+    mine = (await staff.get("/api/whats-new")).json()[0]["items"][0]
+    assert (mine["thanks"], mine["thanked"]) == (2, True)
+    assert (await staff.delete(f"/api/whats-new/items/{item}/thanks")).status_code == 204
+    mine = (await staff.get("/api/whats-new")).json()[0]["items"][0]
+    assert (mine["thanks"], mine["thanked"]) == (1, False)
+    hidden = by_source["channel"]["id"]  # unticked, so staff never see it
+    assert (await staff.put(f"/api/whats-new/items/{hidden}/thanks")).status_code == 404
+
 
 async def test_dashboard_numbers(marc: httpx.AsyncClient, staff: httpx.AsyncClient, darlene: httpx.AsyncClient) -> None:
     await _resolved_item(staff, marc, darlene)

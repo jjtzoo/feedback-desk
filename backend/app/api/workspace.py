@@ -60,6 +60,7 @@ async def list_releases(db: Db, user: DigitalUser) -> list[ReleaseOut]:
 
 async def _release(db: Db, user: CurrentUser, release_id: uuid.UUID) -> ReleaseOut:
     release, project, items = await releases.get(db, user, release_id)
+    counts, _ = await releases.thanks_for(db, [i.id for i in items], user.email)
     return ReleaseOut(
         id=release.id,
         project=ProjectOut.model_validate(project),
@@ -67,7 +68,7 @@ async def _release(db: Db, user: CurrentUser, release_id: uuid.UUID) -> ReleaseO
         status=release.status,
         published_at=release.published_at,
         can_publish=await releases.can_publish(db, user, release),
-        items=[ReleaseItemOut.model_validate(i) for i in items],
+        items=[ReleaseItemOut.model_validate(i).model_copy(update={"thanks": counts.get(i.id, 0)}) for i in items],
     )
 
 

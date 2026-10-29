@@ -106,6 +106,9 @@ export default function ReleaseReviewPage() {
                 Staff can see this
               </label>
               <span className="text-xs text-muted-foreground">{SOURCE[i.source_type]}</span>
+              {release.status === "published" && !!i.thanks && (
+                <span className="text-xs text-muted-foreground">👍 {i.thanks} from staff</span>
+              )}
               {editable && (
                 <Button variant="ghost" size="icon" className="ml-auto" aria-label="Remove item" onClick={() => setItems((all) => all.filter((x) => x.key !== i.key))}>
                   <Trash2 />

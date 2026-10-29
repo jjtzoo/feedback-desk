@@ -396,6 +396,9 @@ export interface ReleaseItem {
   source_id: string | null;
   visible_to_staff: boolean;
   yours?: boolean;
+  /** 👍 Thanks on a published item: how many, and whether you gave one (D110). */
+  thanks?: number;
+  thanked?: boolean;
 }
 
 export interface Release {

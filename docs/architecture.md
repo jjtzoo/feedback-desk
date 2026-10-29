@@ -47,7 +47,7 @@ Tables in schema `app` (models in `backend/app/models/entities.py`, migrations i
 | `feedback_embeddings` | pgvector embeddings for duplicate search |
 | `notifications`, `notification_mutes` | The bell and its emails (title and body masked, then cut to 300 characters); per-item mutes. An ask (needs approval, assigned, ready to start, asked about) settles for everyone once anyone acts, with `outcome` saying what happened (D54); each Admin has one standing approvals row, updated in place and never emailed (D55); `updated_at` lets the bell's stream see rows change in place. `step` names the stage in a word or two; the bell groups rows by item with the steps as a trail, and the worker sends one email for one person's rows about one item that are due together (D78). Links open the panel at the message (`&tab=activity&msg=`) or the tracker at `#latest` (D81). Clear sets `cleared_at`, which takes rows out of the bell but not off the notifications page (`/notifications`, `/console/notifications`), which lists the last 90 days (D108) |
 | `item_reads` | When each Digital Staff member last opened an item; later replies, notes and updates from others show as New in the panel and New reply on the list and board (D82) |
-| `project_messages`, `releases`, `release_items` | Project channels and Friday releases |
+| `project_messages`, `releases`, `release_items`, `release_item_thanks` | Project channels and Friday releases; one Thanks per person per published item, shown as a count (D110) |
 | `user_sessions`, `user_preferences`, `job_runs` | Sign-in sessions, remembered console view, scheduled-job slots |
 
 ## Environments (D25)
