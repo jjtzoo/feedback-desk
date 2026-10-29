@@ -82,6 +82,8 @@ export interface Attachment {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  /** Added with an internal note: the Digital team only (D107). */
+  is_internal: boolean;
 }
 
 export interface ChatCard {

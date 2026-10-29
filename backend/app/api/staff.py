@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, Db
 from app.config import get_settings
-from app.errors import Conflict, NotFound
+from app.errors import Conflict, Forbidden, NotFound
 from app.models import Attachment, Feedback, FeedbackFollower
 from app.models.enums import STAGE_OF
 from app.schemas import (
@@ -167,12 +167,23 @@ async def still_an_issue(ref: str, body: StillAnIssueIn, db: Db, user: CurrentUs
 
 
 @router.post("/feedback/{ref}/attachments", response_model=AttachmentOut, status_code=201)
-async def add_file(ref: str, db: Db, user: CurrentUser, file: UploadFile = File(...)) -> AttachmentOut:  # noqa: B008
+async def add_file(
+    ref: str,
+    db: Db,
+    user: CurrentUser,
+    file: UploadFile = File(...),  # noqa: B008
+    internal: bool = Query(False),
+) -> AttachmentOut:
+    """A file on the item; internal=true (the Digital team only) goes with an internal note (D107)."""
     fb = await feedback_service.load(db, ref_no=ref)
     if not feedback_service.sees_in_full(user, fb):
         raise NotFound("We can't find that feedback.")
+    if internal and not user.is_digital:
+        raise Forbidden("Only the Digital team can add files to internal notes.")
     content = await file.read(get_settings().max_file_mb * 1024 * 1024 + 1)
-    att = await files.save(db, files.Upload(file.filename or "file", content), user.email, feedback_id=fb.id)
+    att = await files.save(
+        db, files.Upload(file.filename or "file", content), user.email, feedback_id=fb.id, is_internal=internal
+    )
     if not user.is_digital:
         fb.submitter_replied_at = datetime.now(UTC)
         await notifications.notify_assignee(
@@ -207,7 +218,7 @@ async def open_file(attachment_id: uuid.UUID, db: Db, user: CurrentUser) -> Resp
             raise NotFound("No such file.")
     else:
         fb = await db.get(Feedback, att.feedback_id)
-        if fb is None or not feedback_service.sees_in_full(user, fb):
+        if fb is None or not feedback_service.sees_in_full(user, fb) or (att.is_internal and not user.is_digital):
             raise NotFound("No such file.")
     return RedirectResponse(await files.signed_url(att), status_code=303)
 

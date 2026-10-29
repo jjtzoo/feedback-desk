@@ -279,6 +279,8 @@ class Attachment(Base):
     size_bytes: Mapped[int] = mapped_column(BigInteger)
     extracted_text: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(String(300))
+    # Added with an internal note: the Digital team only, never on the tracker (D107).
+    is_internal: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     created_at: Mapped[datetime] = _now()
 
 

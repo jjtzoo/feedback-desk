@@ -525,7 +525,12 @@ async def tracker(db: AsyncSession, user: User, ref_no: str) -> TrackerView:
         target = await db.get(Feedback, fb.duplicate_of)
         merged = target.ref_no if target else None
     files = list(
-        await db.scalars(select(Attachment).where(Attachment.feedback_id == fb.id).order_by(Attachment.created_at))
+        await db.scalars(
+            select(Attachment)
+            # An internal note's images stay with the Digital team (D107).
+            .where(Attachment.feedback_id == fb.id, Attachment.is_internal.is_(False))
+            .order_by(Attachment.created_at)
+        )
     )
     return TrackerView(
         feedback=fb,
