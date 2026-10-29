@@ -25,7 +25,7 @@ export type ThreadEntry = {
 };
 
 /** One conversation per item (D105): messages and changes together, oldest at the top, sitting straight on
- *  the page. An internal message has an amber line and a lock, never a box. */
+ *  the page. An internal message sits in an amber box with a lock, so it can't be taken for a reply (D107). */
 export function ActivityThread({ entries, empty }: { entries: ThreadEntry[]; empty: string }) {
   if (entries.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
   return (
@@ -36,7 +36,7 @@ export function ActivityThread({ entries, empty }: { entries: ThreadEntry[]; emp
             <Avatar className="size-8">
               <AvatarFallback className="bg-muted text-xs font-bold">{initials(e.who)}</AvatarFallback>
             </Avatar>
-            <div className={cn("min-w-0 text-sm", e.internal && "border-l-2 border-warning pl-3")}>
+            <div className={cn("min-w-0 text-sm", e.internal && "rounded-xl border border-warning/60 bg-warning-tint px-3 py-2")}>
               <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                 {e.marks}
                 <span className="text-sm font-semibold text-foreground">{e.who}</span>

@@ -12,6 +12,8 @@ import { RoutingLine } from "@/components/console/routing-line";
 import { StatusMenu } from "@/components/console/status-menu";
 import { useMe } from "@/components/me";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +53,8 @@ const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
 ];
 // The panel's tabs: one conversation, Activity, holds the messages and the changes (D105).
 const TABS = ["brief", "activity", "files"];
+/** This browser's choice to show the changes in a conversation (a convenience, not shared). */
+const SHOW_CHANGES = "feedback-show-changes";
 // Links written before D105 name the tabs Activity replaced.
 const OLD_TABS = ["reporter", "team", "history"];
 /** What the composer sends: a reply the person who raised it sees, or an internal note (D96). */
@@ -112,6 +116,23 @@ export function ItemPanel({
   const imageInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The changes between the messages ("Darlene started work"), on unless this browser turned them off.
+  // The panel draws it only once the item has loaded in the browser, so it can be read here.
+  const [showChanges, setShowChanges] = useState(() => {
+    try {
+      return typeof window === "undefined" || window.localStorage.getItem(SHOW_CHANGES) !== "0";
+    } catch {
+      return true; // storage blocked: the changes stay shown
+    }
+  });
+  function toggleChanges(on: boolean) {
+    setShowChanges(on);
+    try {
+      window.localStorage.setItem(SHOW_CHANGES, on ? "1" : "0");
+    } catch {
+      // Storage blocked: the choice lasts until the page closes.
+    }
+  }
 
   const load = useCallback(() => {
     if (!reference) return;
@@ -618,7 +639,13 @@ export function ItemPanel({
                 <TabsContent value="activity" className="grid gap-4 pt-3">
                   <ThreadPeople people={people} />
                   {pinned.length > 0 && <ActivityThread entries={pinned} empty="" />}
-                  <ActivityThread entries={entries} empty="Nothing yet." />
+                  <div className="flex items-center justify-end gap-2">
+                    <Switch id="show-changes" size="sm" checked={showChanges} onCheckedChange={toggleChanges} />
+                    <Label htmlFor="show-changes" className="text-sm font-normal text-muted-foreground">
+                      Show changes
+                    </Label>
+                  </div>
+                  <ActivityThread entries={showChanges ? entries : entries.filter((e) => e.who)} empty="Nothing yet." />
                   {open && composer}
                 </TabsContent>
 
