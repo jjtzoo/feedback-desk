@@ -57,6 +57,12 @@ const OLD_TABS = ["reporter", "team", "history"];
 type Side = "reply" | "note";
 type Field = "project_slug" | "work_type" | "category" | "priority";
 
+/** Two references in the order they came in: one sequence numbers them, so the lower one was first. */
+function ordered(a: string, b: string) {
+  const [first, later] = Number(a.replace(/\D/g, "")) < Number(b.replace(/\D/g, "")) ? [a, b] : [b, a];
+  return { first, later };
+}
+
 function percent(n: number | undefined) {
   return n === undefined ? "–" : `${Math.round(n * 100)}%`;
 }
@@ -282,6 +288,8 @@ export function ItemPanel({
         ...(approverName ? [{ name: approverName, role: "Admin · approved it" }] : []),
       ]
     : [];
+  // Merge from a duplicate's button: the dialog names which one closes into which (the server decides the same way).
+  const merging = item && dialog?.kind === "merge" && dialog.text ? ordered(item.reference, dialog.text) : null;
   const reply = side === "reply";
   const composer = (
     <form onSubmit={(e) => void sendMessage(e)} className={cn("grid gap-2 rounded-2xl border p-3", reply ? "border-primary/50" : "border-dashed border-warning/60 bg-warning-tint")}>
@@ -623,9 +631,17 @@ export function ItemPanel({
                   ? `Take ${item.reference} over from ${holder}?`
                   : dialog?.kind === "approve"
                       ? `Approve ${item.reference}`
-                      : undefined
+                      : merging
+                        ? `Merge ${merging.later} into ${merging.first}?`
+                        : undefined
               }
-              description={dialog?.kind === "take_over" ? `${takeOverText} They are told in the app and by email; the stage, due date and updates stay as they are.` : undefined}
+              description={
+                dialog?.kind === "take_over"
+                  ? `${takeOverText} They are told in the app and by email; the stage, due date and updates stay as they are.`
+                  : merging
+                    ? `${merging.later} closes as a duplicate of ${merging.first}, the first report, which keeps everything. Whoever raised or follows ${merging.later} follows ${merging.first} instead and counts in its tally. There's no undo.`
+                    : undefined
+              }
               people={staff.filter((s) => s.active && s.id !== item.assignee?.id)}
               priority={item.priority}
               due={item.expected_by}

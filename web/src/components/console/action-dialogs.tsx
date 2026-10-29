@@ -77,9 +77,9 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
   // Whichever item it starts from, the newer one closes into the first report (brief §4.2.6).
   merge: {
     title: "Merge duplicates",
-    description: "The newer of the two closes into the first report, which keeps everything; everyone following it follows the first report instead.",
+    description: "The newer of the two closes into the first report, which keeps everything; everyone following it follows the first report instead. There's no undo.",
     field: "Other reference",
-    button: "Merge",
+    button: "Yes, merge",
     required: true,
   },
   // The title and description come from the item: whose it is and what they last did (D53).
@@ -296,7 +296,7 @@ export function ActionDialog({
           <div className="grid gap-2">
             <Label htmlFor="action-text">{copy.field}</Label>
             {kind === "merge" ? (
-              <Input id="action-text" placeholder="FB-0138" value={text} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
+              <Input id="action-text" placeholder="FB-0138" value={text} readOnly={kind === "merge" && Boolean(initialText)} onChange={(e) => setText(e.target.value.toUpperCase())} className="h-11 rounded-xl font-mono" />
             ) : (
               <Textarea id="action-text" rows={4} value={text} maxLength={4000} placeholder={copy.placeholder} onChange={(e) => setText(e.target.value)} className="rounded-xl" />
             )}

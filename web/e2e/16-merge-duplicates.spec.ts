@@ -84,8 +84,11 @@ test("S16.01 'Merge' closes the newer item, its tracker says 'Duplicate of FB-â€
   await duplicates.getByRole("button", { name: "Merge", exact: true }).click();
 
   // The suggested merge goes through the same dialog as a typed one, pre-filled, and nothing happens until it is confirmed.
-  const dialog = darlene.getByRole("dialog", { name: "Merge duplicates", exact: true });
-  await expect(dialog.getByLabel("Original reference")).toHaveValue(original);
+  // It says which one closes into which, before anything happens, and that there's no undo.
+  const dialog = darlene.getByRole("dialog", { name: `Merge ${separate} into ${original}?`, exact: true });
+  await expect(dialog).toContainText(`${separate} closes as a duplicate of ${original}`);
+  await expect(dialog).toContainText("There's no undo.");
+  await expect(dialog.getByLabel("Other reference")).toHaveValue(original);
   expect((await getJson<Item>(darlene, `/console/items/${separate}`)).merged_into, "nothing is merged before the dialog is confirmed").toBeNull();
   await dialog.locator('button[type="submit"]').click();
   await expect(dialog).toHaveCount(0);
@@ -113,8 +116,8 @@ test("S16.02 'Merge with another referenceâ€¦' with a typed FB number gives the 
   await duplicates.getByRole("button", { name: /^Merge with another reference/ }).click();
 
   const dialog = darlene.getByRole("dialog", { name: "Merge duplicates", exact: true });
-  await dialog.getByLabel("Original reference").fill(typed.toLowerCase());
-  await expect(dialog.getByLabel("Original reference")).toHaveValue(typed);
+  await dialog.getByLabel("Other reference").fill(typed.toLowerCase());
+  await expect(dialog.getByLabel("Other reference")).toHaveValue(typed);
   await dialog.locator('button[type="submit"]').click();
   await expect(dialog).toHaveCount(0);
   await expect(duplicates).toContainText(`Merged into ${typed}.`);
