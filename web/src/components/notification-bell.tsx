@@ -125,21 +125,26 @@ export function NotificationBell({ tone = "light" }: { tone?: "light" | "dark" }
               <li key={n.id}>
                 <Link href={n.link} onClick={() => readGroup(group)} className="flex gap-3 px-4 py-3 hover:bg-muted">
                   <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", unreadRow ? "bg-foreground" : "bg-transparent")} aria-hidden="true" />
-                  <span className="min-w-0 flex-1">
-                    <span className={cn("block text-sm", unreadRow && "font-semibold")}>{n.outcome ?? n.title}</span>
+                  {/* Who did what leads; the steps are small, with the latest one darker; what was said reads as a quote. */}
+                  <span className="grid min-w-0 flex-1 gap-1.5">
+                    <span className={cn("block text-sm text-foreground", unreadRow ? "font-semibold" : "font-medium")}>{n.outcome ?? n.title}</span>
                     {trail.length > 1 && (
-                      <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                      <span className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
                         <span className="sr-only">Steps so far: {trail.join(", then ")}</span>
                         {trail.map((step, i) => (
-                          <span key={`${step}-${i}`} className="inline-flex items-center gap-1" aria-hidden="true">
-                            {i > 0 && <ArrowRight className="size-3" />}
+                          <span
+                            key={`${step}-${i}`}
+                            className={cn("inline-flex items-center gap-1", i === trail.length - 1 && "font-medium text-foreground")}
+                            aria-hidden="true"
+                          >
+                            {i > 0 && <ArrowRight className="size-3 text-muted-foreground" />}
                             {step}
                           </span>
                         ))}
                       </span>
                     )}
-                    {summary && <span className="line-clamp-2 block text-sm text-muted-foreground">{summary}</span>}
-                    <span className="mt-1 flex flex-wrap items-center gap-2">
+                    {summary && <span className="line-clamp-2 block border-l-2 pl-2.5 text-sm text-foreground/80">{summary}</span>}
+                    <span className="flex flex-wrap items-center gap-2">
                       <ItemBadge n={n} />
                       <time dateTime={n.created_at} title={when(n.created_at)} className="font-mono text-xs text-muted-foreground tabular">
                         {age(n.created_at)}
