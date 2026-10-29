@@ -102,7 +102,7 @@ cd web && npm run test:e2e:mutation -- 04              # shows each test of sect
 
 Backend tests need no Docker: they start a throwaway Postgres 16 + pgvector, or use `TEST_DATABASE_URL`.
 
-Browser tests start their own API (port 8002, `backend/scripts/e2e_server.py`, with a supervisor on 8012 that restarts it without a model for S06) and web build (port 3100) on a separate `fd_e2e` database with the scripted stub model, so they never touch the servers on 8001 and 3000. The full run (`web/e2e/shards.mjs`) builds the web app once and splits the spec files into shards (2 by default, `E2E_SHARDS` changes it), each with its own API, web server and `fd_e2e_<n>` database on ports 87n2, 37n0 and 87n9, then merges their reports so the coverage step reads one result. First time only: `cd web && npx playwright install chromium`. Rules for writing them, and the bugs they found: `web/e2e/CLAUDE.md`, `web/e2e/FINDINGS.md`.
+Browser tests start their own API (port 8002, `backend/scripts/e2e_server.py`, with a supervisor on 8012 that restarts it without a model for S06) and web build (port 3100) on a separate `fd_e2e` database with the scripted stub model, so they never touch the servers on 8001 and 3000. The full run (`web/e2e/shards.mjs`) builds the web app once and splits the spec files into shards (2 by default, the fastest reliable count measured, see `web/e2e/CLAUDE.md`; `E2E_SHARDS` changes it), each with its own API, web server and `fd_e2e_<n>` database on ports 87n2, 37n0 and 87n9, then merges their reports so the coverage step reads one result. First time only: `cd web && npx playwright install chromium`. Rules for writing them, and the bugs they found: `web/e2e/CLAUDE.md`, `web/e2e/FINDINGS.md`.
 
 ## Build and deploy
 
