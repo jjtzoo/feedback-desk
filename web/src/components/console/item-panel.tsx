@@ -476,7 +476,8 @@ export function ItemPanel({
               </aside>
 
               <Tabs value={tab} onValueChange={setTab} className="min-w-0">
-                <TabsList className="w-full">
+                {/* Five tabs are wider than a phone: the row scrolls rather than clipping the last one. */}
+                <TabsList className="w-full justify-start overflow-x-auto">
                   <TabsTrigger value="brief">Brief</TabsTrigger>
                   <TabsTrigger value="reporter">
                     With {firstName} ({withThem.length})
