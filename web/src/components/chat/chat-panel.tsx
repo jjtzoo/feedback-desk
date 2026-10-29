@@ -530,6 +530,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
                       </li>
                     ))}
                   </ul>
+                  {card && <p className="mt-3 text-sm text-muted-foreground">Different problem? Press Confirm below to send yours as new.</p>}
                 </li>
               )}
               {card && (
