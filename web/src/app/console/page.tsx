@@ -246,7 +246,7 @@ function Work() {
   const position = item ? order.indexOf(item) : -1;
 
   return (
-    <div className="grid gap-4 p-4 sm:p-6">
+    <div className="grid grid-cols-1 gap-4 p-4 sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="text-2xl font-extrabold">Work</h1>
         <ToggleGroup type="single" value={effectiveView} onValueChange={(v) => v && void changeView(v as ConsoleView)} variant="outline" spacing={0} aria-label="View">
