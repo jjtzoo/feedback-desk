@@ -136,6 +136,30 @@ async def test_i_still_have_an_issue_reopens_with_the_same_owner(
     assert up.status_code == 201
 
 
+async def test_after_a_reopen_the_stepper_shows_the_latest_round(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    ref = await resolved(staff, marc, darlene)
+    first = (await status_events(ref))[-1]
+    async with session_scope() as db:  # the first round was resolved three days ago
+        await db.execute(
+            update(FeedbackEvent)
+            .where(FeedbackEvent.id == first.id)
+            .values(created_at=first.created_at - timedelta(days=3))
+        )
+    t = (await staff.post(f"/api/feedback/{ref}/still-an-issue", json={"body": "Still blank on my phone"})).json()
+    stages = {s["key"]: s for s in t["stages"]}
+    reopened = (await status_events(ref))[-1].created_at
+    assert stages["in_progress"]["state"] == "current" and stages["resolved"]["at"] is None
+    assert datetime.fromisoformat(stages["in_progress"]["at"]) == reopened
+
+    await darlene.post(f"/api/console/items/{ref}/resolve", json={"body": "Fixed on phones too"})
+    t = (await staff.get(f"/api/feedback/{ref}/tracker")).json()
+    stages = {s["key"]: s for s in t["stages"]}
+    again = (await status_events(ref))[-1].created_at
+    assert datetime.fromisoformat(stages["resolved"]["at"]) == again != first.created_at - timedelta(days=3)
+
+
 async def test_the_worker_reminds_once_then_closes_as_fixed_by_system(
     staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
 ) -> None:
