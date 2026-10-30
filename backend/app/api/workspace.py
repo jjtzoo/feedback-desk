@@ -20,7 +20,7 @@ router = APIRouter(prefix="/console", tags=["workspace"])
 @router.get("/releases", response_model=list[ReleaseOut])
 async def list_releases(db: Db, user: DigitalUser) -> list[ReleaseOut]:
     out = []
-    for release, project in await releases.list_releases(db, user):
+    for release, project, item_count, shown_count in await releases.list_releases(db, user):
         out.append(
             ReleaseOut(
                 id=release.id,
@@ -29,6 +29,8 @@ async def list_releases(db: Db, user: DigitalUser) -> list[ReleaseOut]:
                 status=release.status,
                 published_at=release.published_at,
                 can_publish=await releases.can_publish(db, user, release),
+                item_count=item_count,
+                shown_count=shown_count,
             )
         )
     return out
@@ -44,6 +46,8 @@ async def _release(db: Db, user: CurrentUser, release_id: uuid.UUID) -> ReleaseO
         status=release.status,
         published_at=release.published_at,
         can_publish=await releases.can_publish(db, user, release),
+        item_count=len(items),
+        shown_count=sum(i.visible_to_staff for i in items),
         items=[ReleaseItemOut.model_validate(i).model_copy(update={"thanks": counts.get(i.id, 0)}) for i in items],
     )
 

@@ -21,10 +21,9 @@ const FILTER_FROM = 8;
 
 /** What a release holds, in words: how much was drafted and how much staff will see. */
 function summary(r: Release): string {
-  const ticked = r.items.filter((i) => i.visible_to_staff).length;
   const count = (n: number) => `${n} item${n === 1 ? "" : "s"}`;
-  if (r.items.length === 0) return "No items";
-  return r.status === "published" ? `${count(ticked)} shown to staff` : `${count(r.items.length)} drafted, ${ticked} ticked for staff`;
+  if (r.item_count === 0) return "No items";
+  return r.status === "published" ? `${count(r.shown_count)} shown to staff` : `${count(r.item_count)} drafted, ${r.shown_count} ticked for staff`;
 }
 
 function Row({ r }: { r: Release }) {

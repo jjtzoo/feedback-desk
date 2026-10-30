@@ -570,6 +570,9 @@ class ReleaseOut(Out):
     status: str
     published_at: datetime | None
     can_publish: bool = False
+    # What the release holds and how much of it staff see, so the list needn't send every item.
+    item_count: int = 0
+    shown_count: int = 0
     items: list[ReleaseItemOut] = []
 
 

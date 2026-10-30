@@ -158,7 +158,8 @@ async def get(db: AsyncSession, user: User, release_id: uuid.UUID) -> tuple[Rele
     return release, project, items
 
 
-async def list_releases(db: AsyncSession, user: User) -> list[tuple[Release, Project]]:
+async def list_releases(db: AsyncSession, user: User) -> list[tuple[Release, Project, int, int]]:
+    """Newest weeks first, each with how many items it holds and how many staff can see."""
     require_digital(user)
     rows = await db.execute(
         select(Release, Project)
@@ -166,7 +167,15 @@ async def list_releases(db: AsyncSession, user: User) -> list[tuple[Release, Pro
         .order_by(Release.week_ending.desc(), Project.name)
         .limit(100)
     )
-    return [(r, p) for r, p in rows]
+    counts = {
+        release_id: (int(total), int(shown))
+        for release_id, total, shown in await db.execute(
+            select(ReleaseItem.release_id, func.count(), func.count().filter(ReleaseItem.visible_to_staff)).group_by(
+                ReleaseItem.release_id
+            )
+        )
+    }
+    return [(r, p, *counts.get(r.id, (0, 0))) for r, p in rows]
 
 
 async def save_items(db: AsyncSession, user: User, release_id: uuid.UUID, items: list[dict[str, Any]]) -> None:

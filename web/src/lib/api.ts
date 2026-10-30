@@ -391,6 +391,8 @@ export interface Release {
   status: "draft" | "approved" | "published";
   published_at: string | null;
   can_publish: boolean;
+  item_count: number;
+  shown_count: number;
   items: ReleaseItem[];
 }
 
