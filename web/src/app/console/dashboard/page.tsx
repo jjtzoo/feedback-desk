@@ -1,134 +1,81 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { Minus, TrendingDown, TrendingUp, TriangleAlert } from "lucide-react";
+import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { Flow, Sparkline, Stuck } from "@/components/console/dashboard-charts";
+import { Team, Tools } from "@/components/console/dashboard-tables";
+import { useMe } from "@/components/me";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api, errorText, type Category, type Dashboard, type UsageSummary, type WorkType } from "@/lib/api";
-import { CATEGORY_LABEL, WORK_TYPE_LABEL, day } from "@/lib/format";
+import { api, errorText, type Dashboard, type DashboardFigure, type DashboardRate, type UsageSummary } from "@/lib/api";
+import { day } from "@/lib/format";
 
-function Stat({ label, value, note, warn }: { label: string; value: string; note?: string; warn?: boolean }) {
+/** A duration in the unit a person reads easily: hours under two days, then days. */
+const duration = (h: number) => (h < 48 ? `${Math.round(h * 10) / 10} h` : `${Math.round(h / 2.4) / 10} days`);
+const asPercent = (r: number) => `${Math.round(r * 100)}%`;
+
+type Change = { text: string; up: boolean | null; good: boolean | null };
+
+/** How a figure moved against the period before, and whether that is good news. */
+function change(f: DashboardFigure, lowerIsBetter: boolean, amount: (d: number) => string, [more, less]: [string, string], since: string): Change | null {
+  if (f.value === null || f.previous === null) return null;
+  const d = f.value - f.previous;
+  if (amount(Math.abs(d)) === amount(0)) return { text: `Same as ${since}`, up: null, good: null };
+  return { text: `${amount(Math.abs(d))} ${d > 0 ? more : less} than ${since}`, up: d > 0, good: d > 0 !== lowerIsBetter };
+}
+
+function Tile({ label, value, delta, note, trend }: { label: string; value: string; delta: Change | null; note: string; trend: (number | null)[] }) {
+  const Icon = delta?.up === null ? Minus : delta?.up ? TrendingUp : TrendingDown;
+  const tone = delta?.good === null ? "text-muted-foreground" : delta?.good ? "font-semibold text-success" : "font-semibold text-warning";
   return (
-    <div className="rounded-3xl border bg-card p-5 shadow-card">
+    <div className="flex flex-col rounded-3xl border bg-card p-5 shadow-card">
       <p className="text-sm font-medium text-muted-foreground">{label}</p>
-      <p className="mt-2 font-mono text-3xl font-bold tabular">{value}</p>
-      {note && (
-        <p className={`mt-1 flex items-center gap-1 text-sm ${warn ? "font-semibold text-warning" : "text-muted-foreground"}`}>
-          {warn && <TriangleAlert className="size-4" aria-hidden="true" />} {note}
+      <p className="mt-2 text-3xl font-bold">{value}</p>
+      {delta && (
+        <p className={`mt-1 flex items-center gap-1 text-sm ${tone}`}>
+          <Icon className="size-4 shrink-0" aria-hidden="true" /> {delta.text}
         </p>
       )}
+      <p className="mt-1 mb-3 text-sm text-muted-foreground">{note}</p>
+      <Sparkline values={trend} />
     </div>
   );
 }
 
-/** One-series ranked bars with direct value labels (no legend needed for one series). */
-function BarList({ title, rows }: { title: string; rows: { label: string; count: number }[] }) {
-  const headingId = useId();
-  const max = Math.max(1, ...rows.map((r) => r.count));
+function Rate({ label, r, of, target }: { label: string; r: DashboardRate; of: string; target?: string }) {
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby={headingId}>
-      <h2 id={headingId} className="font-bold">
-        {title}
-      </h2>
-      {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">No open items.</p>
-      ) : (
-        <ul className="mt-4 grid gap-2.5">
-          {rows.map((r) => (
-            <li key={r.label} className="grid grid-cols-[8.5rem_1fr_2rem] items-center gap-3 text-sm">
-              <span className="truncate" title={r.label}>
-                {r.label}
-              </span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="block h-5 rounded-r-[4px] bg-muted" aria-hidden="true">
-                    <span className="block h-full rounded-r-[4px] bg-series-1" style={{ width: `${(r.count / max) * 100}%` }} />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {r.label}: {r.count} open
-                </TooltipContent>
-              </Tooltip>
-              <span className="text-right font-mono tabular">{r.count}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <div>
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-xl font-bold">{r.rate === null ? "–" : asPercent(r.rate)}</dd>
+      <dd className="text-xs text-muted-foreground">
+        {r.count} of {r.of} {of}
+        {target && ` · Target: ${target}`}
+      </dd>
+    </div>
   );
 }
 
-/** Received vs resolved per week: two series, legend + value labels, table view. */
-function Weekly({ weeks }: { weeks: Dashboard["weekly"] }) {
-  const [table, setTable] = useState(false);
-  const max = Math.max(1, ...weeks.flatMap((w) => [w.received, w.resolved]));
-  const series = [
-    { key: "received" as const, label: "Received", className: "bg-series-1" },
-    { key: "resolved" as const, label: "Resolved", className: "bg-series-2" },
-  ];
+/** Reopens, duplicates, routing corrections and thanks in the period: signs of how well the work lands. */
+function Quality({ q, weeks }: { q: Dashboard["quality"]; weeks: number }) {
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-card lg:col-span-2" aria-labelledby="weekly">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="weekly" className="font-bold">
-          Weekly trend
-        </h2>
-        <div className="flex items-center gap-4 text-sm">
-          {series.map((s) => (
-            <span key={s.key} className="inline-flex items-center gap-1.5">
-              <span className={`size-3 rounded-sm ${s.className}`} aria-hidden="true" /> {s.label}
-            </span>
-          ))}
-          <Button variant="ghost" size="sm" onClick={() => setTable((t) => !t)} aria-pressed={table}>
-            {table ? "Show chart" : "Show table"}
-          </Button>
+    <section className="rounded-3xl border bg-card p-5 shadow-card" aria-labelledby="quality">
+      <h2 id="quality" className="font-bold">
+        Quality
+      </h2>
+      <p className="text-sm text-muted-foreground">In the last {weeks} weeks</p>
+      <dl className="mt-4 grid grid-cols-2 gap-4">
+        <Rate label="Reopened" r={q.reopened} of="resolutions" />
+        <Rate label="Duplicates" r={q.duplicates} of="received" />
+        <Rate label="Routing corrections" r={q.corrections} of="from the chat" target="10% or less" />
+        <div>
+          <dt className="text-sm text-muted-foreground">👍 Thanks</dt>
+          <dd className="mt-1 text-xl font-bold">{q.thanks}</dd>
+          <dd className="text-xs text-muted-foreground">on Fixes and updates</dd>
         </div>
-      </div>
-      {table ? (
-        <Table className="mt-3">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Week starting</TableHead>
-              <TableHead className="text-right">Received</TableHead>
-              <TableHead className="text-right">Resolved</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {weeks.map((w) => (
-              <TableRow key={w.week}>
-                <TableCell>{day(w.week)}</TableCell>
-                <TableCell className="text-right font-mono tabular">{w.received}</TableCell>
-                <TableCell className="text-right font-mono tabular">{w.resolved}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : (
-        <div className="mt-4 grid grid-cols-8 items-end gap-2" role="img" aria-label="Received and resolved per week for the last 8 weeks; use Show table for the numbers">
-          {weeks.map((w) => (
-            <Tooltip key={w.week}>
-              <TooltipTrigger asChild>
-                <div className="grid gap-1.5 rounded-lg p-1 hover:bg-muted/60">
-                  <div className="flex h-36 items-end justify-center gap-[2px]">
-                    {series.map((s) => (
-                      <div key={s.key} className="flex h-full w-full max-w-4 flex-col items-center justify-end gap-1">
-                        <span className="font-mono text-[11px] text-muted-foreground tabular">{w[s.key] || ""}</span>
-                        <span className={`w-full rounded-t-[4px] ${s.className}`} style={{ height: `${(w[s.key] / max) * 100}%`, minHeight: w[s.key] ? 2 : 0 }} />
-                      </div>
-                    ))}
-                  </div>
-                  <span className="text-center text-[11px] text-muted-foreground">{day(w.week).split(" ").slice(1).join(" ")}</span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                Week of {day(w.week)}: {w.received} received, {w.resolved} resolved
-              </TooltipContent>
-            </Tooltip>
-          ))}
-        </div>
-      )}
+      </dl>
     </section>
   );
 }
@@ -244,45 +191,81 @@ function AiUsage({ u }: { u: UsageSummary }) {
   );
 }
 
-/** Dashboard (brief §4.4.6): open items, weekly trend, time to first response, approvals waiting. */
+/** The manager dashboard (D112, Admins only): headline figures against the period before, flow, where
+ * items are stuck, tools and team, quality, and AI usage. */
 export default function DashboardPage() {
+  const me = useMe();
+  const admin = me.role === "admin";
+  const [weeks, setWeeks] = useState(4);
   const [d, setD] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   useEffect(() => {
-    api.get<Dashboard>("/console/dashboard").then(setD).catch((e: unknown) => setError(errorText(e)));
-    api.get<UsageSummary>("/console/usage").then(setUsage).catch(() => undefined);
-  }, []);
+    if (admin) api.get<Dashboard>(`/console/dashboard?weeks=${weeks}`).then(setD).catch((e: unknown) => setError(errorText(e)));
+  }, [admin, weeks]);
+  useEffect(() => {
+    if (admin) api.get<UsageSummary>("/console/usage").then(setUsage).catch(() => undefined);
+  }, [admin]);
 
+  if (!admin) return <p className="p-6 text-muted-foreground">The dashboard is for Admins.</p>;
   if (error) return <p className="p-6 text-destructive">{error}</p>;
   if (!d) return <Skeleton className="m-6 h-96 rounded-3xl" />;
-  const open = d.open_by_project.reduce((n, r) => n + r.count, 0);
+  const before = `the ${d.weeks} weeks before`;
   return (
-    <div className="grid gap-4 p-4 sm:p-6">
-      <h1 className="text-2xl font-extrabold">Dashboard</h1>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Open items" value={String(open)} />
-        <Stat
-          label="Waiting for approval"
-          value={String(d.approvals_waiting)}
-          note={d.approvals_over_2_days ? `${d.approvals_over_2_days} over 2 business days` : undefined}
-          warn={d.approvals_over_2_days > 0}
-        />
-        <Stat label="Avg time to first response" value={d.avg_first_response_hours === null ? "–" : `${d.avg_first_response_hours} h`} note="Target: under 2 business days" />
-        <Stat
-          label="Project reassignment rate"
-          value={d.project_reassignment_rate === null ? "–" : `${Math.round(d.project_reassignment_rate * 100)}%`}
-          note="Target: 10% or less (90% correct)"
-        />
+    <div className="grid grid-cols-1 gap-4 p-4 sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="text-2xl font-extrabold">Dashboard</h1>
+        <ToggleGroup type="single" value={String(weeks)} onValueChange={(v) => v && setWeeks(Number(v))} variant="outline" spacing={0} aria-label="Period">
+          {[4, 12].map((n) => (
+            <ToggleGroupItem key={n} value={String(n)} className="h-9 px-4">
+              Last {n} weeks
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </div>
+      {/* The last answer stays, dimmed, while another period loads. */}
+      <div className={`grid grid-cols-1 gap-4 transition-opacity ${d.weeks === weeks ? "" : "opacity-60"}`} aria-busy={d.weeks !== weeks}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Tile
+            label="Open backlog"
+            value={String(d.backlog.value)}
+            delta={change(d.backlog, true, String, ["more", "fewer"], `${d.weeks} weeks ago`)}
+            note="New to In progress, not yet resolved"
+            trend={d.backlog.trend}
+          />
+          <Tile
+            label="Median time to first response"
+            value={d.first_response_hours.value === null ? "–" : duration(d.first_response_hours.value)}
+            delta={change(d.first_response_hours, true, duration, ["slower", "faster"], before)}
+            note="Target: under 2 business days"
+            trend={d.first_response_hours.trend}
+          />
+          <Tile
+            label="Median time to resolve"
+            value={d.resolve_days.value === null ? "–" : duration(d.resolve_days.value * 24)}
+            delta={change(d.resolve_days, true, (n) => duration(n * 24), ["slower", "faster"], before)}
+            note={`${d.resolve_days.count} resolved`}
+            trend={d.resolve_days.trend}
+          />
+          <Tile
+            label="On time"
+            value={d.on_time.value === null ? "–" : asPercent(d.on_time.value)}
+            delta={change(d.on_time, false, (n) => `${Math.round(n * 100)} points`, ["higher", "lower"], before)}
+            note={`Resolved by the due date, of ${d.on_time.count} with one`}
+            trend={d.on_time.trend}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Flow flow={d.flow} weeks={d.weeks} />
+          <Stuck stuck={d.stuck} approvalsLate={d.approvals_over_2_days} />
+        </div>
+        <Tools rows={d.tools} weeks={d.weeks} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Team rows={d.team} />
+          <Quality q={d.quality} weeks={d.weeks} />
+        </div>
       </div>
       {usage && <AiUsage u={usage} />}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Weekly weeks={d.weekly} />
-        <BarList title="Open by project" rows={d.open_by_project} />
-        <BarList title="Open by assignee" rows={d.open_by_assignee} />
-        <BarList title="Open by category" rows={d.open_by_category.map((r) => ({ ...r, label: CATEGORY_LABEL[r.label as Category] ?? r.label }))} />
-        <BarList title="Open by work type" rows={d.open_by_work_type.map((r) => ({ ...r, label: WORK_TYPE_LABEL[r.label as WorkType] ?? r.label }))} />
-      </div>
     </div>
   );
 }

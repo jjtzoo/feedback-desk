@@ -1,8 +1,11 @@
 {
   "_each": true,
-  "S21.01": ["Target: 10% or less", "Target: 10% or lessx"],
-  "S21.02": ["[\"Week starting\", \"Received\", \"Resolved\"]", "[\"Week starting\", \"Received\", \"Resolvedx\"]"],
-  "S21.03": ["{ Darlene: 3, Marc: 2 }", "{ Darlene: 3, Marc: 3 }"],
-  "S21.04": ["toHaveCount(shown)", "toHaveCount(shown + 1)"],
-  "S21.05": ["toHaveText(\"17%\")", "toHaveText(\"18%\")"]
+  "S21.01": ["toHaveText(\"10 more than 4 weeks ago\")", "toHaveText(\"10 fewer than 4 weeks ago\")"],
+  "S21.02": ["toHaveText(\"10 more than 12 weeks ago\")", "toHaveText(\"10 more than 4 weeks ago\")"],
+  "S21.03": ["10 open now.\")", "11 open now.\")"],
+  "S21.04": ["[\"Needs review\", \"6\", \"0\", \"0\", \"0\", \"6\"]", "[\"Needs review\", \"6\", \"0\", \"0\", \"0\", \"7\"]"],
+  "S21.05": ["toHaveAttribute(\"aria-sort\", \"ascending\")", "toHaveAttribute(\"aria-sort\", \"descending\")"],
+  "S21.06": ["toHaveCount(shown + 1)", "toHaveCount(shown)"],
+  "S21.07": ["toContainText(\"17%\")", "toContainText(\"18%\")"],
+  "S21.08": ["toBe(403)", "toBe(200)"]
 }

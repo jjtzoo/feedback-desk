@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter
 from fastapi.responses import Response
 
-from app.api.deps import CurrentUser, Db, DigitalUser
+from app.api.deps import AdminUser, CurrentUser, Db, DigitalUser
 from app.schemas import (
     ChannelMessageOut,
     ChannelOut,
@@ -91,8 +91,8 @@ async def publish(release_id: uuid.UUID, db: Db, user: DigitalUser) -> ReleaseOu
 
 
 @router.get("/dashboard")
-async def dashboard(db: Db, user: DigitalUser) -> dict[str, object]:
-    return await reports.dashboard(db, user)
+async def dashboard(db: Db, user: AdminUser, weeks: int = 4) -> dict[str, object]:
+    return await reports.dashboard(db, user, weeks)
 
 
 @router.post("/releases/draft-now", status_code=204)

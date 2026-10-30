@@ -368,42 +368,45 @@ test("S18.12 The abuse phrase is not assigned to Darlene, sits in Needs review a
   }
 });
 
-test("S18.13 The dashboard's Waiting for approval shows the count and, in amber, how many have waited over 2 business days", async ({
+test("S18.13 The dashboard's Where it's stuck counts the items awaiting approval and, in amber, how many have waited over 2 business days", async ({
   page,
   signIn,
   team,
 }) => {
   await control(team);
   await signIn("Chris");
-  const stat = page.getByText("Waiting for approval", { exact: true }).locator("..");
-  const value = stat.locator("p").nth(1);
+  const stuck = page.getByRole("region", { name: "Where it's stuck", exact: true });
+  // Read from the chart's row or, under 10 open items, from the plain counts; both say "Awaiting approval N".
+  const waiting = async () => Number(/Awaiting approval\s*(\d+)/.exec(await stuck.innerText())?.[1]);
   await page.goto("/console/dashboard");
-  await expect(stat).toBeVisible();
-  const before = Number(await value.innerText());
+  await expect(stuck).toContainText("Awaiting approval");
+  const before = await waiting();
   expect(before).toBeGreaterThan(0);
 
   // The count follows the queue: one more waiting, then it is approved.
   const ref = await raiseRake(await team.as("Rafael"), "The RAKE Agent calendar page shows an error when I open it");
   await page.reload();
-  await expect(value).toHaveText(String(before + 1));
+  await expect(stuck).toContainText("Awaiting approval");
+  await expect.poll(waiting).toBe(before + 1);
   await postJson(page, `/console/items/${ref}/approve`);
   await page.reload();
-  await expect(value).toHaveText(String(before));
+  await expect(stuck).toContainText("Awaiting approval");
+  await expect.poll(waiting).toBe(before);
 
   // Nothing has waited that long yet, so there is no note.
-  await expect(stat).not.toContainText("over 2 business days");
+  await expect(stuck).not.toContainText("over 2 business days");
 
   // An item can't be made two business days old through the app, so the dashboard's own answer is
   // given a count here: this checks how the page shows it (the note, and amber), not the server's sum.
   const real = await getJson<{ approvals_over_2_days: number }>(page, "/console/dashboard");
   expect(real.approvals_over_2_days).toBe(0);
-  await page.route("**/api/console/dashboard", async (route) => {
+  await page.route("**/api/console/dashboard?*", async (route) => {
     const response = await route.fetch();
     await route.fulfill({ response, json: { ...(await response.json()), approvals_over_2_days: 2 } });
   });
   await page.reload();
-  await expect(stat.getByText("2 over 2 business days")).toHaveClass(/text-warning/);
-  await expect(value).toHaveText(String(before));
+  await expect(stuck.getByText("2 waiting for approval over 2 business days")).toHaveClass(/text-warning/);
+  await expect.poll(waiting).toBe(before);
 });
 
 test("S18.14 Approve opens a dialog with the priority, a due date and instructions; Darlene gets the instructions with the approval, pinned on the item, and the tracker never shows them", async ({ page, signIn, team }) => {

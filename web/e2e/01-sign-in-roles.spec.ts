@@ -169,12 +169,13 @@ test("S01.10 After Sign out, opening /console sends you back to the sign-in page
   await expect(page.getByRole("heading", { name: "Work" })).toHaveCount(0);
 });
 
-test("S01.11 Darlene's console side menu shows Work, Channels, Releases, Dashboard, Admin and no Approvals", async ({ page, signIn }) => {
+test("S01.11 Darlene's console side menu shows Work, Channels, Releases, Admin and no Approvals or Dashboard", async ({ page, signIn }) => {
   await signIn("Darlene");
   await page.goto("/console");
   await expect(consoleNav(page)).toBeVisible();
-  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", /^Assigned to me/, /^Triage/, /^Overdue/, "Channels", "Releases", "Dashboard", "Admin"]);
+  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", /^Assigned to me/, /^Triage/, /^Overdue/, "Channels", "Releases", "Admin"]);
   await expect(consoleNav(page).getByRole("link", { name: "Approvals" })).toHaveCount(0);
+  await expect(consoleNav(page).getByRole("link", { name: "Dashboard" })).toHaveCount(0);
 });
 
 test("S01.12 After signing out from the account menu, Chris lands on the console and its side menu also lists Approvals", async ({ page, signIn }) => {

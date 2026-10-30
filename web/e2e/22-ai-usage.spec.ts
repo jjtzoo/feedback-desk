@@ -204,20 +204,13 @@ test("S22.06 An Admin's AI usage panel: today and this month against the budgets
   await expect(history.locator(":scope > div")).toHaveCount(14);
 });
 
-test("S22.07 As Darlene the AI usage panel shows totals, but no per-person rows", async ({ page, signIn }) => {
+test("S22.07 As Darlene the dashboard is for Admins, so there is no AI usage panel, and the usage API sends her no per-person rows", async ({ page, signIn }) => {
   // With no usage recorded, an Admin would not see rows either (the stub writes none), so what this can prove is
-  // that Darlene gets the panel and its totals and the API sends her no people; the backend test covers the rows.
+  // that Darlene gets no panel and the API sends her no people; the backend test covers the rows.
   await signIn("Darlene");
-  await openPanel(page);
-  const p = panel(page);
-
-  await expect(p.locator("p").filter({ hasText: /^Today/ })).toHaveText(/^TodayA\$\d+\.\d+ of A\$\d+\.\d\d$/);
-  await expect(p.locator("p").filter({ hasText: /^This month/ })).toHaveText(/^This monthA\$\d+\.\d+ of A\$\d+\.\d\d$/);
-  await expect(total(page, "Model calls today")).toHaveText(/^\d+$/);
-  await expect(total(page, "Tokens today")).toBeVisible();
-
-  await expect(p.getByRole("heading", { name: "Top users today" })).toHaveCount(0);
-  await expect(p.getByRole("table")).toHaveCount(0);
-  await expect(p.getByText("Limit reached")).toHaveCount(0);
+  await page.goto("/console/dashboard");
+  await expect(page.getByText("The dashboard is for Admins.")).toBeVisible();
+  await expect(panel(page)).toHaveCount(0);
+  await expect(page.getByText("Top users today")).toHaveCount(0);
   expect((await getJson<Usage>(page, "/console/usage")).people).toEqual([]);
 });

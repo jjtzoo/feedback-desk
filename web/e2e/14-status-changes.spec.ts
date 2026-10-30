@@ -307,8 +307,8 @@ test("S14.08 On a Resolved item Darlene's Status menu has no Close; as Chris, Cl
   await expect(last).toContainText("current stage");
 });
 
-test("S14.07 The dashboard's Avg time to first response changes after the first update on a new item", async ({ page, signIn, team }) => {
-  // Any earlier first response (an approval counts as one) would already be in the average, so this
+test("S14.07 The dashboard's Median time to first response changes after the first update on a new item", async ({ page, signIn, team }) => {
+  // Any earlier first response (an approval counts as one) would already be in the median, so this
   // test starts from the empty seed; the file's other tests raise their own items and do not mind.
   test.setTimeout(90_000);
   resetDatabase();
@@ -316,15 +316,16 @@ test("S14.07 The dashboard's Avg time to first response changes after the first 
   await signIn("Aisha");
   const ref = await raiseBug(page, "afss-portal", "The AFSS Portal invoice download screen shows an error when I open it");
 
-  const darlene = await team.as("Darlene");
-  const average = darlene.getByText("Avg time to first response", { exact: true }).locator("xpath=following-sibling::p[1]");
-  await darlene.goto("/console/dashboard");
-  await expect(average).toHaveText("–");
+  // The dashboard is for Admins (D112); Darlene, who holds the item, gives the first response.
+  const chris = await team.as("Chris");
+  const median = chris.getByText("Median time to first response", { exact: true }).locator("xpath=following-sibling::p[1]");
+  await chris.goto("/console/dashboard");
+  await expect(median).toHaveText("–");
 
   // The first update on the item, before anyone has approved it, is the first response.
-  await postJson(darlene, `/console/items/${ref}/update`, { body: "Looking into the invoice download now" });
-  await darlene.reload();
-  await expect(average).toHaveText(/^\d+(\.\d+)? h$/);
+  await postJson(await team.as("Darlene"), `/console/items/${ref}/update`, { body: "Looking into the invoice download now" });
+  await chris.reload();
+  await expect(median).toHaveText(/^\d+(\.\d+)? h$/);
 });
 
 test("S14.09 Change the due date says what the date is for and picks it on a calendar in the app's date style, with no Ask them to check it; Resolve shows an example", async ({ page, signIn, team }) => {

@@ -47,6 +47,11 @@
   --color-waiting-tint: var(--waiting-tint);
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
+  --color-age-1: var(--age-1);
+  --color-age-2: var(--age-2);
+  --color-age-3: var(--age-3);
+  --color-age-4: var(--age-4);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -94,6 +99,12 @@
   /* Chart series, validated with the dataviz palette script (light and dark). */
   --series-1: #2a78d6;
   --series-2: #1baf7a;
+  --series-3: #eb6834;
+  /* How long an item has sat in its stage, light to dark (one-hue ordinal ramp, validated with --ordinal). */
+  --age-1: #86b6ef;
+  --age-2: #3987e5;
+  --age-3: #1c5cab;
+  --age-4: #0d366b;
 }
 
 @layer base {
