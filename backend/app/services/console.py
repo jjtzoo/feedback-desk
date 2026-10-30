@@ -281,9 +281,15 @@ async def unread_items(db: AsyncSession, user: User, items: list[Feedback]) -> s
 
 
 def needs_detail(fb: Feedback) -> bool:
-    """Saved with open gaps and not yet added to by the person: the owner asks for info first (D63)."""
-    gaps = (fb.dev_brief or {}).get("open_gaps")
-    return bool(gaps) and fb.status in OPEN_STATUSES and fb.submitter_replied_at is None
+    """Saved with open gaps and not yet added to by the person (a note on the card or a reply): the
+    owner asks for info first (D63)."""
+    brief = fb.dev_brief or {}
+    return (
+        bool(brief.get("open_gaps"))
+        and not brief.get("notes")
+        and fb.status in OPEN_STATUSES
+        and fb.submitter_replied_at is None
+    )
 
 
 def needs_priority_review(fb: Feedback, reporters: int) -> bool:

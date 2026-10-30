@@ -42,6 +42,9 @@ TEXT_LIMITS = {
 }
 BRIEF_TEXT = ("problem", "expected", "actual", "who_needs_it", "asking_for", "submitter_quote")
 BRIEF_LISTS = ("steps", "done_when", "open_gaps")
+# What the person adds on the confirm card, one entry per press of Add (kept apart from the chat).
+NOTES_MAX = 10
+NOTE_CHARS = 1000
 CONFIDENCE = ("project", "work_type", "category", "priority")
 # A number, letter or bullet the model put in front of a list item: "1.", "2)", "Step 3:", "a.", "-", "•".
 LIST_MARKER = re.compile(r"^\s*(?:(?:step\s*)?\d{1,2}\s*[.):](?=\s)|[a-z][.)](?=\s)|[-*•](?=\s))\s*", re.IGNORECASE)
@@ -116,6 +119,16 @@ def apply_update(draft: Draft, updates: dict[str, Any], valid_slugs: set[str]) -
     return new, errors
 
 
+def with_note(draft: Draft, note: str) -> Draft:
+    """The draft with one more note on its report. The agent is not asked, so the card stays as it was."""
+    new: Draft = json.loads(json.dumps(draft or {}))
+    notes = new.setdefault("brief", {}).setdefault("notes", [])
+    if len(notes) >= NOTES_MAX:
+        raise ValueError("notes_full")
+    notes.append(note.strip()[:NOTE_CHARS])
+    return new
+
+
 def with_tool(draft: Draft, slug: str) -> Draft:
     """The draft with a tool the person chose on the page (`?project=` or an app card, D99): certain,
     so Sig never asks which tool."""
@@ -157,6 +170,7 @@ def card(draft: Draft, project_name: str | None) -> dict[str, Any]:
         "summary": draft.get("summary", ""),
         "what_happened": happened,
         "gaps": [] if praise else list(brief.get("open_gaps") or []),
+        "notes": list(brief.get("notes") or []),
     }
 
 

@@ -12,7 +12,8 @@ import type { ChatCard, Priority } from "@/lib/api";
 
 /** "Here's what I'll send" (brief §4.1.6): project, type, summary, priority (none for praise, D50),
  *  what happened for a fix, the files sent with it (screenshots as thumbnails, D95), and what is
- *  still unknown with a box to add it (D63); Confirm or Change. */
+ *  still unknown with a box to add notes to the report (D63); each note is listed on the card and the
+ *  box stays for the next, never a chat message. Confirm or Change. */
 export function ConfirmCard({
   card,
   files,
@@ -26,9 +27,11 @@ export function ConfirmCard({
   busy: boolean;
   onConfirm: () => void;
   onChange: () => void;
-  onAdd: (detail: string) => void;
+  /** Saves the note on the report; true once it is on the card. */
+  onAdd: (detail: string) => Promise<boolean>;
 }) {
   const [detail, setDetail] = useState("");
+  const [adding, setAdding] = useState(false);
   const rows: [string, string][] = [
     ["Tool", card.project],
     ["Type", [card.work_type, card.category].filter(Boolean).join(" · ")],
@@ -37,9 +40,12 @@ export function ConfirmCard({
     ["What happened", card.what_happened !== card.summary ? card.what_happened : ""],
   ];
 
-  function add(e: FormEvent) {
+  async function add(e: FormEvent) {
     e.preventDefault();
-    if (detail.trim()) onAdd(detail);
+    if (!detail.trim() || adding) return;
+    setAdding(true);
+    if (await onAdd(detail)) setDetail("");
+    setAdding(false);
   }
 
   return (
@@ -61,6 +67,20 @@ export function ConfirmCard({
             <dt className="font-medium text-muted-foreground">Priority</dt>
             <dd>
               <PriorityBadge priority={card.priority as Priority} />
+            </dd>
+          </>
+        )}
+        {card.notes.length > 0 && (
+          <>
+            <dt className="font-medium text-muted-foreground">Your notes</dt>
+            <dd>
+              <ul className="list-disc pl-5">
+                {card.notes.map((n, i) => (
+                  <li key={i} className="whitespace-pre-wrap">
+                    {n}
+                  </li>
+                ))}
+              </ul>
             </dd>
           </>
         )}
@@ -87,9 +107,9 @@ export function ConfirmCard({
             Add what you know
           </Label>
           <div className="mt-1.5 flex gap-2">
-            <Input id="add-detail" value={detail} onChange={(e) => setDetail(e.target.value)} className="h-11 rounded-xl bg-card" disabled={busy} />
-            <Button type="submit" variant="outline" className="h-11 rounded-xl px-4" disabled={busy || !detail.trim()}>
-              Add
+            <Input id="add-detail" value={detail} onChange={(e) => setDetail(e.target.value)} className="h-11 rounded-xl bg-card" disabled={busy || adding} maxLength={1000} />
+            <Button type="submit" variant="outline" className="h-11 rounded-xl px-4" disabled={busy || adding || !detail.trim()}>
+              {adding && <Loader2 className="animate-spin" />} Add
             </Button>
           </div>
         </form>

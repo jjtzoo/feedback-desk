@@ -188,6 +188,12 @@ class ConfirmIn(BaseModel):
     draft_hash: str = Field(min_length=64, max_length=64)
 
 
+class CardNoteIn(BaseModel):
+    """What the person adds to the card's report; it is not a chat message."""
+
+    text: str = Field(min_length=1, max_length=1000)
+
+
 class PlusOneIn(BaseModel):
     reference: str = Field(pattern=r"^FB-\d{4,}$")
     comment: str = Field(default="", max_length=4000)

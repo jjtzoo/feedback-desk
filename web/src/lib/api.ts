@@ -97,6 +97,8 @@ export interface ChatCard {
   what_happened: string;
   /** What Sig couldn't find out; the card offers a box to add it (D63). */
   gaps: string[];
+  /** What the person added with that box, in order (kept off the chat). */
+  notes: string[];
 }
 
 export interface Chip {
@@ -319,6 +321,7 @@ export interface DevBrief {
   done_when?: string[];
   submitter_quote?: string;
   open_gaps?: string[];
+  notes?: string[];
 }
 
 export interface Detail extends Card {

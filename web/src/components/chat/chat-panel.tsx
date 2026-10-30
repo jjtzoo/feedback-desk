@@ -316,6 +316,20 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
     if (card && sid) await run(`/chat/sessions/${sid}/confirm`, { draft_hash: card.hash });
   }
 
+  /** The card's Add box: the note goes onto the report and the card, not into the chat. */
+  async function addNote(text: string): Promise<boolean> {
+    if (!sid) return false;
+    try {
+      const r = await api.post<{ card: ChatCard; hash: string }>(`/chat/sessions/${sid}/notes`, { text });
+      setCard({ card: r.card, hash: r.hash });
+      setError(null);
+      return true;
+    } catch (e) {
+      setError(errorText(e));
+      return false;
+    }
+  }
+
   function change() {
     setCard(null);
     setTurns((t) => [...t, { role: "agent", text: "No worries. What should I change?" }]);
@@ -535,7 +549,7 @@ export function ChatPanel({ projectSlug, starterText }: { projectSlug: string | 
               )}
               {card && (
                 <li>
-                  <ConfirmCard card={card.card} files={sent} busy={busy} onConfirm={() => void confirm()} onChange={change} onAdd={(detail) => void send(detail)} />
+                  <ConfirmCard card={card.card} files={sent} busy={busy} onConfirm={() => void confirm()} onChange={change} onAdd={addNote} />
                 </li>
               )}
             </ol>

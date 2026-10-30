@@ -25,6 +25,7 @@ from app.db import session_scope
 from app.models import Attachment, Feedback, FeedbackEvent, FeedbackMessage, Notification
 from app.services import auth
 from app.services import feedback as feedback_service
+from app.services.console import needs_detail
 from app.services.drafts import CONTINUE, is_complete
 from tests.conftest import STAFF, STAFF2, first, parse_sse, say, signed_in, start_chat, submit_via_chat, texts
 from tests.test_units import PNG, _docx
@@ -59,6 +60,7 @@ async def test_bug_conversation_routes_to_the_owner_and_waits_for_approval(staff
         "summary": "RAKE gives a blank answer when I ask about leave.",
         "what_happened": "got an empty box",
         "gaps": ["Steps to reproduce"],
+        "notes": [],
     }
     assert await count() == 0  # nothing saved before Confirm
 
@@ -190,6 +192,34 @@ async def test_confirm_needs_the_hash_of_the_current_draft(staff: httpx.AsyncCli
     assert (await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": old["hash"]})).status_code == 409
     r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": new["hash"]})
     assert first(parse_sse(r.text), "done") is not None
+
+
+async def test_a_note_on_the_card_is_kept_with_the_report_and_never_enters_the_chat(staff: httpx.AsyncClient) -> None:
+    sid = await start_chat(staff)
+    await say(staff, sid, "RAKE gives a blank answer when I ask about leave.")
+    await say(staff, sid, "It's blocking my work")
+    card = first(await say(staff, sid, "I expected an answer about leave, but got an empty box"), "draft")
+    assert card is not None
+
+    first_note = await staff.post(f"/api/chat/sessions/{sid}/notes", json={"text": "Ask about annual leave"})
+    second = await staff.post(f"/api/chat/sessions/{sid}/notes", json={"text": "It started on Monday"})
+    assert first_note.status_code == 200 and second.status_code == 200
+    assert second.json()["card"]["notes"] == ["Ask about annual leave", "It started on Monday"]
+    assert second.json()["card"]["gaps"] == ["Steps to reproduce"]
+    resumed = (await staff.get(f"/api/chat/sessions/{sid}")).json()
+    assert resumed["card"]["notes"] == ["Ask about annual leave", "It started on Monday"]
+    assert resumed["card_hash"] == second.json()["hash"]
+    assert not any("annual leave" in t["text"] for t in resumed["turns"])
+
+    stale = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": card["hash"]})
+    assert stale.status_code == 409
+    r = await staff.post(f"/api/chat/sessions/{sid}/confirm", json={"draft_hash": second.json()["hash"]})
+    assert first(parse_sse(r.text), "done") is not None
+    async with session_scope() as db:
+        fb = await db.scalar(select(Feedback))
+        assert fb is not None
+        assert fb.dev_brief["notes"] == ["Ask about annual leave", "It started on Monday"]
+        assert needs_detail(fb) is False
 
 
 async def test_chat_belongs_to_the_person_who_started_it(staff: httpx.AsyncClient) -> None:

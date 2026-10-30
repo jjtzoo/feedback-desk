@@ -224,7 +224,7 @@ test("S04.13 A P1 (blocking) tells every Admin, Chris, Marc and Mike, 'P1 needs 
   }
 });
 
-test("S04.14 The card shows what happened and what Sig couldn't find out; what you add there is sent and the card comes back without that gap", async ({ page, signIn }) => {
+test("S04.14 The card shows what happened and what Sig couldn't find out; what you add there goes on the card as a note, not into the chat, and the box stays for the next", async ({ page, signIn }) => {
   await signIn("Aisha");
   await reachCard(page, "The Training Portal shows an error when I open a course");
   await expect(field(page, "What happened")).toHaveText("got a blank screen");
@@ -233,9 +233,14 @@ test("S04.14 The card shows what happened and what Sig couldn't find out; what y
 
   await unknown.getByLabel("Add what you know").fill("Open My courses, then press Start on any course");
   await unknown.getByRole("button", { name: "Add", exact: true }).click();
-  await expect(chat(page).getByText("You: Open My courses, then press Start on any course")).toBeVisible();
-  await expect(card(page)).toBeVisible();
-  await expect(card(page).getByRole("form", { name: "We don't know yet" })).toHaveCount(0);
+  await expect(card(page).getByText("Open My courses, then press Start on any course")).toBeVisible();
+  await expect(chat(page).getByText("You: Open My courses, then press Start on any course")).toHaveCount(0);
+  await expect(unknown.getByLabel("Add what you know")).toHaveValue("");
+
+  await unknown.getByLabel("Add what you know").fill("It started on Monday");
+  await unknown.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(card(page).getByText("It started on Monday")).toBeVisible();
+  await expect(card(page).getByText("Your notes")).toBeVisible();
 });
 
 test("S04.15 A how-to question asks 'Want me to send that to the team?' first; No thanks sends nothing", async ({ page, signIn }) => {

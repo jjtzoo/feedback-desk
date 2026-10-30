@@ -50,6 +50,7 @@ const BRIEF_ROWS: [keyof Detail["dev_brief"], string][] = [
   ["asking_for", "What they're asking for"],
   ["done_when", "Done when"],
   ["submitter_quote", "Submitter's words"],
+  ["notes", "Added by the submitter"],
 ];
 // The panel's tabs: one conversation, Activity, holds the messages and the changes (D105).
 const TABS = ["brief", "activity", "files"];

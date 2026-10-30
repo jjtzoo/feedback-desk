@@ -34,6 +34,7 @@ from app.errors import Conflict, NotFound, ServiceError
 from app.models import Attachment
 from app.schemas import (
     AttachmentOut,
+    CardNoteIn,
     ChatResumeOut,
     ChatStartIn,
     ChatStartOut,
@@ -62,6 +63,7 @@ from app.services.drafts import (
     is_complete,
     project_known,
     step_line,
+    with_note,
     with_tool,
 )
 from app.services.privacy import mask
@@ -194,6 +196,23 @@ async def confirm(session_id: str, body: ConfirmIn, user: StreamUser) -> EventSo
         _stream(user, session_id, [types.Part(text="Confirmed")], {"draft_confirmed": True, "step": None}),
         headers=STREAM_HEADERS,
     )
+
+
+@router.post("/chat/sessions/{session_id}/notes")
+async def add_note(session_id: str, body: CardNoteIn, user: CurrentUser) -> dict[str, Any]:
+    """The card's Add box: the note goes on the report as it is (masked), with no turn for the agent,
+    so it never enters the chat and the card stays up for the next one."""
+    state = await _state(user, session_id)
+    draft = state.get("draft") or {}
+    if not is_complete(draft) or draft_hash(draft) != state.get("card_hash"):
+        raise Conflict("draft_changed", "The summary changed. Please check it again.")
+    try:
+        new = with_note(draft, mask(body.text))
+    except ValueError as exc:
+        raise ServiceError("notes_full", "That's enough notes for one report. Press Confirm to send it.", 409) from exc
+    shown = draft_hash(new)
+    await runtime.update_state(user, session_id, {"draft": new, "card_hash": shown})
+    return {"card": await _card(new), "hash": shown}
 
 
 @router.post("/chat/sessions/{session_id}/plus-one", response_model=SavedOut)
