@@ -43,7 +43,8 @@ function ColumnView({ column, allowed, onOpen }: { column: Column; allowed: bool
       ref={setNodeRef}
       aria-label={`${column.title}, ${column.count} items`}
       className={cn(
-        "flex w-[290px] shrink-0 flex-col rounded-3xl bg-muted/60 p-2.5 transition-colors",
+        // Columns share the width: at 1920 px the five stages (and the Archive's six endings) fit without scrolling.
+        "flex min-w-64 max-w-[26rem] flex-1 basis-0 flex-col rounded-3xl bg-muted/60 p-2.5 transition-colors",
         isOver && allowed && "bg-muted ring-2 ring-foreground/20",
         allowed === false && "opacity-60",
       )}
