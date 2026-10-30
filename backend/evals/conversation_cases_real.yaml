@@ -216,12 +216,13 @@ cases:
       - "chrome"
     expect: card
     require: []
-    forbid: ["sorry for", "—"]
-    good: Don't ask how often after "every 5 min"; if Sig asked, take the pushback and move on without apologising at length.
+    forbid: ["sorry for", "since when", "how often", "—"]
+    good: Don't ask how often or since when after "every 5 min"; asking which screen is fine, as "logging me out" names none. If Sig asked anything, take the pushback and move on without apologising at length.
     card: {project: Training Portal, kind: problem, impact: Slowing me down}
     chips: [no_impact, no_impact, card]
-    never_ask: [which tool, how often]
+    never_ask: [which tool]
     never_repeat: [which browser]
+    revised: "2026-10-30: never_ask had how often, which the judge reads as every details question, so asking which screen failed it; the words how often and since when are now forbidden directly"
 
   - name: pushback-i-said-i-cant-work
     messages:
