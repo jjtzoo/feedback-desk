@@ -471,3 +471,22 @@ async def test_console_counts_follow_the_inboxes_and_approvals(
     # Approvals are an Admin's number: the Digital team sees zero, staff cannot ask at all.
     assert (await darlene.get("/api/console/counts")).json()["approvals"] == 0
     assert (await staff.get("/api/console/counts")).status_code == 403
+
+
+async def test_all_open_follows_the_board(
+    staff: httpx.AsyncClient, marc: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    async def open_refs(client: httpx.AsyncClient) -> list[str]:
+        return [
+            i["reference"] for i in (await client.get("/api/console/items", params={"inbox": "open"})).json()["items"]
+        ]
+
+    ref = await raise_bug(staff)
+    # Awaiting approval is not a column on Darlene's board, so it is not in her All open or its count,
+    # but it is in Assigned to me: it is hers once approved.
+    counts = (await darlene.get("/api/console/counts")).json()
+    assert ref not in await open_refs(darlene) and counts["open"] == 0 and counts["mine"] == 1
+    assert ref in await open_refs(marc)
+    assert (await marc.post(f"/api/console/items/{ref}/approve")).status_code == 200
+    assert ref in await open_refs(darlene)
+    assert (await darlene.get("/api/console/counts")).json()["open"] == 1

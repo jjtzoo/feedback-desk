@@ -16,5 +16,6 @@
   "S12.15": ["toEqual(refsOf(urgent))", "toEqual(refsOf(urgent).reverse())"],
   "S12.16": ["ending=wont_fix(&|$)", "ending=wont_fixx(&|$)"],
   "S12.17": ["toHaveClass(/text-muted-foreground/);", "toHaveClass(/text-warning/);"],
-  "S12.18": ["toEqual([\"Close…\"])", "toEqual([\"Start work\", \"Close…\"])"]
+  "S12.18": ["toEqual([\"Close…\"])", "toEqual([\"Start work\", \"Close…\"])"],
+  "S12.19": ["counts what the board shows` }).toBe(0)", "counts what the board shows` }).toBe(1)"]
 }
