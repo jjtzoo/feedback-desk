@@ -13,11 +13,11 @@ The user's scope for this stretch is **four things only**:
 
 Plus the standing item: the user pushes `main` (section 2).
 
-I went past that list and built backlog items nobody asked for (Channels removal, backward moves, an Inbox, board width, a phone header fix). The user objected ("wtf the test earlier only had dashboard as missing") and chose **"Stop extras, do tests"**. Those extras are parked on their own branches (section 5). **Do not merge or build any of them unless the user says so, and do not start anything else from the old handoff backlog. When the list is done, report and ask.**
+I went past that list and built backlog items nobody asked for (Channels removal, backward moves, an Inbox, board width, a phone header fix). The user objected ("wtf the test earlier only had dashboard as missing") and chose **"Stop extras, do tests"**. Those extras were parked on their own branches (section 5). **Later that evening the user chose to put three of them on the presentation build: the board width, the phone header fix and the Channels removal** (they are marked below). Backward moves and the Inbox stay parked. **Do not merge or build any of them unless the user says so, and do not start anything else from the old handoff backlog. When the list is done, report and ask.**
 
 ## 1. What is running now (the user's presentation)
 
-Everything runs from the worktree `.claude/worktrees/conversation-label`, now on the local-and-pushed branch **`demo/presentation-30oct`** (`963fb9c`): the stack (`fix/stepper-latest-dates`) plus exactly three merges, `feat/manager-dashboard`, `fix/all-open-follows-board` and `fix/vent-asks-what-happened`, and this handoff. Nothing else.
+Everything runs from the worktree `.claude/worktrees/conversation-label`, on the pushed branch **`demo/presentation-30oct`**: the stack (`fix/stepper-latest-dates`) plus these merges, and this handoff: `feat/manager-dashboard`, `fix/all-open-follows-board`, `fix/vent-asks-what-happened`, `ui/board-fit`, `ui/console-header-phone` (which also has a one-class fix so the Work page stops scrolling sideways on a phone) and `feat/remove-channels`. Nothing else. Checked in a browser on 30 Oct: Marc's menu has Releases, Dashboard and Admin and no Channels, Darlene's has no Dashboard, `/console/channels` is 404, the five board columns fit at 1920 px, and every main page is 390 px wide at 390 px.
 
 - API on **8001** with Gemini (`GOOGLE_API_KEY` from the root `.env`), web on **3000**. Restart:
 
@@ -27,7 +27,7 @@ GOOGLE_API_KEY=<from the root .env> PORT=8001 APP_BASE_URL=http://localhost:3000
 cd ../web && API_ORIGIN=http://127.0.0.1:8001 npx next dev --port 3000
 ```
 
-- The local database is `backend/.localdb` in that worktree (migration 0008). **129 made-up items of demo history were added** (`uv run python -m scripts.demo_history`, local only, run once; they carry `context.demo_history`) so the dashboard charts have 14 weeks to show. The presentation data from before is still there.
+- The local database is `backend/.localdb` in that worktree, **now at migration 0009** (Channels removed; it held no channel messages, release items from channels or mention notifications, so nothing was lost). **129 made-up items of demo history were added** (`uv run python -m scripts.demo_history`, local only, run once; they carry `context.demo_history`) so the dashboard charts have 14 weeks to show. The presentation data from before is still there.
 - Also still running, for comparison: a **preview** on 8011 and 3010 from the detached worktree `.claude/worktrees/preview-30oct`, which merges **every** finished branch including the extras. Stop it (nothing depends on it) when you no longer need it. `.claude/worktrees/manager-dashboard` has no servers.
 - Browser tests use their own servers: 8102/3200/8112 with database `fd_e2e_md` (manager-dashboard worktree) and 8202/3300/8212 with `fd_e2e_ao` (all-open-board worktree). Never use port 8000 (another app).
 
@@ -66,21 +66,21 @@ From `docs/testing/conversation-eval-2026-10-30.md`: 91 of 98 on the final merge
 - Typo and sarcasm cases (typo-go-forms-extention, sarcasm-wonderful-update) flake and passed twice each when re-run; watch them.
 Run `uv run python -m evals.run_conversations --only <name> --parallel 3` per fix, then the whole set once at the end. Gemini cost is no concern.
 
-## 5. Parked branches (all pushed; none is in `main` or the presentation build)
+## 5. Branches off the 30 Oct stack (all pushed; none is in `main`; the first three are in the presentation build, the last two are parked)
 
 | Branch | State |
 |---|---|
-| `feat/remove-channels` (`787dac3`) | **Finished and checked in part.** Removes Channels (D40, user chose "remove completely" on 30 Oct), records D38 as decided as built; migration **0009** (tested up, down, up); web and e2e lists updated; checklist section 17 marked removed. Backend `test_workspace` and `test_platform_auth` pass, web `tsc` and ESLint clean; the full suites were not run. Merging it with `feat/manager-dashboard` conflicts in `docs/feedback-build-spec-v3.md` (take the Documents master copy), and in `web/e2e/01-sign-in-roles.spec.ts` and `02-landing.spec.ts` (S01.11 menu: Work, Releases, Admin, no Channels, no Dashboard; S02.08 guide: Mario sees Work, Releases; Chris adds Approvals, Dashboard, Admin). The preview worktree has that resolution. |
-| `ui/board-fit` (`9d72574`) | Finished. Board columns share the row width (min 16rem, max 26rem) so five columns fit at 1920 px. |
-| `ui/console-header-phone` (`81ff5cf`) | Finished. The "Smoke Signal" name is screen-reader-only below 640 px, so the console (was 457 px at 390) and staff (411 px for the Digital team) headers stop scrolling sideways. |
+| `feat/remove-channels` (`787dac3`) | **In the presentation build.** Finished and checked in part. Removes Channels (D40, user chose "remove completely" on 30 Oct), records D38 as decided as built; migration **0009** (tested up, down, up); web and e2e lists updated; checklist section 17 marked removed. Backend `test_workspace` and `test_platform_auth` pass, web `tsc` and ESLint clean; the full suites were not run. Merging it with `feat/manager-dashboard` conflicts in `docs/feedback-build-spec-v3.md` (take the Documents master copy), and in `web/e2e/01-sign-in-roles.spec.ts` and `02-landing.spec.ts` (S01.11 menu: Work, Releases, Admin, no Channels, no Dashboard; S02.08 guide: Mario sees Work, Releases; Chris adds Approvals, Dashboard, Admin). The preview worktree has that resolution. |
+| `ui/board-fit` (`9d72574`) | **In the presentation build.** Finished. Board columns share the row width (min 16rem, max 26rem) so five columns fit at 1920 px. |
+| `ui/console-header-phone` (`44fa4eb`) | **In the presentation build.** Finished. The "Smoke Signal" name is screen-reader-only below 640 px, so the console (was 457 px at 390) and staff (411 px for the Digital team) headers stop scrolling sideways. |
 | `feat/backward-moves` (`a75d704`) | **WIP, unreviewed.** Un-approve, Stop work, Reopen (console), the Ask for info button, reply refused on ended items; 9 backend tests passed, web tsc/ESLint clean; two review agents' findings are in the workflow journal `C:\Users\Jacob Toledo\.claude\projects\c--Apps-Feedback\3f526701-815e-49d5-b82c-8a841021f1a2\subagents\workflows\wf_7b06a4ec-c49\journal.jsonl` and **were not acted on**. Decisions the user made: reasons for Un-approve and Stop work stay internal; Reopen is Admins only with a public reason. Not recorded in the spec yet (it would be the next free D number). S13.17 will fail when this merges (the badge became a button). Stacked on `feat/remove-channels`. |
 | `feat/console-inbox` (`5c597a0`) | **Half-built.** Backend only (`services/inbox.py`, `GET /console/inbox`, `inbox` in `/console/counts`); no web page, no tests, no spec row. |
 | Not started | Undo toast (the design is in Documents, `Feedback undo and backward moves design 30 Oct.json`), ticket cards in messages, AI-drafted replies. |
 
 ## 6. Documents (not in git)
 
-- `Feedback test checklist.txt`, edited today, **all 39 of the user's [x] ticks kept**: section 21 rewritten as 8 items for the dashboard (D112); S01.11, S02.08, S14.07, S18.13, S22.07 follow it; **S12.19** added as the last item of section 12 ("All open" follows the board); section 17 marked removed and Channels dropped from the menu lists (these two belong to the parked Channels branch, so if it is not merged, put those lines back: section 17 and the Channels mentions in the intro, S01.11, S02.08, section 20's "channel items", S23.04, gaps 13 and 18).
-- `feedback-build-spec-v3.md` (master) holds D112 (dashboard), D38 decided as built and D40 removed, plus F15 removed. Each repo branch only has its own part (D112 on `feat/manager-dashboard`, D38 and D40 on `feat/remove-channels`). If Channels is not merged, undo the D38 and D40 edits and F15 in the master.
+- `Feedback test checklist.txt`, edited today, **all 39 of the user's [x] ticks kept**: section 21 rewritten as 8 items for the dashboard (D112); S01.11, S02.08, S14.07, S18.13, S22.07 follow it; **S12.19** added as the last item of section 12 ("All open" follows the board); section 17 marked removed and Channels dropped from the menu lists (these two belong to the Channels removal, which is in the presentation build; if it is dropped, put those lines back: section 17 and the Channels mentions in the intro, S01.11, S02.08, section 20's "channel items", S23.04, gaps 13 and 18).
+- `feedback-build-spec-v3.md` (master) holds D112 (dashboard), D38 decided as built and D40 removed, plus F15 removed. Each repo branch only has its own part (D112 on `feat/manager-dashboard`, D38 and D40 on `feat/remove-channels`). Channels is now in the presentation build, so the master is right as it is; if the Channels removal is dropped later, undo the D38 and D40 edits and F15 in the master.
 - The dashboard's spec row is **D112**; the next free number is D113 (check every branch first).
 
 ## 7. How the user works
