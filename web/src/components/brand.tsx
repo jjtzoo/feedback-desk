@@ -31,11 +31,12 @@ export function BrandMark({ className }: { className?: string }) {
   );
 }
 
+/** The logo and name. Below 640 px only the logo shows (the name stays for screen readers), so the headers fit a phone. */
 export function Brand({ href = "/", tone = "light" }: { href?: string; tone?: "light" | "dark" }) {
   return (
     <Link href={href} className="flex min-h-11 items-center gap-2.5 rounded-md text-lg whitespace-nowrap font-extrabold tracking-tight">
       <BrandMark />
-      <span className={tone === "dark" ? "text-band-foreground" : "text-foreground"}>Smoke Signal</span>
+      <span className={cn("sr-only sm:not-sr-only", tone === "dark" ? "text-band-foreground" : "text-foreground")}>Smoke Signal</span>
     </Link>
   );
 }
