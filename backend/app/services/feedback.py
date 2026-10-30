@@ -414,11 +414,12 @@ async def _status_events(db: AsyncSession, fb: Feedback) -> list[FeedbackEvent]:
 
 
 def _stages(fb: Feedback, status_events: list[FeedbackEvent]) -> list[dict[str, Any]]:
-    """The five-stage stepper, each stage with when it was reached."""
+    """The five-stage stepper, each stage with when it was last reached: after a reopen, In progress,
+    Resolved and the ending show the latest round, not the first."""
     reached: dict[str, datetime] = {"received": fb.created_at}
     for ev in status_events:
         to = STAGE_OF.get(str(ev.after.get("status", "")))
-        if to and to not in reached:
+        if to and to != "received":
             reached[to] = ev.created_at
     current_index = STAGES.index(STAGE_OF[fb.status])
     last_label = (
