@@ -69,7 +69,7 @@ async def clean_db(migrated: None) -> AsyncIterator[None]:
                 "TRUNCATE app.feedback_events, app.feedback_messages, app.feedback_followers, app.attachments, "
                 "app.feedback_embeddings, app.notification_mutes, app.item_reads, app.notifications, "
                 "app.release_items, app.releases, "
-                "app.project_messages, app.feedback, app.routing_rules, app.projects, app.digital_staff, "
+                "app.feedback, app.routing_rules, app.projects, app.digital_staff, "
                 "app.user_sessions, app.user_preferences, app.job_runs, app.model_usage CASCADE"
             )
         )

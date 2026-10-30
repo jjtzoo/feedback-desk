@@ -18,7 +18,6 @@ import { day } from "@/lib/format";
 const SOURCE: Record<ReleaseItem["source_type"], string> = {
   feedback: "Resolved feedback",
   progress: "Progress update",
-  channel: "Project channel (internal, unticked by default)",
   manual: "Added by hand",
 };
 const SECTION: { value: WorkType | "none"; label: string }[] = [

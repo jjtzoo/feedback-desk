@@ -350,21 +350,6 @@ class NotificationMute(Base):
     created_at: Mapped[datetime] = _now()
 
 
-class ProjectMessage(Base):
-    __tablename__ = "project_messages"
-    __table_args__ = (Index(None, "project_id", "created_at"),)
-
-    id: Mapped[uuid.UUID] = _id()
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"))
-    author_email: Mapped[str] = mapped_column(String(320))
-    author_name: Mapped[str] = mapped_column(String(200))
-    body: Mapped[str] = mapped_column(Text)
-    mentions: Mapped[list[str]] = _tags()
-    feedback_refs: Mapped[list[str]] = _tags()
-    pinned: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
-    created_at: Mapped[datetime] = _now()
-
-
 class Release(Base):
     __tablename__ = "releases"
     __table_args__ = (CheckConstraint(check_in("status", RELEASE_STATUSES), name="status"),)
@@ -387,7 +372,7 @@ class ReleaseItem(Base):
     title: Mapped[str] = mapped_column(String(200))
     body: Mapped[str] = mapped_column(Text, default="", server_default="")
     work_type: Mapped[str | None] = mapped_column(String(20))
-    source_type: Mapped[str] = mapped_column(String(20))  # feedback | progress | channel | manual
+    source_type: Mapped[str] = mapped_column(String(20))  # feedback | progress | manual
     source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     visible_to_staff: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

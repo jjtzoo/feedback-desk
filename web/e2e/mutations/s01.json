@@ -9,7 +9,9 @@
   "S01.08": ["{ name: \"Console\" });", "{ name: \"Consolex\" });"],
   "S01.09": ["What can we help you with?", "What can we help you with?x"],
   "S01.10": ["toBe(\"/console\")", "toBe(\"/consolex\")"],
-  "S01.11": ["/^Overdue/, \"Channels\", \"Releases\"", "/^Overdue/, \"Channelsx\", \"Releases\""],
+  "S01.11": ["/^Overdue/, \"Releases\", \"Dashboard\", \"Admin\"]);
+  await expect(consoleNav(page).getByRole(\"link\", { name: \"Approvals\" }))", "/^Overdue/, \"Releasesx\", \"Dashboard\", \"Admin\"]);
+  await expect(consoleNav(page).getByRole(\"link\", { name: \"Approvals\" }))"],
   "S01.12": ["[/^Approvals/, \"Work\"", "[/^Approvalsx/, \"Work\""],
   "S01.13": ["not.toContainText(title)", "toContainText(title)"],
   "S01.14": ["not.toContainText(/[{}]/)", "toContainText(/[{}]/)"],

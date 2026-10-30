@@ -1,8 +1,0 @@
-{
-  "S17.01": ["Staff never see these.", "Staff never see thesex."],
-  "S17.02": ["toHaveCount(1)", "toHaveCount(2)"],
-  "S17.03": ["toContainText(\"Approved\")", "toContainText(\"Approvedx\")"],
-  "S17.04": ["/font-semibold/", "/font-semiboldx/"],
-  "S17.05": ["toBeLessThan(otherTop)", "toBeGreaterThan(otherTop)"],
-  "S17.06": ["not.toContainText(\"logins for the vendor portal\")", "toContainText(\"logins for the vendor portal\")"]
-}

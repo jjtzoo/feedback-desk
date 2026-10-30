@@ -2,7 +2,7 @@
 that week; the owner ticks, edits and publishes. Nothing publishes automatically.
 
 Drafter guardrails: it only summarises the sources, never invents changes, never names the
-staff who reported issues, and never copies internal notes. Items from the channel start
+staff who reported issues, and never copies internal notes. Items from progress updates start
 unticked, so internal detail is never published by accident.
 """
 
@@ -22,7 +22,6 @@ from app.models import (
     FeedbackFollower,
     FeedbackMessage,
     Project,
-    ProjectMessage,
     Release,
     ReleaseItem,
     ReleaseItemThanks,
@@ -128,22 +127,6 @@ async def _sources(db: AsyncSession, project: Project, start: datetime, end: dat
                 "work_type": fb.work_type if fb.work_type in SECTION else None,
                 "source_type": "progress",
                 "source_id": msg.id,
-                "visible_to_staff": False,
-            }
-        )
-    channel = await db.scalars(
-        select(ProjectMessage).where(
-            ProjectMessage.project_id == project.id, ProjectMessage.created_at >= start, ProjectMessage.created_at < end
-        )
-    )
-    for note in channel:
-        out.append(
-            {
-                "title": first_sentence(note.body, 80),
-                "body": "",
-                "work_type": None,
-                "source_type": "channel",
-                "source_id": note.id,
                 "visible_to_staff": False,
             }
         )

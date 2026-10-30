@@ -47,7 +47,7 @@ test("S27.06 The console Guide at phone width points at Open menu, then highligh
   await press(tryCard(page), "Next");
 
   // Every other step either shows its control or says where it is, and moves on.
-  for (const title of ["Approvals", "Channels", "Releases", "Dashboard", "Admin"]) {
+  for (const title of ["Approvals", "Releases", "Dashboard", "Admin"]) {
     await press(tourCard(page, title), "OK");
     await expect(clickCard(page)).toContainText("Open the highlighted menu first.");
     await press(clickCard(page), "Skip this step");

@@ -20,7 +20,7 @@ An index of what the app must do. It does not restate the spec; each row points 
 | F12 | Approvals: approve, decline or ask for info before work starts | 3 | MVP scope, D3 |
 | F13 | Parcel-style staff tracker, five stages | 3 | MVP scope, Feedback lifecycle |
 | F14 | Notifications in the app and by email | 3 | MVP scope, D11 |
-| F15 | Private project channels for Digital Staff | 3 | MVP scope |
+| F15 | Private project channels for Digital Staff | 3 | Removed by D40 (2026-10-30) |
 | F16 | Dashboard and daily digest (first to slip) | 3 | MVP scope, D14 |
 | F17 | Friday releases and Fixes and updates (second to slip) | 4 | MVP scope |
 | F18 | Launch: production, 3-day pilot of about 15 staff, intranet tile, guides | 4 | MVP scope |
