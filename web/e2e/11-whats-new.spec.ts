@@ -27,7 +27,6 @@ const FIXED_ITEM = "The RAKE Agent reply page shows an error when I open it"; //
 const UNTICKED_ITEM = "The RAKE Agent export page shows an error when I open it"; // resolved, but the owner unticks it
 const IN_PROGRESS_ITEM = "The RAKE Agent sharing page shows an error when I open it"; // still being worked on: an unticked "In progress" draft item
 const PORTAL_ITEM = "The Training Portal course list shows an error when I open it"; // second tool's release
-const CHANNEL_NOTE = "Channel note for the team: rollout checklist ready, Mario to review";
 const PROGRESS_UPDATE = "Progress detail: waiting on the vendor, Darlene has the logs";
 const INTERNAL_NOTE = "Internal note: Aisha escalated this, code 7731";
 const STAFF_NAMES = /\b(Liam|Aisha|Tom|Grace|Rafael|Mei|Darlene|Mario|Marc|Chris|Mike)\b/;
@@ -60,15 +59,14 @@ function publishReleases(team: Team) {
     const worker = await holder(working);
     await postJson(worker, `/console/items/${working}/start`);
     await postJson(worker, `/console/items/${working}/update`, { body: PROGRESS_UPDATE });
-    await postJson(chris, "/console/channels/rake-agent", { body: CHANNEL_NOTE });
     await resolve(await raiseBug(aisha, "training-portal", PORTAL_ITEM));
 
     await postJson(chris, "/console/releases/draft-now");
     const drafts = await getJson<ReleaseRow[]>(chris, "/console/releases");
     const draft = (slug: string) => drafts.find((r) => r.project.slug === slug && r.status === "draft")!;
 
-    // The owner's edit: untick the export item. The drafter's own items from the channel and the
-    // in-progress update start unticked already.
+    // The owner's edit: untick the export item. The drafter's own item from the
+    // in-progress update starts unticked already.
     const rake = await getJson<ReleaseDetail>(chris, `/console/releases/${draft("rake-agent").id}`);
     const kept = rake.items.map((i) => ({ ...i, visible_to_staff: i.visible_to_staff && !i.title.includes("export page") }));
     const saved = await chris.request.put(`/api/console/releases/${rake.id}/items`, { data: { items: kept } });

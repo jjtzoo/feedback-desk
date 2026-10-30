@@ -169,11 +169,11 @@ test("S01.10 After Sign out, opening /console sends you back to the sign-in page
   await expect(page.getByRole("heading", { name: "Work" })).toHaveCount(0);
 });
 
-test("S01.11 Darlene's console side menu shows Work, Channels, Releases, Dashboard, Admin and no Approvals", async ({ page, signIn }) => {
+test("S01.11 Darlene's console side menu shows Work, Releases, Dashboard, Admin and no Approvals", async ({ page, signIn }) => {
   await signIn("Darlene");
   await page.goto("/console");
   await expect(consoleNav(page)).toBeVisible();
-  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", /^Assigned to me/, /^Triage/, /^Overdue/, "Channels", "Releases", "Dashboard", "Admin"]);
+  await expect(consoleNav(page).getByRole("link")).toHaveText(["Work", /^Assigned to me/, /^Triage/, /^Overdue/, "Releases", "Dashboard", "Admin"]);
   await expect(consoleNav(page).getByRole("link", { name: "Approvals" })).toHaveCount(0);
 });
 
@@ -187,7 +187,7 @@ test("S01.12 After signing out from the account menu, Chris lands on the console
   await pick(page, "Chris");
   await expect(page.getByRole("heading", { name: "Work", level: 1 })).toBeVisible();
   await expect(page).toHaveURL(/\/console$/);
-  await expect(consoleNav(page).getByRole("link")).toHaveText([/^Approvals/, "Work", /^Assigned to me/, /^Triage/, /^Overdue/, "Channels", "Releases", "Dashboard", "Admin"]);
+  await expect(consoleNav(page).getByRole("link")).toHaveText([/^Approvals/, "Work", /^Assigned to me/, /^Triage/, /^Overdue/, "Releases", "Dashboard", "Admin"]);
   // An Admin starts on what is open; the Digital team starts on what is theirs.
   await expect(page.getByRole("tab", { name: /^All open/ })).toHaveAttribute("aria-selected", "true");
 });

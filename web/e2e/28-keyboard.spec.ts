@@ -163,7 +163,6 @@ test("S28.01 Tab through the landing page, chat, tracker and console: a visible 
     /^Assigned to me/,
     /^Triage/,
     /^Overdue/,
-    "Channels",
     "Releases",
     "Dashboard",
     "Admin",

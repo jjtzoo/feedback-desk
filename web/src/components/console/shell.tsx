@@ -1,6 +1,6 @@
 "use client";
 
-import { ChartColumn, ClipboardCheck, House, LayoutList, Megaphone, Menu, Rocket, Settings, type LucideIcon } from "lucide-react";
+import { ChartColumn, ClipboardCheck, House, LayoutList, Menu, Rocket, Settings, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useState, type ReactNode } from "react";
@@ -20,7 +20,6 @@ import { cn } from "@/lib/utils";
 const NAV: { href: string; label: string; icon: LucideIcon; exact?: boolean; admin?: boolean }[] = [
   { href: "/console/approvals", label: "Approvals", icon: ClipboardCheck, admin: true },
   { href: "/console", label: "Work", icon: LayoutList, exact: true },
-  { href: "/console/channels", label: "Channels", icon: Megaphone },
   { href: "/console/releases", label: "Releases", icon: Rocket },
   { href: "/console/dashboard", label: "Dashboard", icon: ChartColumn },
   { href: "/console/admin", label: "Admin", icon: Settings },

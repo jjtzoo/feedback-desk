@@ -1,6 +1,5 @@
 {
   "S23.01": ["toBe(\"/api/my/feedback\")", "toBe(\"/api/my/feedbackx\")"],
   "S23.02": ["toHaveAttribute(\"href\", \"/\")", "toHaveAttribute(\"href\", \"/x\")"],
-  "S23.03": ["not.toContainText(\"RAKE Agent\")", "toContainText(\"RAKE Agent\")"],
-  "S23.04": ["expect(channelCalls).toEqual([])", "expect(channelCalls).toEqual([\"x\"])"]
+  "S23.03": ["not.toContainText(\"RAKE Agent\")", "toContainText(\"RAKE Agent\")"]
 }

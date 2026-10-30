@@ -549,31 +549,6 @@ class ReadIn(BaseModel):
     ids: list[uuid.UUID] | None = None
 
 
-class ChannelMessageOut(Out):
-    id: uuid.UUID
-    author_name: str
-    author_email: str
-    body: str
-    mentions: list[str]
-    feedback_refs: list[str]
-    pinned: bool
-    created_at: datetime
-
-
-class ChannelOut(Out):
-    project: ProjectOut
-    messages: list[ChannelMessageOut]
-    chips: dict[str, dict[str, str]]
-
-
-class ChannelPostIn(BaseModel):
-    body: str = Field(min_length=1, max_length=8000)
-
-
-class PinIn(BaseModel):
-    pinned: bool
-
-
 class ReleaseItemOut(Out):
     id: uuid.UUID
     title: str

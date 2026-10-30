@@ -370,29 +370,12 @@ export interface Notification {
   step: string | null;
 }
 
-export interface ChannelMessage {
-  id: string;
-  author_name: string;
-  author_email: string;
-  body: string;
-  mentions: string[];
-  feedback_refs: string[];
-  pinned: boolean;
-  created_at: string;
-}
-
-export interface Channel {
-  project: Project;
-  messages: ChannelMessage[];
-  chips: Record<string, { title: string; status: Status }>;
-}
-
 export interface ReleaseItem {
   id: string;
   title: string;
   body: string;
   work_type: WorkType | null;
-  source_type: "feedback" | "progress" | "channel" | "manual";
+  source_type: "feedback" | "progress" | "manual";
   source_id: string | null;
   visible_to_staff: boolean;
   yours?: boolean;

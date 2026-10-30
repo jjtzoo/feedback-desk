@@ -1,4 +1,4 @@
-"""Digital Staff workspace: project channels, Friday releases and the dashboard (brief §4.4.6, §4.7, §4.8)."""
+"""Digital Staff workspace: Friday releases and the dashboard (brief §4.4.6, §4.8)."""
 
 import uuid
 
@@ -7,38 +7,14 @@ from fastapi.responses import Response
 
 from app.api.deps import CurrentUser, Db, DigitalUser
 from app.schemas import (
-    ChannelMessageOut,
-    ChannelOut,
-    ChannelPostIn,
-    PinIn,
     ProjectOut,
     ReleaseItemOut,
     ReleaseItemsIn,
     ReleaseOut,
 )
-from app.services import channels, releases, reports
+from app.services import releases, reports
 
 router = APIRouter(prefix="/console", tags=["workspace"])
-
-
-@router.get("/channels/{slug}", response_model=ChannelOut)
-async def channel(slug: str, db: Db, user: DigitalUser) -> ChannelOut:
-    project, messages, chips = await channels.messages(db, user, slug)
-    return ChannelOut(
-        project=ProjectOut.model_validate(project),
-        messages=[ChannelMessageOut.model_validate(m) for m in messages],
-        chips=chips,
-    )
-
-
-@router.post("/channels/{slug}", response_model=ChannelMessageOut, status_code=201)
-async def post(slug: str, body: ChannelPostIn, db: Db, user: DigitalUser) -> ChannelMessageOut:
-    return ChannelMessageOut.model_validate(await channels.post(db, user, slug, body.body))
-
-
-@router.post("/channels/messages/{message_id}/pin", response_model=ChannelMessageOut)
-async def pin(message_id: str, body: PinIn, db: Db, user: DigitalUser) -> ChannelMessageOut:
-    return ChannelMessageOut.model_validate(await channels.pin(db, user, message_id, body.pinned))
 
 
 @router.get("/releases", response_model=list[ReleaseOut])

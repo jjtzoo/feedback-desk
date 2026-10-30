@@ -75,12 +75,6 @@ const STEPS: Record<Area, Step[]> = {
       roles: ["admin"],
     },
     {
-      title: "Channels",
-      body: "One shared thread per project, for the team to discuss its items.",
-      action: "Click Channels",
-      target: "console-channels",
-    },
-    {
       title: "Releases",
       body: "Each Friday a release is drafted per project. The owner ticks, edits and publishes it to Fixes and updates. Nothing publishes on its own.",
       action: "Click Releases",

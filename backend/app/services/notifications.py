@@ -60,7 +60,6 @@ STEPS = {
     "handed_over": "Handed over",
     "progress": "Update",
     "reply": "Reply",
-    "mention": "Mention",
 }
 
 

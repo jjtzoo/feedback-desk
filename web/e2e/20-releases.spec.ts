@@ -24,7 +24,6 @@ const IMPACT = ["Slowing me down", "I expected it to open but got a blank screen
 const NEW_ITEM = "Please add a dark mode to RAKE Agent"; // Liam's: ticked, published in S20.07
 const FIXED_ITEM = "The RAKE Agent reply page shows an error when I open it"; // Aisha's: reworded in S20.04
 const IN_PROGRESS_ITEM = "The RAKE Agent sharing page shows an error when I open it"; // still in progress: unticked "Progress update"
-const CHANNEL_NOTE = "Channel note for the team: rollout checklist ready, Mario to review";
 const PROGRESS_UPDATE = "Progress detail: waiting on the vendor, Darlene has the logs";
 const CPD_ITEMS = ["The CPD Tracker points page shows an error when I open it", "The CPD Tracker export page shows an error when I open it"];
 const PORTAL_ITEM = "The Training Portal course list shows an error when I open it"; // left as a draft in S20.08
@@ -32,7 +31,6 @@ const PORTAL_ITEM = "The Training Portal course list shows an error when I open 
 const SOURCE = {
   feedback: "Resolved feedback",
   progress: "Progress update",
-  channel: "Project channel (internal, unticked by default)",
   manual: "Added by hand",
 };
 const PUBLISH = "Approve and publish";
@@ -42,7 +40,7 @@ let seeded: Promise<void> | null = null;
 let drafted: Promise<void> | null = null;
 
 /**
- * Resolved feedback, a progress update and a channel note for RAKE Agent, two resolved items for
+ * Resolved feedback and a progress update for RAKE Agent, two resolved items for
  * CPD Tracker and one for the Training Portal. Built once per file; no draft exists yet.
  */
 function seedActivity(team: Team) {
@@ -62,7 +60,6 @@ function seedActivity(team: Team) {
     const worker = await holder(working);
     await postJson(worker, `/console/items/${working}/start`);
     await postJson(worker, `/console/items/${working}/update`, { body: PROGRESS_UPDATE });
-    await postJson(chris, "/console/channels/rake-agent", { body: CHANNEL_NOTE });
     await resolve(await raiseBug(tom, "cpd-tracker", CPD_ITEMS[0]));
     await resolve(await raiseBug(grace, "cpd-tracker", CPD_ITEMS[1]));
     await resolve(await raiseBug(rafael, "training-portal", PORTAL_ITEM));
@@ -156,13 +153,13 @@ test("S20.02 Each project owner's bell shows a draft-ready notification", async 
   await expect(page.getByRole("heading", { level: 1, name: "Training Portal" })).toBeVisible();
 });
 
-test("S20.03 Each draft item is labelled with its source and channel items start unticked", async ({ page, signIn, team }) => {
+test("S20.03 Each draft item is labelled with its source and progress updates start unticked", async ({ page, signIn, team }) => {
   await draftsReady(team);
   await signIn("Chris");
   await openRelease(page, "RAKE Agent");
 
   const items = page.locator("ol > li");
-  await expect(items).toHaveCount(4);
+  await expect(items).toHaveCount(3);
   const withSource = (source: string) => items.filter({ hasText: source });
   const ticked = (row: ReturnType<typeof withSource>) => row.getByRole("checkbox", { name: "Staff can see this" });
 
@@ -172,10 +169,6 @@ test("S20.03 Each draft item is labelled with its source and channel items start
   await expect(withSource(SOURCE.progress)).toHaveCount(1);
   await expect(withSource(SOURCE.progress).getByLabel("Title")).toHaveValue(IN_PROGRESS_ITEM);
   await expect(ticked(withSource(SOURCE.progress))).not.toBeChecked();
-
-  await expect(withSource(SOURCE.channel)).toHaveCount(1);
-  await expect(withSource(SOURCE.channel).getByLabel("Title")).toHaveValue(CHANNEL_NOTE);
-  await expect(ticked(withSource(SOURCE.channel))).not.toBeChecked();
 });
 
 test("S20.04 Editing, changing a section, removing and adding an item, then Save draft keeps the changes after reload", async ({ page, signIn, team }) => {
@@ -196,14 +189,14 @@ test("S20.04 Editing, changing a section, removing and adding an item, then Save
   await page.getByRole("option", { name: "Other", exact: true }).click();
   await expect(fixed.getByRole("combobox", { name: "Section" })).toContainText("Other");
 
-  // Remove the channel item.
-  const channel = await itemRow(page, CHANNEL_NOTE);
-  await channel.getByRole("button", { name: "Remove item" }).click();
-  await expect(page.locator("ol > li")).toHaveCount(3);
+  // Remove the progress item.
+  const progress = await itemRow(page, IN_PROGRESS_ITEM);
+  await progress.getByRole("button", { name: "Remove item" }).click();
+  await expect(page.locator("ol > li")).toHaveCount(2);
 
   // Add one by hand.
   await page.getByRole("button", { name: "Add item" }).click();
-  await expect(page.locator("ol > li")).toHaveCount(4);
+  await expect(page.locator("ol > li")).toHaveCount(3);
   const added = page.locator("ol > li").last();
   await expect(added).toContainText(SOURCE.manual);
   await added.getByLabel("Title").fill(ADDED);
@@ -215,11 +208,11 @@ test("S20.04 Editing, changing a section, removing and adding an item, then Save
   await page.reload();
   await expect(page.getByLabel("Title").first()).toBeVisible();
   const after = await titles(page);
-  expect(after).toHaveLength(4);
+  expect(after).toHaveLength(3);
   expect(after).toContain(REWORDED);
   expect(after).toContain(ADDED);
   expect(after.some((t) => t.includes(FIXED_ITEM))).toBe(false);
-  expect(after.some((t) => t.includes(CHANNEL_NOTE))).toBe(false);
+  expect(after.some((t) => t.includes(IN_PROGRESS_ITEM))).toBe(false);
 
   const reworded = await itemRow(page, REWORDED);
   await expect(reworded.getByLabel("Description")).toHaveValue(REWORDED_BODY);
