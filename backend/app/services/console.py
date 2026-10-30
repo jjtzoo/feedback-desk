@@ -103,6 +103,11 @@ class Filters:
     ending: str | None = None  # in the Archive: an ending, or "acknowledged" for praise
 
 
+def _shown(user: User) -> list[str]:
+    """The statuses of the columns this person's board shows."""
+    return [s for _, _, statuses in visible_columns(user) for s in statuses]
+
+
 def _filtered(user: User, f: Filters) -> Select[Feedback]:
     query = select(Feedback).options(selectinload(Feedback.project), selectinload(Feedback.assignee))
     conds: list[Any] = []
@@ -112,8 +117,7 @@ def _filtered(user: User, f: Filters) -> Select[Feedback]:
         conds.append(Feedback.status.in_(OPEN_STATUSES))
     elif f.inbox == "needs_review":
         # Only what this person's board shows, so the Triage count never holds an item they can't see.
-        shown = [s for _, _, statuses in visible_columns(user) for s in statuses]
-        conds.append(Feedback.status.in_(shown))
+        conds.append(Feedback.status.in_(_shown(user)))
         conds.append(
             or_(
                 Feedback.status.in_(("needs_review", "new")),
@@ -121,7 +125,8 @@ def _filtered(user: User, f: Filters) -> Select[Feedback]:
             )
         )
     elif f.inbox == "open":
-        conds.append(Feedback.status.in_(OPEN_STATUSES))
+        # All open too, so a Digital Staff member's leaves out Needs review and Awaiting approval.
+        conds.append(Feedback.status.in_(_shown(user)))
     elif f.inbox == "archive":
         conds.append(Feedback.status.in_(CLOSED_STATUSES))
     elif f.inbox == "overdue":

@@ -717,3 +717,30 @@ test("S12.17 A Resolved card, its list row and the Archive show the priority in 
   await expect(priority(page.getByRole("row", { name: new RegExp(ref) }))).toHaveClass(/text-muted-foreground/);
   await openWork(page, "Board");
 });
+
+test("S12.19 Darlene's All open and Triage count only what her board's columns show; her item waiting for approval counts in Assigned to me", async ({ page, signIn, team }) => {
+  await signIn("Darlene");
+  const ref = await raise(await team.as("Liam"), "The RAKE Agent leave report shows an error when I open it", IMPACT, "rake-agent");
+  const item = await getJson<{ status: string; assignee: { name: string } | null }>(page, `/console/items/${ref}`);
+  expect([item.status, item.assignee?.name.split(" ")[0]]).toEqual(["awaiting_approval", "Darlene"]);
+  /** The number a tab shows (its words for screen readers say ", N items"), 0 when it shows none. */
+  const count = async (label: string) => {
+    const words = inboxTab(page, label).locator(".sr-only");
+    return (await words.count()) ? Number(/\d+/.exec((await words.textContent()) ?? "")?.[0]) : 0;
+  };
+
+  // Awaiting approval is not one of Darlene's columns, so the item is on neither tab's board nor in its count.
+  await openWork(page, "Board");
+  for (const label of ["All open", "Triage"]) {
+    await inboxTab(page, label).click();
+    await expect(inboxTab(page, label)).toHaveAttribute("aria-selected", "true");
+    await expect(boardCard(page, ref)).toHaveCount(0);
+    await expect.poll(async () => (await count(label)) - (await page.locator(CARD).count()), { message: `${label} counts what the board shows` }).toBe(0);
+  }
+  expect(await count("All open")).toBeGreaterThan(0);
+
+  // It is hers once approved, so it is in Assigned to me already.
+  await openWork(page, "Cards");
+  await inboxTab(page, "Assigned to me").click();
+  await expect(page.getByRole("button", { name: new RegExp(ref) })).toHaveCount(1);
+});
