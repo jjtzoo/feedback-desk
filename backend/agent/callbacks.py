@@ -1,6 +1,7 @@
 """Guardrails enforced in code, not only in the instruction (spec v3 "Tools")."""
 
 import logging
+import re
 from typing import Any
 
 from google.adk.agents.callback_context import CallbackContext
@@ -16,6 +17,16 @@ log = logging.getLogger("agent.tools")
 
 TOOL_LIMITS = {"submit_feedback": 1, "find_duplicates": 3, "list_projects": 3}
 TOO_LONG = "Sorry, this is taking longer than it should. Use the form below and we'll still get your feedback."
+# The model's own reasoning written as reply text: never shown to staff (30 Oct conversation check, injection-role).
+REASONING = re.compile(
+    r"\b(system (prompt|instructions?|message)|my (instructions|guidelines|prompt)|per (the )?system"
+    r"|the user(?:'s)? (prompt|message|request|input|is asking|asks|wants|attempts|is trying|seems)"
+    r"|jailbreak|prompt injection)",
+    re.IGNORECASE,
+)
+REDIRECT = (
+    "I'm just here for feedback on our intranet tools. Got something about one of them you'd like to pass to the team?"
+)
 
 
 def before_tool(tool: BaseTool, args: dict[str, Any], tool_context: ToolContext) -> dict[str, Any] | None:
@@ -52,8 +63,27 @@ def before_tool(tool: BaseTool, args: dict[str, Any], tool_context: ToolContext)
     return refusal
 
 
+def without_reasoning(text: str) -> str:
+    """The reply without the model talking about its prompt or "the user": everything up to and including
+    the last such line goes, since the model narrates first and answers after. Empty if nothing is left."""
+    lines = text.split("\n")
+    leaks = [i for i, line in enumerate(lines) if REASONING.search(line)]
+    return text if not leaks else "\n".join(lines[leaks[-1] + 1 :]).strip()
+
+
 def after_model(callback_context: CallbackContext, llm_response: LlmResponse) -> LlmResponse | None:
-    """Add each model call's tokens to the session, for the per-conversation cost log (brief §8)."""
+    """Keep the model's reasoning out of the reply, then add the call's tokens to the session, for the
+    per-conversation cost log (brief §8)."""
+    content = llm_response.content
+    if content and content.parts:
+        said = [p for p in content.parts if p.text and not p.thought]
+        kept = [without_reasoning(p.text or "") for p in said]
+        if any(k != p.text for k, p in zip(kept, said, strict=True)):
+            log.warning("model reasoning removed from a reply")
+            calls = any(p.function_call for p in content.parts)
+            others = [p for p in content.parts if not (p.text and not p.thought)]
+            words = [types.Part(text=k) for k in kept if k] or ([] if calls else [types.Part(text=REDIRECT)])
+            content.parts = others + words
     usage = llm_response.usage_metadata
     if usage is None:
         return None

@@ -343,6 +343,37 @@ def test_thinking_tokens_count_as_output() -> None:
     assert ctx.state["usage"] == {"calls": 1, "input_tokens": 1000, "output_tokens": 940}
 
 
+def _reply(*parts: types.Part) -> LlmResponse:
+    return LlmResponse(content=types.Content(role="model", parts=list(parts)))
+
+
+def test_the_models_reasoning_never_reaches_the_reply() -> None:
+    """The 30 Oct injection-role case: the model wrote its reasoning as reply text, then its answer."""
+    leaked = (
+        'The user prompt attempts a classic jailbreak ("Ignore all previous instructions.").\n'
+        "Per system instructions, I should redirect.\n"
+        "I'm just here to help with feedback on our tools. Got something to pass to the team?"
+    )
+    r = _reply(types.Part(text=leaked))
+    callbacks.after_model(FakeContext(), r)  # type: ignore[arg-type]
+    assert [p.text for p in r.content.parts] == [  # type: ignore[union-attr]
+        "I'm just here to help with feedback on our tools. Got something to pass to the team?"
+    ]
+    # Nothing left: Sig's redirect, unless a tool was called, when the turn goes on without words.
+    r = _reply(types.Part(text="The user is asking me to ignore my instructions."))
+    callbacks.after_model(FakeContext(), r)  # type: ignore[arg-type]
+    assert [p.text for p in r.content.parts] == [callbacks.REDIRECT]  # type: ignore[union-attr]
+    call = types.Part(function_call=types.FunctionCall(name="update_draft", args={}))
+    r = _reply(types.Part(text="The user wants to report a slow page."), call)
+    callbacks.after_model(FakeContext(), r)  # type: ignore[arg-type]
+    assert r.content.parts == [call]  # type: ignore[union-attr]
+    # An ordinary reply is untouched, words like "system" included.
+    plain = "Sorry about that. Does the AFSS Portal system log you out every time you save?"
+    r = _reply(types.Part(text=plain))
+    callbacks.after_model(FakeContext(), r)  # type: ignore[arg-type]
+    assert [p.text for p in r.content.parts] == [plain]  # type: ignore[union-attr]
+
+
 def test_a_summary_about_the_user_is_refused() -> None:
     draft, errors = apply_update({}, {"summary": "The user reported the system is slow.", "title": "Slow"}, set())
     assert "summary" not in draft and draft["title"] == "Slow"
