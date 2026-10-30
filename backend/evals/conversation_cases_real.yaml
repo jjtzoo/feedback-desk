@@ -320,9 +320,10 @@ cases:
     expect: card
     require: []
     forbid: ["nuisance", "nice-to-have", "—"]
-    good: Keep the impact from turn 2, ask for the tool once more if needed, map "the epm thing" to ADAIR EPM Portal.
+    good: Ask for the tool once, keep the impact from turn 2 and ask about the problem itself next, map "the epm thing" to ADAIR EPM Portal.
     card: {project: ADAIR EPM Portal, kind: problem, impact: Slowing me down}
-    chips: [tools, tools, card]
+    chips: [tools, no_impact, card]
+    revised: "2026-10-30, D69: the tool is asked once (the product owner, 27 Oct), so turn 2 no longer expects the tool chips again"
     never_ask: [how much it affects their work]
     never_repeat: [how often]
 
@@ -334,9 +335,10 @@ cases:
     expect: card
     require: []
     forbid: ["—"]
-    good: Keep the steps, ask for the tool once if unclear, then card for CPD Tracker; never ask for steps again.
+    good: Ask for the tool once, keep the steps, then card for CPD Tracker; never ask for steps again.
     card: {project: CPD Tracker, kind: problem}
-    chips: [tools, tools, card]
+    chips: [tools, no_impact, card]
+    revised: "2026-10-30, D69: the tool is asked once (the product owner, 27 Oct), so turn 2 no longer expects the tool chips again"
     never_ask: [what happens when you upload]
     never_repeat: [what happens when you upload]
 
