@@ -22,7 +22,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; exact?: boolean; adm
   { href: "/console", label: "Work", icon: LayoutList, exact: true },
   { href: "/console/channels", label: "Channels", icon: Megaphone },
   { href: "/console/releases", label: "Releases", icon: Rocket },
-  { href: "/console/dashboard", label: "Dashboard", icon: ChartColumn },
+  { href: "/console/dashboard", label: "Dashboard", icon: ChartColumn, admin: true },
   { href: "/console/admin", label: "Admin", icon: Settings },
 ];
 

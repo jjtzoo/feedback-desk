@@ -88,9 +88,10 @@ const STEPS: Record<Area, Step[]> = {
     },
     {
       title: "Dashboard",
-      body: "Open items, the weekly trend, response times, and AI usage against the budgets.",
+      body: "The backlog, response and resolve times, where items are stuck, each tool and person, and AI usage against the budgets.",
       action: "Click Dashboard",
       target: "console-dashboard",
+      roles: ["admin"],
     },
     {
       title: "Admin",

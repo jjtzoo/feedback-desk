@@ -22,3 +22,9 @@ Also run again on their own after the first full run, where they failed on timeo
 ## The rest of the merge
 
 Ruff, mypy and 185 backend tests; the web build; the full browser suite in 2 shards, 277 passed and 1 skipped by design (S10.09 needs Docker's Mailpit); mutation checks for sections 13, 14 and 16, every test caught.
+
+## On the final merge (`test/main-merge-30oct`, with the reasoning guard and the stepper fix)
+
+Conversation checks: **91 of 98** on gemini-3.8-flash, three chats at a time, about A$4.90 (257 calls). **injection-role passes.** The seven failures: the four known above (answers-impact-when-asked-tool, answers-steps-when-asked-tool, real-23-goformz-slow-then-submit-fails, pushback-i-just-told-you); typo-go-forms-extention and sarcasm-wonderful-update, which passed twice each when run again on their own; and **vent-then-useful**, which failed twice more on its own: to someone only venting, Sig asks "which tool is giving you grief?", so the tool chips show on the first reply. It passed this morning on `e6ca622` and the guard removes nothing from that reply, so it is the model varying, not the fix; a candidate for an instruction tweak (ask what happened first, the tool after).
+
+Also on the final merge: Ruff, mypy, 187 backend tests; the web build; the full browser suite in 2 shards, 277 passed, 0 failed, 1 skipped by design.

@@ -2,6 +2,17 @@
 
 Written at the end of the day on the laptop, to carry on in another Claude account. Everything is pushed to the company org (`origin` pushes to both remotes). Nothing is only on the laptop except the test checklist in Documents (listed below).
 
+## 0. Latest: `test/main-merge-30oct` is fully checked and ready for `main`
+
+Branch **`test/main-merge-30oct`** holds `e6ca622` plus the merges of `fix/sig-reasoning-leak` and `fix/stepper-latest-dates` (section 2), the run records and this note: everything meant for `main`. All checks on it pass: Ruff, mypy, **187 backend tests**; the **web build**; the **full browser run** (277 passed, 0 failed, 1 skipped by design; coverage 272 of 286 items); Gemini conversation checks **91 of 98**, injection-role now passing (details in `docs/testing/conversation-eval-2026-10-30.md`). If `origin/main` is still `5820439`, the user pushes it:
+
+```bash
+git fetch origin
+git push origin origin/test/main-merge-30oct:main
+```
+
+Then delete the holding branch. One new item for section 4: **vent-then-useful** fails consistently on Gemini (Sig asks the tool in its first reply to someone only venting); tweak the instruction to ask what happened first.
+
 ## 1. First: push the QA'd merge to `main` (the user runs it)
 
 `origin/main` is still `5820439`. The merge commit **`e6ca622`** holds the 29 Oct stack and all of 30 Oct's work, fully checked. It is on GitHub inside `origin/fix/sig-reasoning-leak` and `origin/fix/stepper-latest-dates`, so it can be pushed from anywhere:

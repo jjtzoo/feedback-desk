@@ -435,16 +435,33 @@ export interface UsageSummary {
   people: { email: string; name: string; tokens: number; cost_aud: number; limit_reached: boolean }[];
 }
 
+/** A headline figure for this period, the same figure for the period before, and one value a week. */
+export interface DashboardFigure {
+  value: number | null;
+  previous: number | null;
+  trend: (number | null)[];
+  count: number;
+}
+
+export interface DashboardRate {
+  count: number;
+  of: number;
+  rate: number | null;
+}
+
+/** The manager dashboard (D112, Admins only). Backlog: New to In progress, not yet resolved. */
 export interface Dashboard {
-  open_by_project: { label: string; count: number }[];
-  open_by_assignee: { label: string; count: number }[];
-  open_by_category: { label: string; count: number }[];
-  open_by_work_type: { label: string; count: number }[];
-  weekly: { week: string; received: number; resolved: number }[];
-  avg_first_response_hours: number | null;
-  approvals_waiting: number;
+  weeks: number;
+  backlog: DashboardFigure;
+  first_response_hours: DashboardFigure;
+  resolve_days: DashboardFigure;
+  on_time: DashboardFigure;
+  flow: { week: string; received: number; resolved: number; backlog: number }[];
+  stuck: { stage: Status; bands: number[] }[];
   approvals_over_2_days: number;
-  project_reassignment_rate: number | null;
+  tools: { slug: string | null; name: string; new: number; open: number; oldest_days: number | null; reopened: number; resolved: number; thanks: number }[];
+  team: { id: string; name: string; open: number; overdue: number; oldest_days: number | null }[];
+  quality: { reopened: DashboardRate; duplicates: DashboardRate; corrections: DashboardRate; thanks: number };
 }
 
 export class ApiError extends Error {

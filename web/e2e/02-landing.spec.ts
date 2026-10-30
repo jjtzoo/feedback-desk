@@ -284,13 +284,12 @@ test("S02.07 Skip this step moves on, Skip tour ends the tour, Esc ends it excep
   await expect(tourCard(page, "Fixes and updates")).toContainText("Step 6 of 9");
 });
 
-test("S02.08 As Mario the console's Guide runs Work, Channels, Releases, Dashboard, then Smoke Signal home; Chris also gets Approvals and Admin", async ({ page, signIn, team }) => {
+test("S02.08 As Mario the console's Guide runs Work, Channels, Releases, then Smoke Signal home; Chris also gets Approvals, Dashboard and Admin", async ({ page, signIn, team }) => {
   await signIn("Mario");
   await runConsoleGuide(page, [
     ["Work", "OK"],
     ["Channels", "OK"],
     ["Releases", "OK"],
-    ["Dashboard", "OK"],
     ["Smoke Signal home", "Next"],
     ["That's it", "Done"],
   ]);

@@ -71,6 +71,8 @@ Without Docker, one command starts the API and the web app in the same terminal;
 
 (`dev.ps1` on Windows, `dev.sh` on macOS and Linux.) The script runs `uv run python -m scripts.dev_server` in `backend` and `npm run dev` in `web`, installs the web packages on the first run, and stops early if port 8001 or 3000 is already taken. The API then runs on port 8001 with a throwaway Postgres (`pgserver`), the stub model and email off. Port 8000 is left free for other local apps.
 
+To give the manager dashboard (D112, Admins only) something to show, add 14 weeks of made-up history to the local database once: `cd backend && uv run python -m scripts.demo_history` (the local database the dev script uses, or `DATABASE_URL` when set). It runs only with `APP_ENV=local` and does nothing the second time.
+
 ## Resolved items
 
 A Resolved item asks the person who raised it Is it fixed? (D92). If they don't answer, the worker sends one reminder after `RESOLVED_REMINDER_DAYS` (3) and closes it as Fixed after `RESOLVED_AUTO_CLOSE_DAYS` (7); they can still reopen it with I still have an issue for `REOPEN_DAYS` (14) after it closes. All three are in `.env.example`. Under Docker Compose the `worker` service runs it; `dev.ps1` and `dev.sh` don't start the worker, so nothing reminds or closes by itself there.

@@ -6,7 +6,7 @@ import httpx
 from sqlalchemy import select, update
 
 from app.db import session_scope
-from app.models import Feedback, Notification
+from app.models import Feedback, FeedbackEvent, Notification
 from app.services import releases
 from tests.conftest import DARLENE, STAFF, signed_in, submit_via_chat
 
@@ -106,12 +106,91 @@ async def test_friday_release_draft_review_and_publish(
 
 
 async def test_dashboard_numbers(marc: httpx.AsyncClient, staff: httpx.AsyncClient, darlene: httpx.AsyncClient) -> None:
-    await _resolved_item(staff, marc, darlene)
+    ref = await _resolved_item(staff, marc, darlene)
+    assert (await staff.post(f"/api/feedback/{ref}/still-an-issue", json={"body": "Still blank"})).status_code == 200
     await submit_via_chat(staff, "I need access to the Training Portal admin area")
     d = (await marc.get("/api/console/dashboard")).json()
-    assert {"label": "Training Portal", "count": 1} in d["open_by_project"]
-    assert d["approvals_waiting"] == 1 and d["avg_first_response_hours"] is not None
-    assert sum(w["received"] for w in d["weekly"]) == 2
+    # The reopened item is back In progress and the access request waits for approval: both are backlog.
+    assert d["weeks"] == 4 and d["backlog"]["value"] == 2 and d["backlog"]["previous"] == 0
+    assert d["backlog"]["trend"][-1] == 2 and len(d["flow"]) == 4
+    assert sum(w["received"] for w in d["flow"]) == 2 and sum(w["resolved"] for w in d["flow"]) == 1
+    stuck = {row["stage"]: row["bands"] for row in d["stuck"]}
+    assert stuck["in_progress"] == [1, 0, 0, 0] and sum(map(sum, stuck.values())) == 2
+    assert d["first_response_hours"]["count"] == 1 and d["resolve_days"]["count"] == 1
+    tools = {row["name"]: row for row in d["tools"]}
+    assert tools["RAKE Agent"] | {"oldest_days": 0} == {
+        "slug": "rake-agent",
+        "name": "RAKE Agent",
+        "new": 1,
+        "open": 1,
+        "oldest_days": 0,
+        "reopened": 1,
+        "resolved": 1,
+        "thanks": 0,
+    }
+    assert tools["Training Portal"]["open"] == 1
+    assert {row["name"]: row["open"] for row in d["team"]}["Darlene"] == 1
+    assert d["quality"]["reopened"] == {"count": 1, "of": 1, "rate": 1.0}
+    assert d["quality"]["corrections"] == {"count": 0, "of": 2, "rate": 0.0}
+
+
+async def test_dashboard_is_for_admins_and_shows_4_or_12_weeks(
+    marc: httpx.AsyncClient, darlene: httpx.AsyncClient
+) -> None:
+    assert (await darlene.get("/api/console/dashboard")).status_code == 403
+    assert (await marc.get("/api/console/dashboard?weeks=5")).status_code == 400
+    assert len((await marc.get("/api/console/dashboard?weeks=12")).json()["flow"]) == 12
+
+
+async def test_dashboard_compares_with_the_period_before(marc: httpx.AsyncClient) -> None:
+    now = datetime.now(UTC)
+
+    def ago(days: int) -> datetime:
+        return now - timedelta(days=days)
+
+    async with session_scope() as db:
+        # Raised 40 days ago (before the last 4 weeks) and approved the next day, due 5 days ago: still open.
+        late = Feedback(
+            submitter_email=STAFF,
+            submitter_name="Sam",
+            title="Late",
+            summary="Late",
+            status="approved",
+            created_at=ago(40),
+            expected_by=ago(5).date(),
+        )
+        # Raised 20 days ago (in the last 4 weeks), resolved in 10 days, a day before it was due.
+        quick = Feedback(
+            submitter_email=STAFF,
+            submitter_name="Sam",
+            title="Quick",
+            summary="Quick",
+            status="resolved",
+            created_at=ago(20),
+            expected_by=ago(9).date(),
+            resolved_at=ago(10),
+        )
+        db.add_all([late, quick])
+        await db.flush()
+        for fb, before, after, days in [(late, "new", "approved", 39), (quick, "new", "resolved", 10)]:
+            db.add(
+                FeedbackEvent(
+                    feedback_id=fb.id,
+                    actor_type="staff",
+                    event_type="status",
+                    created_at=ago(days),
+                    before={"status": before},
+                    after={"status": after},
+                )
+            )
+    d = (await marc.get("/api/console/dashboard")).json()
+    assert d["backlog"] | {"trend": None} == {"value": 1, "previous": 1, "trend": None, "count": 1}
+    assert d["resolve_days"]["value"] == 10.0 and d["resolve_days"]["previous"] is None
+    assert d["on_time"]["value"] == 1.0
+    assert {row["stage"]: row["bands"] for row in d["stuck"]}["approved"] == [0, 0, 0, 1]
+    assert {row["name"]: row["overdue"] for row in d["team"]}["Unassigned"] == 1
+    assert sum(w["received"] for w in d["flow"]) == 1
+    assert sum(w["received"] for w in (await marc.get("/api/console/dashboard?weeks=12")).json()["flow"]) == 2
 
 
 async def test_daily_digest_job_runs_once_per_day(staff: httpx.AsyncClient, anon: httpx.AsyncClient) -> None:
