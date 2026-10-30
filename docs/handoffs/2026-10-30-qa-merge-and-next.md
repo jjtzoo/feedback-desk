@@ -2,12 +2,16 @@
 
 Written at the end of the day on the laptop, to carry on in another Claude account. Everything is pushed to the company org (`origin` pushes to both remotes). Nothing is only on the laptop except the test checklist in Documents (listed below).
 
-## 0. Latest (08:35): everything is merged on `test/main-merge-30oct`
+## 0. Latest: `test/main-merge-30oct` is fully checked and ready for `main`
 
-The user switched accounts mid-check. Branch **`test/main-merge-30oct`** holds `e6ca622` plus the merges of `fix/sig-reasoning-leak` and `fix/stepper-latest-dates` (section 2) and this note: everything meant for `main`. On it: Ruff, mypy, **187 backend tests pass**; the **web build passes**; the **full browser run passes** (277 passed, 0 failed, 1 skipped by design; coverage 272 of 286 items, committed). Interrupted, not yet known: the Gemini conversation checks (the reasoning guard changes how Sig's replies are handled). Next session:
+Branch **`test/main-merge-30oct`** holds `e6ca622` plus the merges of `fix/sig-reasoning-leak` and `fix/stepper-latest-dates` (section 2), the run records and this note: everything meant for `main`. All checks on it pass: Ruff, mypy, **187 backend tests**; the **web build**; the **full browser run** (277 passed, 0 failed, 1 skipped by design; coverage 272 of 286 items); Gemini conversation checks **91 of 98**, injection-role now passing (details in `docs/testing/conversation-eval-2026-10-30.md`). If `origin/main` is still `5820439`, the user pushes it:
 
-1. In a detached worktree from `origin/test/main-merge-30oct`: `uv run python -m evals.run_conversations --parallel 3` with the key from the root `.env`, keeping the full output (92 of 98 on `e6ca622`; the six failures are in `docs/testing/conversation-eval-2026-10-30.md`), and add the result to that file.
-2. If all is well, give the user: `git push origin HEAD:main` from that worktree (or `git push origin origin/test/main-merge-30oct:main` if nothing was added). Sections 1 and 2 below then describe what `main` contains.
+```bash
+git fetch origin
+git push origin origin/test/main-merge-30oct:main
+```
+
+Then delete the holding branch. One new item for section 4: **vent-then-useful** fails consistently on Gemini (Sig asks the tool in its first reply to someone only venting); tweak the instruction to ask what happened first.
 
 ## 1. First: push the QA'd merge to `main` (the user runs it)
 
