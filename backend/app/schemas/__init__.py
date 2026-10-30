@@ -371,6 +371,31 @@ class CountsOut(Out):
     overdue: int
     archive: int
     approvals: int
+    # Conversations waiting on this person's answer (the Inbox, D114).
+    inbox: int
+
+
+class InboxRowOut(Out):
+    reference: str
+    title: str
+    project: ProjectOut | None
+    status: Status
+    assignee: PersonOut | None
+    last_author: str
+    # The reporter wrote it, rather than the Digital team.
+    last_from_reporter: bool
+    last_internal: bool
+    last_body: str
+    last_at: datetime
+    waiting: bool
+    unread: bool
+
+
+class InboxOut(Out):
+    view: str
+    total: int
+    counts: dict[str, int]
+    rows: list[InboxRowOut]
 
 
 class ListOut(Out):

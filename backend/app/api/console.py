@@ -24,6 +24,8 @@ from app.schemas import (
     EventOut,
     FieldsIn,
     HandOverIn,
+    InboxOut,
+    InboxRowOut,
     ListOut,
     MergeIn,
     MessageOut,
@@ -38,7 +40,7 @@ from app.schemas import (
     UsageSummaryOut,
     ViewIn,
 )
-from app.services import console, usage
+from app.services import console, inbox, usage
 
 router = APIRouter(prefix="/console", tags=["console"])
 
@@ -162,7 +164,34 @@ async def items(
 
 @router.get("/counts", response_model=CountsOut)
 async def counts(db: Db, user: DigitalUser) -> CountsOut:
-    return CountsOut(**await console.counts(db, user))
+    return CountsOut(**await console.counts(db, user), inbox=await inbox.waiting_count(db, user))
+
+
+@router.get("/inbox", response_model=InboxOut)
+async def inbox_view(db: Db, user: DigitalUser, view: str = "waiting") -> InboxOut:
+    rows, total, views = await inbox.inbox(db, user, view)
+    return InboxOut(
+        view=view,
+        total=total,
+        counts=views,
+        rows=[
+            InboxRowOut(
+                reference=r.item.ref_no,
+                title=r.item.title,
+                project=ProjectOut.model_validate(r.item.project) if r.item.project else None,
+                status=r.item.status,
+                assignee=PersonOut.model_validate(r.item.assignee) if r.item.assignee else None,
+                last_author=r.last.author_name or "Someone",
+                last_from_reporter=r.last.author_type == "staff",
+                last_internal=r.last.is_internal,
+                last_body=r.last.body[:200],
+                last_at=r.last.created_at,
+                waiting=r.waiting,
+                unread=r.unread,
+            )
+            for r in rows
+        ],
+    )
 
 
 @router.put("/view", status_code=204)
