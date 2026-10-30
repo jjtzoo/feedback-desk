@@ -114,12 +114,13 @@ test("S20.01 Draft this week now says the drafts are ready, one per project with
   await expect(page.getByText("No releases yet. The first draft is prepared on Friday.")).toBeVisible();
 
   await page.getByRole("button", { name: "Draft this week now" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Draft now" }).click();
   await expect(page.getByText("This week's drafts are ready")).toBeVisible();
 
   // Sorted by tool name: the three with activity, nothing for the quiet ones.
   const rows = page.locator('a[href^="/console/releases/"]');
   await expect(rows).toHaveCount(3);
-  await expect(rows).toHaveText([/^CPD Tracker\s*Week ending/, /^RAKE Agent\s*Week ending/, /^Training Portal\s*Week ending/]);
+  await expect(rows).toHaveText([/^CPD Tracker\s*\d+ items? drafted/, /^RAKE Agent\s*\d+ items? drafted/, /^Training Portal\s*\d+ items? drafted/]);
   for (const row of await rows.all()) await expect(row).toContainText("Draft");
   await expect(page.getByText("Published", { exact: true })).toHaveCount(0);
 });
@@ -280,7 +281,11 @@ test("S20.07 Approve and publish publishes the release, tells the contributors a
   await expect(page.getByText(/Week ending .* · Published/)).toBeVisible();
   await expect(page.getByRole("button", { name: PUBLISH })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Save draft" })).toHaveCount(0);
-  await expect(page.getByLabel("Title").first()).toBeDisabled();
+  // A published release reads as text, not as a form: no boxes, each item says whether staff can see it.
+  await expect(page.getByLabel("Title")).toHaveCount(0);
+  const published = page.getByRole("list", { name: "Items in this release" }).getByRole("listitem");
+  await expect(published.filter({ hasText: NEW_ITEM })).toContainText("Shown to staff");
+  await expect(page.getByText("Not shown to staff").first()).toBeVisible();
 
   // Liam is told, and the release is on What's new with his item marked.
   await signIn("Liam");
@@ -346,6 +351,6 @@ test("S20.09 A published release is kept in the Releases list", async ({ page, s
   await row.click();
   await expect(page.getByRole("heading", { level: 1, name: "RAKE Agent" })).toBeVisible();
   await expect(page.getByText(/Week ending .* · Published/)).toBeVisible();
-  expect((await titles(page)).some((t) => t.includes(NEW_ITEM))).toBe(true);
+  await expect(page.getByRole("heading", { level: 2, name: NEW_ITEM })).toBeVisible();
   await expect(page.getByRole("button", { name: PUBLISH })).toHaveCount(0);
 });

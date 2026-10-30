@@ -1,6 +1,6 @@
 {
   "_each": true,
-  "S20.01": ["toHaveCount(3)", "toHaveCount(4)"],
+  "S20.01": ["await expect(rows).toHaveCount(3);", "await expect(rows).toHaveCount(4);"],
   "S20.02": ["DRAFT_READY(\"RAKE Agent\"))).toBeVisible()", "DRAFT_READY(\"RAKE Agentx\"))).toBeVisible()"],
   "S20.03": ["expect(ticked(withSource(SOURCE.progress))).not.toBeChecked()", "expect(ticked(withSource(SOURCE.progress))).toBeChecked()"],
   "S20.04": ["toContain(REWORDED)", "toContain(REWORDED + \"x\")"],

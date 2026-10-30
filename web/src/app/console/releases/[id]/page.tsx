@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { api, errorText, type Release, type ReleaseItem, type WorkType } from "@/lib/api";
 import { day } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const SOURCE: Record<ReleaseItem["source_type"], string> = {
   feedback: "Resolved feedback",
@@ -96,43 +97,64 @@ export default function ReleaseReviewPage() {
         </p>
       </div>
 
-      <ol className="grid gap-3">
-        {items.map((i) => (
-          <li key={i.key} className="grid gap-3 rounded-3xl border bg-card p-4 shadow-card">
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                <Checkbox checked={i.visible_to_staff} disabled={!editable} onCheckedChange={(v) => update(i.key, { visible_to_staff: v === true })} />
-                Staff can see this
-              </label>
-              <span className="text-xs text-muted-foreground">{SOURCE[i.source_type]}</span>
-              {release.status === "published" && !!i.thanks && (
-                <span className="text-xs text-muted-foreground">👍 {i.thanks} from staff</span>
-              )}
-              {editable && (
-                <Button variant="ghost" size="icon" className="ml-auto" aria-label="Remove item" onClick={() => setItems((all) => all.filter((x) => x.key !== i.key))}>
-                  <Trash2 />
-                </Button>
-              )}
-            </div>
-            <div className="grid gap-2 sm:grid-cols-[1fr_10rem]">
-              <Input value={i.title} disabled={!editable} onChange={(e) => update(i.key, { title: e.target.value })} aria-label="Title" className="h-11 rounded-xl font-semibold" />
-              <Select value={i.work_type ?? "none"} disabled={!editable} onValueChange={(v) => update(i.key, { work_type: v === "none" ? null : (v as WorkType) })}>
-                <SelectTrigger className="h-11 w-full rounded-xl" aria-label="Section">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SECTION.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Textarea value={i.body} disabled={!editable} rows={2} onChange={(e) => update(i.key, { body: e.target.value })} aria-label="Description" className="rounded-xl" />
-          </li>
-        ))}
-      </ol>
+      {release.status === "published" ? (
+        <ol className="grid gap-3" aria-label="Items in this release">
+          {release.items.map((i) => (
+            <li key={i.id} className="grid gap-2 rounded-3xl border bg-card p-5 shadow-card">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+                <span className="rounded-full bg-muted px-2.5 py-0.5 font-semibold text-foreground">{SECTION.find((s) => s.value === (i.work_type ?? "none"))?.label}</span>
+                <span>{SOURCE[i.source_type]}</span>
+                <span className={cn("inline-flex items-center gap-1 font-semibold", i.visible_to_staff ? "text-success" : "text-muted-foreground")}>
+                  {i.visible_to_staff ? <Eye className="size-3.5" aria-hidden="true" /> : <EyeOff className="size-3.5" aria-hidden="true" />}
+                  {i.visible_to_staff ? "Shown to staff" : "Not shown to staff"}
+                </span>
+                {!!i.thanks && <span className="ml-auto">👍 {i.thanks} from staff</span>}
+              </div>
+              <h2 className="text-lg font-bold">{i.title}</h2>
+              {i.body && <p className="text-muted-foreground">{i.body}</p>}
+            </li>
+          ))}
+          {release.items.length === 0 && <li className="rounded-3xl border border-dashed p-8 text-center text-muted-foreground">Nothing was in this release.</li>}
+        </ol>
+      ) : (
+        <ol className="grid gap-3">
+          {items.map((i) => (
+            <li key={i.key} className="grid gap-3 rounded-3xl border bg-card p-4 shadow-card">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm font-semibold">
+                  <Checkbox checked={i.visible_to_staff} disabled={!editable} onCheckedChange={(v) => update(i.key, { visible_to_staff: v === true })} />
+                  Staff can see this
+                </label>
+                <span className="text-xs text-muted-foreground">{SOURCE[i.source_type]}</span>
+                {release.status === "published" && !!i.thanks && (
+                  <span className="text-xs text-muted-foreground">👍 {i.thanks} from staff</span>
+                )}
+                {editable && (
+                  <Button variant="ghost" size="icon" className="ml-auto" aria-label="Remove item" onClick={() => setItems((all) => all.filter((x) => x.key !== i.key))}>
+                    <Trash2 />
+                  </Button>
+                )}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[1fr_10rem]">
+                <Input value={i.title} disabled={!editable} onChange={(e) => update(i.key, { title: e.target.value })} aria-label="Title" className="h-11 rounded-xl font-semibold" />
+                <Select value={i.work_type ?? "none"} disabled={!editable} onValueChange={(v) => update(i.key, { work_type: v === "none" ? null : (v as WorkType) })}>
+                  <SelectTrigger className="h-11 w-full rounded-xl" aria-label="Section">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SECTION.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Textarea value={i.body} disabled={!editable} rows={2} onChange={(e) => update(i.key, { body: e.target.value })} aria-label="Description" className="rounded-xl" />
+            </li>
+          ))}
+        </ol>
+      )}
 
       {editable && (
         <div className="flex flex-wrap gap-2">
