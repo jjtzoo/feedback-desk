@@ -494,7 +494,8 @@ class MergeIn(BaseModel):
 
 
 class MoveIn(BaseModel):
-    column: Literal["approved", "in_progress", "resolved"]
+    # Back to Approved from In progress stops work; back to Awaiting approval un-approves (D113).
+    column: Literal["awaiting_approval", "approved", "in_progress", "resolved"]
     note: str = Field(default="", max_length=1000)
 
 
@@ -505,7 +506,9 @@ class BulkIn(BaseModel):
     reason: str = ""
 
 
-class DeclineIn(BaseModel):
+class ReasonIn(BaseModel):
+    """Decline, un-approve, stop work and reopen all need a reason."""
+
     reason: str = Field(min_length=1, max_length=1000)
 
 

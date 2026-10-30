@@ -74,21 +74,22 @@ export function RowActions({
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
             )}
-            {moves.length > 0 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    {moves.map((m) => (
-                      <DropdownMenuItem key={m.key} onSelect={() => onMove(m)}>
-                        {m.label}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              </>
-            )}
+          </>
+        )}
+        {/* An ended item has one move, Reopen, for an Admin (D113). */}
+        {moves.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                {moves.map((m) => (
+                  <DropdownMenuItem key={m.key} onSelect={() => onMove(m)}>
+                    {m.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </>
         )}
       </DropdownMenuContent>

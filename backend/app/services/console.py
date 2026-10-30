@@ -31,6 +31,7 @@ from app.models.enums import (
     CATEGORIES,
     CLOSED_STATUSES,
     DUE_STATUSES,
+    ENDED_STATUSES,
     ENDINGS,
     OPEN_STATUSES,
     PRIORITIES,
@@ -424,9 +425,9 @@ def require_holder(fb: Feedback, user: User) -> None:
         raise Forbidden(f"{fb.assignee.name} has {fb.ref_no}. Take it over first.")
 
 
-def _require_open(fb: Feedback) -> None:
+def _require_open(fb: Feedback, then: str = "it can't change hands") -> None:
     if fb.status in CLOSED_STATUSES:
-        raise Conflict("closed", "That item has ended; it can't change hands.")
+        raise Conflict("closed", f"That item has ended; {then}.")
 
 
 async def _load_locked(db: AsyncSession, ref_no: str) -> Feedback:
@@ -539,13 +540,16 @@ def _set_status(
     new: str,
     public_text: str | None = None,
     detail: dict[str, Any] | None = None,
+    was: dict[str, Any] | None = None,
 ) -> None:
-    """Move the item and log it. detail adds to the event's after, such as who closed it and why (D92)."""
+    """Move the item and log it. detail adds to the event's after, such as who closed it and why (D92);
+    was adds to its before, such as the ending a reopen clears."""
     if new not in STATUSES:
         raise ServiceError("bad_value", "Unknown status.")
     actor = who.actor if isinstance(who, User) else who
     after = {"status": new} | (detail or {})
-    events.log(db, fb.id, actor, "status", before={"status": fb.status}, after=after, public_text=public_text)
+    before = {"status": fb.status} | (was or {})
+    events.log(db, fb.id, actor, "status", before=before, after=after, public_text=public_text)
     fb.status = new
     fb.updated_at = _now()
 
@@ -586,6 +590,38 @@ async def start_work(db: AsyncSession, user: User, ref_no: str) -> Feedback:
         body=text,
         actor_email=user.email,
         step="In progress",
+    )
+    return await load(db, feedback_id=fb.id)
+
+
+async def stop_work(db: AsyncSession, user: User, ref_no: str, reason: str) -> Feedback:
+    """Put an item in progress back to Approved (D113): its holder only, Admins included (D53). It keeps
+    its holder, due date and approval; the reason stays internal, and staff read that it's still planned."""
+    require_digital(user)
+    reason = reason.strip()
+    if not reason:
+        raise ServiceError("reason_required", "Say why work stopped; only the Digital team sees it.")
+    fb = await load(db, ref_no=ref_no)
+    if fb.status != "in_progress":
+        raise Conflict("not_started", "Only items in progress can stop.")
+    require_holder(fb, user)
+    due = day_text(fb.expected_by) if fb.expected_by else None
+    text = await _told(
+        db,
+        fb,
+        "Work on it has paused; it's still planned" + (f". Expected by {due}" if due else ""),
+        "Work on it paused; it is still planned",
+        {"Expected by": due},
+    )
+    _set_status(db, fb, user, "approved", text, {"reason": reason[:500]})
+    await notifications.notify_submitters(
+        db,
+        fb,
+        type="stage",
+        title=f"Work on {fb.ref_no} has paused",
+        body=text,
+        actor_email=user.email,
+        step="Planned",
     )
     return await load(db, feedback_id=fb.id)
 
@@ -811,6 +847,7 @@ async def reply(db: AsyncSession, user: User, ref_no: str, body: str) -> Feedbac
     if not body.strip():
         raise ServiceError("empty", "Write a reply first.")
     fb = await load(db, ref_no=ref_no)
+    _require_open(fb, "the person who raised it can't answer there")
     message_id = uuid.uuid4()
     db.add(
         FeedbackMessage(
@@ -969,9 +1006,15 @@ async def move(db: AsyncSession, user: User, ref_no: str, column: str, note: str
     """Dragging a card on the board is the same as changing its stage."""
     fb = await load(db, ref_no=ref_no)
     if column == "approved":
-        if fb.status in ("awaiting_approval", "needs_review"):
+        if fb.status in APPROVAL_STATUSES:
             return await approve(db, user, ref_no)
-        raise Conflict("bad_move", "Only items waiting for approval can move to Approved.")
+        if fb.status == "in_progress":
+            return await stop_work(db, user, ref_no, note)
+        raise Conflict("bad_move", "Only items waiting for approval or in progress can move to Approved.")
+    if column == "awaiting_approval":
+        if fb.status == "approved":
+            return await unapprove(db, user, ref_no, note)
+        raise Conflict("bad_move", "Only approved items can go back to Awaiting approval.")
     if column == "in_progress":
         return await start_work(db, user, ref_no)
     if column == "resolved":
@@ -1102,6 +1145,130 @@ async def decline(db: AsyncSession, user: User, ref_no: str, reason: str) -> Fee
         body=reason.strip(),
         actor_email=user.email,
         step="Declined",
+    )
+    return await load(db, feedback_id=fb.id)
+
+
+async def _status_before(db: AsyncSession, fb: Feedback, to: str, among: tuple[str, ...]) -> str | None:
+    """The status the item had before its latest move to `to` from one of `among`: where a move back returns it."""
+    moves = await db.scalars(
+        select(FeedbackEvent)
+        .where(FeedbackEvent.feedback_id == fb.id, FeedbackEvent.event_type == "status")
+        .order_by(FeedbackEvent.created_at.desc())
+    )
+    return next(
+        (str(e.before["status"]) for e in moves if e.after.get("status") == to and e.before.get("status") in among),
+        None,
+    )
+
+
+async def unapprove(db: AsyncSession, user: User, ref_no: str, reason: str) -> Feedback:
+    """Withdraw an approval before work starts (D113): any Admin. The item waits for a decision again where
+    it waited before, keeps its holder and loses its approval and due date; the reason stays internal, and
+    staff read only that it's gone back to the Admins."""
+    require_admin(user)
+    reason = reason.strip()
+    if not reason:
+        raise ServiceError("reason_required", "Say why it goes back; only the Digital team sees it.")
+    fb = await load(db, ref_no=ref_no)
+    if fb.status == "in_progress":
+        raise Conflict("started", "Work has started on it. Whoever has it stops work first.")
+    if fb.status != "approved":
+        raise Conflict("not_approved", "Only approved items can go back for a decision.")
+    back = await _status_before(db, fb, "approved", APPROVAL_STATUSES) or "awaiting_approval"
+    text = await _told(
+        db,
+        fb,
+        "Not planned yet: it's gone back to the Admins to decide",
+        "Its approval was withdrawn; it has gone back to the Admins to decide",
+        {},
+    )
+    if fb.expected_by is not None:
+        events.log(
+            db, fb.id, user.actor, "expected_by", before={"expected_by": str(fb.expected_by)}, after={"expected_by": ""}
+        )
+    fb.approved_by, fb.approved_at, fb.expected_by = None, None, None
+    _set_status(db, fb, user, back, text, {"reason": reason[:500]})
+    await notifications.settle(db, fb.id, ("approved",), f"{fb.ref_no} un-approved")
+    await notifications.ask_admins(db, fb, actor_email=user.email)
+    await notifications.refresh_approvals(db)
+    await notifications.notify_submitters(
+        db,
+        fb,
+        type="stage",
+        title=f"{fb.ref_no} is waiting for a decision again",
+        body=text,
+        actor_email=user.email,
+        step="Under review",
+    )
+    return await load(db, feedback_id=fb.id)
+
+
+# Where a reopened item goes back to, from the status it had before it ended (D45: one that isn't
+# really fixed is started again).
+REOPEN_TO = {"new": "needs_review", "resolved": "in_progress"}
+
+
+async def reopen(db: AsyncSession, user: User, ref_no: str, reason: str) -> Feedback:
+    """Reopen a declined or closed item (D113): an Admin, with a reason staff see on their tracker. It goes
+    back to the status it had before it ended and asks again for what that stage needs. A merged duplicate
+    stays merged and praise stays thanks; the reporter's I still have an issue is unchanged (D92)."""
+    require_admin(user)
+    reason = reason.strip()
+    if not reason:
+        raise ServiceError("reason_required", "Give the reason; the person who raised it sees it.")
+    fb = await load(db, ref_no=ref_no)
+    if fb.status not in ENDED_STATUSES:
+        raise Conflict("not_ended", "Only declined or closed items can be reopened.")
+    if fb.ending == "duplicate":
+        raise Conflict("duplicate", "A merged duplicate stays merged. Follow the item it went into.")
+    before = await _status_before(db, fb, fb.status, OPEN_STATUSES) or "needs_review"
+    to = REOPEN_TO.get(before, before)
+    first = user.name.split(" ")[0]
+    text = await _told(
+        db,
+        fb,
+        f"Reopened by {first}: {reason[:140]}",
+        "It was reopened after it had ended",
+        {"Reopened by": first, "Reason": reason},
+    )
+    # The ending goes in the same change as the status (D44).
+    was = {"ending": fb.ending}
+    fb.ending, fb.close_reason = None, None
+    if to == "in_progress":
+        fb.resolved_at = None
+    _set_status(db, fb, user, to, text, {"by": "admin", "reopened": True, "reason": reason[:500]}, was)
+    if to in APPROVAL_STATUSES:
+        await notifications.ask_admins(db, fb, actor_email=user.email)
+        await notifications.refresh_approvals(db)
+    elif to == "approved":
+        await notifications.notify_assignee(
+            db,
+            fb,
+            type="approved",
+            title=f"Reopened, ready to start: {fb.ref_no} · {fb.title}",
+            body=f"{user.name}: {reason}",
+            actor_email=user.email,
+            step="Reopened",
+        )
+    else:
+        await notifications.notify_assignee(
+            db,
+            fb,
+            type="reopened",
+            title=f"{fb.ref_no} reopened by {user.name}",
+            body=reason,
+            actor_email=user.email,
+            step="Reopened",
+        )
+    await notifications.notify_submitters(
+        db,
+        fb,
+        type="stage",
+        title=f"{fb.ref_no} is reopened",
+        body=reason,
+        actor_email=user.email,
+        step="Reopened",
     )
     return await load(db, feedback_id=fb.id)
 

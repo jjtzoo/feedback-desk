@@ -255,26 +255,7 @@ async def _notify_new(db: AsyncSession, fb: Feedback, routing: Routing) -> None:
             link=notifications.console_link(fb),
             feedback_id=fb.id,
         )
-    if fb.flagged:
-        await notifications.notify(
-            db,
-            await notifications.admin_emails(db),
-            type="flagged",
-            title=f"Flagged feedback needs an Admin: {fb.ref_no}",
-            body="The message may be abusive about a colleague. It was not routed to them.",
-            link=notifications.console_link(fb),
-            feedback_id=fb.id,
-        )
-    elif fb.priority == "P1" and fb.status in ("awaiting_approval", "needs_review"):
-        await notifications.notify(
-            db,
-            await notifications.admin_emails(db),
-            type="approval_p1",
-            title=f"P1 needs approval: {label}",
-            body=fb.summary,
-            link=notifications.console_link(fb),
-            feedback_id=fb.id,
-        )
+    await notifications.ask_admins(db, fb)
 
 
 async def plus_one(db: AsyncSession, user: User, ref_no: str, comment: str) -> Feedback:

@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Staff } from "@/lib/api";
 import { PRIORITIES, PRIORITY_LABEL, day } from "@/lib/format";
 
-export type ActionKind = "approve" | "due" | "resolve" | "fix" | "close" | "decline" | "merge" | "take_over" | "hand_over";
+export type ActionKind = "approve" | "due" | "resolve" | "fix" | "close" | "decline" | "merge" | "take_over" | "hand_over" | "unapprove" | "stop" | "reopen";
 
 /** How an open item can end by hand (D45). Fixed comes from a resolved item; duplicate and declined have their own actions. */
 export type CloseEnding = "wont_fix" | "no_longer_needed";
@@ -97,6 +97,28 @@ const COPY: Record<ActionKind, { title: string; description: string; field: stri
     button: "Hand over",
     required: false,
   },
+  // Going back a stage (D113): the reason stays with the Digital team, except a reopen's, which the person reads.
+  unapprove: {
+    title: "Un-approve",
+    description: "It goes back to the Admins to decide. Whoever has it keeps it; the approval and the due date are cleared. The person who raised it sees it's waiting again, not why.",
+    field: "Reason (only the Digital team sees it)",
+    button: "Un-approve",
+    required: true,
+  },
+  stop: {
+    title: "Stop work",
+    description: "It goes back to Approved and stays yours, with its due date. The person who raised it sees that work has paused, not why.",
+    field: "Reason (only the Digital team sees it)",
+    button: "Stop work",
+    required: true,
+  },
+  reopen: {
+    title: "Reopen",
+    description: "It goes back to the stage it ended from; a fixed item goes back to In progress. Whoever acts next is told.",
+    field: "Reason (shown to the person who raised it)",
+    button: "Reopen",
+    required: true,
+  },
 };
 
 export interface ActionResult {
@@ -111,7 +133,7 @@ export interface ActionResult {
   to?: string;
 }
 
-/** One dialog for every action that needs words or a choice (approve, due date, resolve, close, decline, merge, take over, hand over). */
+/** One dialog for every action that needs words or a choice (approve, due date, resolve, close, decline, merge, take over, hand over, the moves back). */
 export function ActionDialog({
   kind,
   initialText = "",

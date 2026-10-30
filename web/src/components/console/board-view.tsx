@@ -11,7 +11,8 @@ import { STATUS_LABEL } from "@/lib/format";
 import type { Move } from "@/lib/moves";
 import { cn } from "@/lib/utils";
 
-const DROPPABLE = new Set(["approved", "in_progress", "resolved"]);
+// Awaiting approval takes a card back for an Admin only (D113); movesFor decides who may drop where.
+const DROPPABLE = new Set(["awaiting_approval", "approved", "in_progress", "resolved"]);
 const EMPTY: Record<string, string> = {
   needs_review: "New items nobody has looked at yet appear here.",
   awaiting_approval: "Items waiting for an Admin appear here.",

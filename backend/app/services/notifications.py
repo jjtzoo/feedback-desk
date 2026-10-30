@@ -263,6 +263,33 @@ async def admin_emails(db: AsyncSession) -> list[str]:
     )
 
 
+async def ask_admins(db: AsyncSession, fb: Feedback, actor_email: str | None = None) -> None:
+    """Ask the Admins to decide (D54): on a flagged item, or a P1 waiting for approval. Raised when it is
+    submitted, and again when an approval is withdrawn or an Admin reopens it to wait for a decision."""
+    if fb.flagged:
+        await notify(
+            db,
+            await admin_emails(db),
+            type="flagged",
+            title=f"Flagged feedback needs an Admin: {fb.ref_no}",
+            body="The message may be abusive about a colleague. It was not routed to them.",
+            link=console_link(fb),
+            feedback_id=fb.id,
+            actor_email=actor_email,
+        )
+    elif fb.priority == "P1" and fb.status in APPROVAL_STATUSES:
+        await notify(
+            db,
+            await admin_emails(db),
+            type="approval_p1",
+            title=f"P1 needs approval: {fb.ref_no} · {fb.title}",
+            body=fb.summary,
+            link=console_link(fb),
+            feedback_id=fb.id,
+            actor_email=actor_email,
+        )
+
+
 async def triage_lead_emails(db: AsyncSession) -> list[str]:
     leads = list(
         await db.scalars(

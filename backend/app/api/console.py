@@ -19,7 +19,6 @@ from app.schemas import (
     CloseIn,
     ColumnOut,
     CountsOut,
-    DeclineIn,
     DetailOut,
     EventOut,
     FieldsIn,
@@ -31,6 +30,7 @@ from app.schemas import (
     NoteIn,
     PersonOut,
     ProjectOut,
+    ReasonIn,
     ReplyIn,
     SimilarOut,
     TakeOverIn,
@@ -219,6 +219,12 @@ async def start(ref: str, db: Db, user: DigitalUser) -> DetailOut:
     return await _detail(db, user, ref)
 
 
+@router.post("/items/{ref}/stop", response_model=DetailOut)
+async def stop(ref: str, body: ReasonIn, db: Db, user: DigitalUser) -> DetailOut:
+    await console.stop_work(db, user, ref, body.reason)
+    return await _detail(db, user, ref)
+
+
 @router.post("/items/{ref}/assign-to-me", response_model=DetailOut)
 async def assign_to_me(ref: str, db: Db, user: DigitalUser) -> DetailOut:
     await console.assign_to_me(db, user, ref)
@@ -306,8 +312,20 @@ async def approve(ref: str, db: Db, user: AdminUser, body: ApproveIn | None = No
 
 
 @router.post("/items/{ref}/decline", response_model=DetailOut)
-async def decline(ref: str, body: DeclineIn, db: Db, user: AdminUser) -> DetailOut:
+async def decline(ref: str, body: ReasonIn, db: Db, user: AdminUser) -> DetailOut:
     await console.decline(db, user, ref, body.reason)
+    return await _detail(db, user, ref)
+
+
+@router.post("/items/{ref}/unapprove", response_model=DetailOut)
+async def unapprove(ref: str, body: ReasonIn, db: Db, user: AdminUser) -> DetailOut:
+    await console.unapprove(db, user, ref, body.reason)
+    return await _detail(db, user, ref)
+
+
+@router.post("/items/{ref}/reopen", response_model=DetailOut)
+async def reopen(ref: str, body: ReasonIn, db: Db, user: AdminUser) -> DetailOut:
+    await console.reopen(db, user, ref, body.reason)
     return await _detail(db, user, ref)
 
 

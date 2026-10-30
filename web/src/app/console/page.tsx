@@ -72,8 +72,15 @@ const ARCHIVE_GROUPS: Group[] = [
 ];
 
 /** due: the item's due date, so Update asks why when it moves (D94). */
-type Pending = { ref: string; kind: "resolve" | "due" | "close" | "fix"; due?: string | null };
-const MOVE_DIALOG: Partial<Record<MoveKey, Pending["kind"]>> = { resolve: "resolve", close: "close", close_fixed: "fix" };
+type Pending = { ref: string; kind: "resolve" | "due" | "close" | "fix" | "unapprove" | "stop" | "reopen"; due?: string | null };
+const MOVE_DIALOG: Partial<Record<MoveKey, Pending["kind"]>> = {
+  resolve: "resolve",
+  close: "close",
+  close_fixed: "fix",
+  unapprove: "unapprove",
+  stop: "stop",
+  reopen: "reopen",
+};
 
 function Work() {
   const router = useRouter();
@@ -192,6 +199,13 @@ function Work() {
       } else if (pending.kind === "close" || pending.kind === "fix") {
         await api.post(`/console/items/${pending.ref}/close`, { reason: r.text, ending: pending.kind === "fix" ? "fixed" : r.ending });
         toast.success(`${pending.ref} closed`);
+      } else if (pending.kind === "reopen") {
+        await api.post(`/console/items/${pending.ref}/reopen`, { reason: r.text });
+        toast.success(`${pending.ref} reopened`);
+      } else if (pending.kind === "unapprove" || pending.kind === "stop") {
+        // Going back from the board or the row menu (D113): the reason travels as the move's note.
+        await api.post(`/console/items/${pending.ref}/move`, { column: pending.kind === "stop" ? "approved" : "awaiting_approval", note: r.text });
+        toast.success(pending.kind === "stop" ? `${pending.ref} moved back to Approved` : `${pending.ref} un-approved`);
       } else {
         await api.post(`/console/items/${pending.ref}/move`, { column: "resolved", note: r.text });
         toast.success(`${pending.ref} resolved`);

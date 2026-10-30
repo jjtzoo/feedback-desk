@@ -114,6 +114,7 @@ export function ItemPanel({
   // Images to send with a reply, for example to show the fix (D95), or with an internal note, where they stay internal (D107).
   const [images, setImages] = useState<{ file: File; src: string | null }[]>([]);
   const imageInput = useRef<HTMLInputElement>(null);
+  const draftInput = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   // The changes between the messages ("Darlene started work"), on unless this browser turned them off.
@@ -180,10 +181,22 @@ export function ItemPanel({
       // Sends who had it when the dialog opened, so a second person taking it at once is told (D53).
       take_over: ["take-over", { holder_id: item?.assignee?.id, reason: r.text }],
       hand_over: ["hand-over", { to: r.to, reason: r.text }],
+      unapprove: ["unapprove", { reason: r.text }],
+      stop: ["stop", { reason: r.text }],
+      reopen: ["reopen", { reason: r.text }],
     };
+    const done: Partial<Record<ActionKind, string>> = { approve: "Approved", unapprove: "Un-approved", stop: "Work stopped", reopen: "Reopened" };
     const ok = await act(...call[kind]);
-    if (ok) toast.success(kind === "approve" ? "Approved" : "Saved");
+    if (ok) toast.success(done[kind] ?? "Saved");
     return ok;
+  }
+
+  /** Needs detail (D63): asking is a reply to the person who raised it, written in the conversation (D105). */
+  function askForInfo() {
+    setTab("activity");
+    setSide("reply");
+    // The composer mounts with the tab, so it takes the focus once drawn.
+    requestAnimationFrame(() => draftInput.current?.focus());
   }
 
   function addImages(files: File[]) {
@@ -241,8 +254,9 @@ export function ItemPanel({
 
   const chat = item?.messages.filter((m) => m.message_type === "chat") ?? [];
   const talk = item?.messages.filter((m) => m.message_type !== "chat") ?? [];
-  // Pinned for whoever works it; newest first, so the first is the approval's (D93).
-  const instructions = item?.events.find((e) => e.event_type === "instructions");
+  // Pinned for whoever works it, from Approved on; newest first, so the first is the approval's (D93). An
+  // un-approved item waits for a new decision, so its old instructions stay in the conversation only (D113).
+  const instructions = item && ["approved", "in_progress", "resolved"].includes(item.status) ? item.events.find((e) => e.event_type === "instructions") : undefined;
   const awaiting = item && (item.status === "awaiting_approval" || item.status === "needs_review");
   const open = item && !["declined", "closed", "acknowledged"].includes(item.status);
   // A pick that puts a property back as it was is no longer a change.
@@ -259,6 +273,7 @@ export function ItemPanel({
   const moves = item ? allowedMoves(item, me, staff).filter((m) => m.key !== "approve") : [];
   function onMove(m: Move) {
     if (m.key === "start" || m.key === "restart") void act("start").then((ok) => ok && toast.success(m.key === "start" ? "Started" : "Started again"));
+    else if (m.key === "unapprove" || m.key === "stop" || m.key === "reopen") setDialog({ kind: m.key });
     else setDialog({ kind: m.key === "resolve" ? "resolve" : m.key === "close_fixed" ? "fix" : "close" });
   }
   // Someone else's words since you last looked; on an item you never opened, only when it's yours (D82).
@@ -331,6 +346,7 @@ export function ItemPanel({
         </span>
       </div>
       <Textarea
+        ref={draftInput}
         rows={3}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -428,10 +444,10 @@ export function ItemPanel({
                     <TrendingUp className="size-3.5" aria-hidden="true" /> Priority review suggested
                   </span>
                 )}
-                {item.needs_detail && (
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-muted-foreground">
-                    <CircleHelp className="size-3.5" aria-hidden="true" /> Needs detail: ask for info first
-                  </span>
+                {item.needs_detail && open && (
+                  <Button variant="outline" size="sm" className="h-7 rounded-lg px-2 text-xs" onClick={askForInfo}>
+                    <CircleHelp aria-hidden="true" /> Ask for info
+                  </Button>
                 )}
                 <span className="ml-auto flex gap-1">
                   <Button variant="ghost" size="icon" className="size-9 rounded-lg" disabled={!previous} onClick={() => previous && onStep(previous)} aria-label="Previous item">
@@ -458,7 +474,7 @@ export function ItemPanel({
                     </Button>
                   </>
                 )}
-                {moves.length > 0 && <StatusMenu status={item.status} moves={moves} busy={busy} onMove={onMove} />}
+                {moves.length > 0 && <StatusMenu status={item.status} ending={item.ending} moves={moves} busy={busy} onMove={onMove} />}
                 {open && can?.canAssignToMe && item.status !== "approved" && (
                   <Button variant="outline" className="h-10 rounded-xl" disabled={busy} onClick={() => void act("assign-to-me").then((ok) => ok && toast.success(`${item.reference} is yours`))}>
                     Assign to me
